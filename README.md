@@ -135,35 +135,35 @@ PORT=3000
 ```mermaid
 graph TB
     subgraph "Frontend (React/Next.js)"
-        A[Главная страница] --> B[Управление пользователями]
-        A --> C[Циклы оценки]
-        A --> D[Отчеты и аналитика]
-        A --> E[Тестирование API]
+        A["Главная страница"] --> B["Управление пользователями"]
+        A --> C["Циклы оценки"]
+        A --> D["Отчеты и аналитика"]
+        A --> E["Тестирование API"]
         
-        B --> F[Создание пользователя]
-        C --> G[Создание цикла]
-        C --> H[Номинация оценивающих]
+        B --> F["Создание пользователя"]
+        C --> G["Создание цикла"]
+        C --> H["Номинация оценивающих"]
     end
     
     subgraph "API Layer (Next.js API Routes)"
-        I[/api/users] --> J[GET - список пользователей]
-        I --> K[POST - создание пользователя]
+        I["/api/users"] --> J["GET список пользователей"]
+        I --> K["POST создание пользователя"]
         
-        L[/api/cycles] --> M[GET - список циклов]
-        L --> N[POST - создание цикла]
+        L["/api/cycles"] --> M["GET список циклов"]
+        L --> N["POST создание цикла"]
     end
     
     subgraph "Database Layer (SQLite/PostgreSQL)"
-        O[(База данных)]
-        P[User - пользователи]
-        Q[QuestionCategory - категории]
-        R[Question - вопросы]
-        S[FeedbackCycle - циклы]
-        T[CycleParticipant - участники]
-        U[ReviewerNomination - номинации]
-        V[FeedbackResponse - ответы]
-        W[Notification - уведомления]
-        X[Schedule - расписание]
+        O[("База данных")]
+        P["User пользователи"]
+        Q["QuestionCategory категории"]
+        R["Question вопросы"]
+        S["FeedbackCycle циклы"]
+        T["CycleParticipant участники"]
+        U["ReviewerNomination номинации"]
+        V["FeedbackResponse ответы"]
+        W["Notification уведомления"]
+        X["Schedule расписание"]
         
         O --> P
         O --> Q
@@ -177,9 +177,9 @@ graph TB
     end
     
     subgraph "External Services"
-        Y[Mattermost API]
-        Z[Webhook уведомления]
-        AA[Бот-уведомления]
+        Y["Mattermost API"]
+        Z["Webhook уведомления"]
+        AA["Бот уведомления"]
     end
     
     F --> K
@@ -246,23 +246,23 @@ FeedbackCycle (1) ──────── (*) Notification (cycleId)
 ```mermaid
 graph LR
     subgraph "Client Side"
-        A[React Components] --> B[Material-UI]
-        A --> C[Next.js Router]
-        A --> D[TypeScript]
+        A["React Components"] --> B["Material-UI"]
+        A --> C["Next.js Router"]
+        A --> D["TypeScript"]
     end
     
     subgraph "Server Side"
-        E[Next.js 14 App Router] --> F[API Routes]
-        F --> G[Prisma ORM]
-        G --> H[SQLite/PostgreSQL]
+        E["Next.js 14 App Router"] --> F["API Routes"]
+        F --> G["Prisma ORM"]
+        G --> H["SQLite/PostgreSQL"]
         
-        I[Server Components] --> E
-        J[Server Actions] --> E
+        I["Server Components"] --> E
+        J["Server Actions"] --> E
     end
     
     subgraph "External APIs"
-        K[Mattermost API]
-        L[Webhook Endpoints]
+        K["Mattermost API"]
+        L["Webhook Endpoints"]
     end
     
     A --> F
@@ -315,23 +315,23 @@ graph LR
 
 ```mermaid
 flowchart TD
-    A[Создание цикла оценки] --> B[Выбор сотрудника для оценки]
-    B --> C[Номинация оценивающих<br/>минимум 5 человек]
-    C --> D[Отправка уведомлений в Mattermost]
-    D --> E[Сбор ответов на 49 вопросов]
-    E --> F[Ежедневные напоминания]
-    F --> G{Все ответы<br/>получены?}
-    G -->|Нет| F
-    G -->|Да| H[Завершение цикла]
-    H --> I[Генерация отчетов]
-    I --> J[Отправка результатов]
+    A["Создание цикла оценки"] --> B["Выбор сотрудника для оценки"]
+    B --> C["Номинация оценивающих<br/>минимум 5 человек"]
+    C --> D["Отправка уведомлений в Mattermost"]
+    D --> E["Сбор ответов на 49 вопросов"]
+    E --> F["Ежедневные напоминания"]
+    F --> G{"Все ответы<br/>получены?"}
+    G -->|"Нет"| F
+    G -->|"Да"| H["Завершение цикла"]
+    H --> I["Генерация отчетов"]
+    I --> J["Отправка результатов"]
     
     subgraph "Роли оценивающих"
-        K[SELF - Самооценка]
-        L[MANAGER - Руководитель]
-        M[PEER - Коллеги]
-        N[SUBORDINATE - Подчиненные]
-        O[CUSTOMER - Клиенты]
+        K["SELF Самооценка"]
+        L["MANAGER Руководитель"]
+        M["PEER Коллеги"]
+        N["SUBORDINATE Подчиненные"]
+        O["CUSTOMER Клиенты"]
     end
     
     C --> K
