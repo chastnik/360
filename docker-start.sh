@@ -3,7 +3,7 @@
 # Скрипт запуска системы 360-градусной оценки персонала в Docker
 # Поддерживает как разработку, так и продакшн
 #
-# Copyright (c) 2024 Стас Чашин для БИТ.Цифра
+# Copyright (c) 2025 Стас Чашин для БИТ.Цифра
 # Все права защищены
 
 set -e
@@ -64,7 +64,7 @@ create_dockerfile() {
         log_info "Создание Dockerfile..."
         cat > Dockerfile << 'EOF'
 # Dockerfile for 360-degree feedback system
-# Copyright (c) 2024 Стас Чашин для БИТ.Цифра
+# Copyright (c) 2025 Стас Чашин для БИТ.Цифра
 # Все права защищены
 
 # Многоэтапная сборка для оптимизации размера образа
@@ -128,7 +128,7 @@ create_docker_compose() {
         log_info "Создание docker-compose.yml..."
         cat > docker-compose.yml << 'EOF'
 # Docker Compose configuration for 360-degree feedback system
-# Copyright (c) 2024 Стас Чашин для БИТ.Цифра
+# Copyright (c) 2025 Стас Чашин для БИТ.Цифра
 # Все права защищены
 
 version: '3.8'
@@ -184,7 +184,7 @@ create_dockerignore() {
         log_info "Создание .dockerignore..."
         cat > .dockerignore << 'EOF'
 # Docker ignore file for 360-degree feedback system
-# Copyright (c) 2024 Стас Чашин для БИТ.Цифра
+# Copyright (c) 2025 Стас Чашин для БИТ.Цифра
 
 node_modules
 .next
@@ -219,7 +219,7 @@ create_health_endpoint() {
         mkdir -p app/api/health
         cat > app/api/health/route.ts << 'EOF'
 // Health check endpoint for 360-degree feedback system
-// Copyright (c) 2024 Стас Чашин для БИТ.Цифра
+// Copyright (c) 2025 Стас Чашин для БИТ.Цифра
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';

@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 REM Скрипт запуска системы 360-градусной оценки персонала для Windows
-REM Copyright (c) 2024 Стас Чашин для БИТ.Цифра
+REM Copyright (c) 2025 Стас Чашин для БИТ.Цифра
 REM Все права защищены
 
 echo.
