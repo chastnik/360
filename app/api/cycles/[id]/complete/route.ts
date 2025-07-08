@@ -6,10 +6,10 @@ import { emailService } from '@/lib/email'
 // Завершить цикл оценки и отправить уведомления
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     // Получаем цикл оценки
     const cycle = await prisma.feedbackCycle.findUnique({

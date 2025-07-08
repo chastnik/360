@@ -278,7 +278,7 @@ export default function ReportsPage() {
                     <Typography variant="h6" gutterBottom>
                       Распределение по отделам
                     </Typography>
-                    {reportData.departments?.map((dept: any, index: number) => (
+                    {reportData.departments && reportData.departments.length > 0 ? reportData.departments.map((dept: any, index: number) => (
                       <Box key={index} mb={2}>
                         <Box display="flex" justifyContent="space-between" alignItems="center">
                           <Typography variant="body2">{dept.name}</Typography>
@@ -290,7 +290,11 @@ export default function ReportsPage() {
                           sx={{ mt: 1 }}
                         />
                       </Box>
-                    ))}
+                    )) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Данные по отделам отсутствуют
+                      </Typography>
+                    )}
                   </CardContent>
                 </Card>
               </Grid>
@@ -365,7 +369,7 @@ export default function ReportsPage() {
 
       {/* Отделы */}
       <TabPanel value={activeTab} index={1}>
-        {reportData?.departments && (
+        {reportData?.departments && reportData.departments.length > 0 ? (
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
@@ -386,10 +390,10 @@ export default function ReportsPage() {
                     {reportData.departments.map((dept: any, index: number) => (
                       <TableRow key={index}>
                         <TableCell>{dept.name}</TableCell>
-                        <TableCell>{dept.users}</TableCell>
-                        <TableCell>{dept.cycles.total}</TableCell>
-                        <TableCell>{dept.cycles.active}</TableCell>
-                        <TableCell>{dept.cycles.completed}</TableCell>
+                        <TableCell>{dept.users || 0}</TableCell>
+                        <TableCell>{dept.cycles?.total || 0}</TableCell>
+                        <TableCell>{dept.cycles?.active || 0}</TableCell>
+                        <TableCell>{dept.cycles?.completed || 0}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -397,6 +401,10 @@ export default function ReportsPage() {
               </TableContainer>
             </CardContent>
           </Card>
+        ) : (
+          <Alert severity="info">
+            Данные по отделам отсутствуют или загружаются...
+          </Alert>
         )}
       </TabPanel>
 

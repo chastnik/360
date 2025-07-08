@@ -4,10 +4,10 @@ import { prisma } from '@/lib/db'
 // Получить конкретный цикл по ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     const cycle = await prisma.feedbackCycle.findUnique({
       where: { id },
@@ -63,10 +63,10 @@ export async function GET(
 // Обновить цикл
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
     const body = await request.json()
     
     const { 
@@ -207,10 +207,10 @@ export async function PUT(
 // Удалить цикл
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     // Проверяем, что цикл существует
     const existingCycle = await prisma.feedbackCycle.findUnique({

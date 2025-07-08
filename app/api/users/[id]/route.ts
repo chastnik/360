@@ -4,10 +4,10 @@ import { prisma } from '@/lib/db'
 // Получить конкретного пользователя по ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -57,10 +57,10 @@ export async function GET(
 // Обновить пользователя
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
     const body = await request.json()
     
     const { 
@@ -161,10 +161,10 @@ export async function PUT(
 // Удалить пользователя
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     // Проверяем, что пользователь существует
     const existingUser = await prisma.user.findUnique({

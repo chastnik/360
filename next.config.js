@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverActions: true,
-  },
   env: {
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
@@ -10,7 +7,16 @@ const nextConfig = {
     MATTERMOST_TOKEN: process.env.MATTERMOST_TOKEN,
   },
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.mattermost.com',
+      },
+    ],
   },
 }
 

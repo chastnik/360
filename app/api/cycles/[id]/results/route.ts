@@ -20,10 +20,10 @@ interface FeedbackResult {
 // Получить результаты цикла оценки
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
     const url = new URL(request.url)
     const viewerUserId = url.searchParams.get('viewer') // ID пользователя, который просматривает результаты
 
@@ -178,8 +178,8 @@ export async function GET(
 
       questionResults[questionId].responses.push({
         id: response.id,
-        ratingValue: response.ratingValue,
-        textValue: response.textValue,
+        ratingValue: response.ratingValue ?? undefined,
+        textValue: response.textValue ?? undefined,
         reviewerName,
         reviewerRole,
         isAnonymous: !canViewNonAnonymous
