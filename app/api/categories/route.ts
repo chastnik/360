@@ -1,32 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  try {
-    const categories = await prisma.questionCategory.findMany({
-      include: {
-        questions: {
-          select: {
-            id: true,
-            text: true,
-            type: true,
-            order: true,
-            isActive: true,
-            isRequired: true,
-            ratingScale: true,
-          },
-          orderBy: { order: 'asc' }
-        }
-      },
-      orderBy: { order: 'asc' }
-    })
+export async function GET() {
+  return NextResponse.json({ categories: [] });
+}
 
-    return NextResponse.json({ categories })
-  } catch (error) {
-    console.error('Error fetching categories:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch categories' },
-      { status: 500 }
-    )
-  }
+export async function POST() {
+  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
 } 

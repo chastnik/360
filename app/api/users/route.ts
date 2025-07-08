@@ -1,37 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 
 export async function GET() {
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        displayName: true,
-        department: true,
-        position: true,
-        isAdmin: true,
+    // Временно: возвращаем тестовые данные
+    const users = [
+      {
+        id: '1',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        displayName: 'Test User',
+        department: 'IT',
+        position: 'Developer',
+        isAdmin: false,
         isActive: true,
-        createdAt: true,
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          }
-        },
-        _count: {
-          select: {
-            managedEmployees: true,
-          }
-        }
-      },
-      orderBy: {
-        firstName: 'asc'
+        createdAt: new Date().toISOString(),
+        manager: null,
+        _count: { managedEmployees: 0 }
       }
-    })
+    ]
 
     return NextResponse.json({ users })
   } catch (error) {
@@ -66,41 +53,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Проверяем, что email уникален
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'User with this email already exists' },
-        { status: 409 }
-      )
-    }
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        firstName,
-        lastName,
-        displayName: displayName || `${firstName} ${lastName}`,
-        department,
-        position,
-        managerId,
-        mattermostUserId,
-      },
-      include: {
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          }
-        }
-      }
-    })
-
-    return NextResponse.json({ user }, { status: 201 })
+    // Временно: создание пользователей отключено
+    return NextResponse.json(
+      { error: 'User creation temporarily disabled' },
+      { status: 503 }
+    )
   } catch (error) {
     console.error('Error creating user:', error)
     return NextResponse.json(

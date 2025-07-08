@@ -1,7 +1,18 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { User } from '@prisma/client'
+
+interface User {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  displayName?: string | null
+  department?: string | null
+  position?: string | null
+  isAdmin: boolean
+  isActive: boolean
+}
 
 interface AppContextType {
   currentUser: User | null
