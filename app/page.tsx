@@ -33,10 +33,10 @@ export default function HomePage() {
       {/* Заголовок */}
       <Box textAlign="center" mb={4}>
         <Typography variant="h2" component="h1" gutterBottom>
-          Система 360-градусной оценки
+          БИТ.Цифра: 360° оценка
         </Typography>
         <Typography variant="h5" color="text.secondary" gutterBottom>
-          Комплексная оценка персонала с интеграцией Mattermost
+          Комплексная оценка персонала
         </Typography>
         <Chip 
           label="Демо версия" 
@@ -112,7 +112,7 @@ export default function HomePage() {
               </Typography>
             </CardContent>
             <CardActions>
-              <Button size="small" href="/admin">Настроить</Button>
+              <Button size="small" href="/settings">Настроить</Button>
             </CardActions>
           </Card>
         </Grid>

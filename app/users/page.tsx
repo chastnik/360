@@ -35,6 +35,7 @@ import {
   AdminPanelSettings,
   Edit,
   Visibility,
+  Delete,
 } from '@mui/icons-material'
 
 interface User {
@@ -62,6 +63,10 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [openDialog, setOpenDialog] = useState(false)
+  const [openEditDialog, setOpenEditDialog] = useState(false)
+  const [openViewDialog, setOpenViewDialog] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [viewingUser, setViewingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -120,6 +125,84 @@ export default function UsersPage() {
     } catch (error) {
       console.error('Error creating user:', error)
       setAlert({ type: 'error', message: 'Ошибка создания пользователя' })
+    }
+  }
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user)
+    setFormData({
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      displayName: user.displayName || '',
+      department: user.department || '',
+      position: user.position || '',
+      managerId: user.manager?.id || '',
+    })
+    setOpenEditDialog(true)
+  }
+
+  const handleView = (user: User) => {
+    setViewingUser(user)
+    setOpenViewDialog(true)
+  }
+
+  const handleEditSubmit = async () => {
+    if (!editingUser) return
+
+    try {
+      const response = await fetch(`/api/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      if (response.ok) {
+        setAlert({ type: 'success', message: 'Пользователь успешно обновлен' })
+        setOpenEditDialog(false)
+        setEditingUser(null)
+        setFormData({
+          email: '',
+          firstName: '',
+          lastName: '',
+          displayName: '',
+          department: '',
+          position: '',
+          managerId: '',
+        })
+        fetchUsers()
+      } else {
+        const error = await response.json()
+        setAlert({ type: 'error', message: error.error || 'Ошибка обновления пользователя' })
+      }
+    } catch (error) {
+      console.error('Error updating user:', error)
+      setAlert({ type: 'error', message: 'Ошибка обновления пользователя' })
+    }
+  }
+
+  const handleDelete = async (user: User) => {
+    if (!confirm(`Вы уверены, что хотите удалить пользователя ${user.firstName} ${user.lastName}?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setAlert({ type: 'success', message: 'Пользователь успешно удален' })
+        fetchUsers()
+      } else {
+        const error = await response.json()
+        setAlert({ type: 'error', message: error.error || 'Ошибка удаления пользователя' })
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      setAlert({ type: 'error', message: 'Ошибка удаления пользователя' })
     }
   }
 
@@ -277,13 +360,22 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>
                       <Tooltip title="Просмотр">
-                        <IconButton size="small">
+                        <IconButton size="small" onClick={() => handleView(user)}>
                           <Visibility />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Редактировать">
-                        <IconButton size="small">
+                        <IconButton size="small" onClick={() => handleEdit(user)}>
                           <Edit />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Удалить">
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleDelete(user)}
+                          color="error"
+                        >
+                          <Delete />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
@@ -380,6 +472,168 @@ export default function UsersPage() {
             disabled={!formData.email || !formData.firstName || !formData.lastName}
           >
             Создать
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог редактирования пользователя */}
+      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Редактировать пользователя</DialogTitle>
+        <DialogContent>
+          <Box component="form" sx={{ pt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Имя"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Фамилия"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Отображаемое имя (необязательно)"
+                  value={formData.displayName}
+                  onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Отдел"
+                  value={formData.department}
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Должность"
+                  value={formData.position}
+                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Менеджер"
+                  value={formData.managerId}
+                  onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+                >
+                  <MenuItem value="">Нет менеджера</MenuItem>
+                  {users.filter(u => u.id !== editingUser?.id).map((user) => (
+                    <MenuItem key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEditDialog(false)}>Отмена</Button>
+          <Button 
+            onClick={handleEditSubmit} 
+            variant="contained"
+            disabled={!formData.email || !formData.firstName || !formData.lastName}
+          >
+            Сохранить
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог просмотра пользователя */}
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Информация о пользователе</DialogTitle>
+        <DialogContent>
+          {viewingUser && (
+            <Box sx={{ pt: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="h6">{viewingUser.firstName} {viewingUser.lastName}</Typography>
+                  {viewingUser.displayName && viewingUser.displayName !== `${viewingUser.firstName} ${viewingUser.lastName}` && (
+                    <Typography variant="body2" color="text.secondary">
+                      {viewingUser.displayName}
+                    </Typography>
+                  )}
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Email:</strong> {viewingUser.email}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Отдел:</strong> {viewingUser.department || 'Не указан'}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2"><strong>Должность:</strong> {viewingUser.position || 'Не указана'}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <strong>Менеджер:</strong> {
+                      viewingUser.manager 
+                        ? `${viewingUser.manager.firstName} ${viewingUser.manager.lastName}`
+                        : 'Нет'
+                    }
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <strong>Подчиненных:</strong> {viewingUser._count.managedEmployees}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Box display="flex" gap={1}>
+                    {viewingUser.isAdmin && (
+                      <Chip label="Администратор" size="small" color="primary" />
+                    )}
+                    <Chip 
+                      label={viewingUser.isActive ? 'Активен' : 'Неактивен'} 
+                      size="small" 
+                      color={viewingUser.isActive ? 'success' : 'default'}
+                    />
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <strong>Дата создания:</strong> {new Date(viewingUser.createdAt).toLocaleDateString('ru-RU')}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewDialog(false)}>Закрыть</Button>
+          <Button 
+            onClick={() => {
+              setOpenViewDialog(false)
+              if (viewingUser) handleEdit(viewingUser)
+            }}
+            variant="contained"
+          >
+            Редактировать
           </Button>
         </DialogActions>
       </Dialog>
