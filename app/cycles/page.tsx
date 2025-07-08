@@ -43,6 +43,7 @@ import {
   Delete,
   PlayArrow,
   Stop,
+  Assignment,
 } from '@mui/icons-material'
 
 interface User {
@@ -245,6 +246,33 @@ export default function CyclesPage() {
     }
   }
 
+  const handleComplete = async (cycle: FeedbackCycle) => {
+    if (!confirm(`Вы уверены, что хотите завершить цикл "${cycle.name}"? После завершения участники получат уведомления с результатами.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/cycles/${cycle.id}/complete`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAlert({ 
+          type: 'success', 
+          message: `Цикл "${cycle.name}" успешно завершен. Уведомления отправлены участникам.` 
+        })
+        fetchCycles()
+      } else {
+        const error = await response.json()
+        setAlert({ type: 'error', message: error.error || 'Ошибка завершения цикла' })
+      }
+    } catch (error) {
+      console.error('Error completing cycle:', error)
+      setAlert({ type: 'error', message: 'Ошибка завершения цикла' })
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PLANNED': return 'default'
@@ -441,11 +469,33 @@ export default function CyclesPage() {
                           <Visibility />
                         </IconButton>
                       </Tooltip>
+                      {cycle.status === 'COMPLETED' && (
+                        <Tooltip title="Результаты оценки">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => window.open(`/results/${cycle.id}?viewer=${cycle.subject.id}`, '_blank')}
+                            color="primary"
+                          >
+                            <Assessment />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="Редактировать">
                         <IconButton size="small" onClick={() => handleEdit(cycle)}>
                           <Edit />
                         </IconButton>
                       </Tooltip>
+                      {cycle.status === 'ACTIVE' && (
+                        <Tooltip title="Завершить цикл">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleComplete(cycle)}
+                            color="success"
+                          >
+                            <Assignment />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="Удалить">
                         <IconButton 
                           size="small" 

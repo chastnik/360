@@ -99,11 +99,22 @@ function TabPanel(props: TabPanelProps) {
   )
 }
 
+interface SystemSettings {
+  ratingScale: number
+  cycleDuration: number
+  emailNotifications: boolean
+  requireComments: boolean
+  reminderDays: number
+  mattermostIntegration: boolean
+  autoReminders: boolean
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
   
   // Диалоги
   const [openQuestionDialog, setOpenQuestionDialog] = useState(false)
@@ -118,8 +129,20 @@ export default function SettingsPage() {
     ratingScale: 5,
   })
 
+  // Системные настройки
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({
+    ratingScale: 5,
+    cycleDuration: 14,
+    emailNotifications: true,
+    requireComments: true,
+    reminderDays: 3,
+    mattermostIntegration: true,
+    autoReminders: true,
+  })
+
   useEffect(() => {
     fetchCategories()
+    fetchSystemSettings()
   }, [])
 
   const fetchCategories = async () => {
@@ -134,6 +157,43 @@ export default function SettingsPage() {
       console.error('Error fetching categories:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchSystemSettings = async () => {
+    try {
+      const response = await fetch('/api/settings')
+      if (response.ok) {
+        const data = await response.json()
+        setSystemSettings(data.settings)
+      }
+    } catch (error) {
+      console.error('Error fetching system settings:', error)
+    }
+  }
+
+  const saveSystemSettings = async () => {
+    try {
+      setSavingSettings(true)
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(systemSettings),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSystemSettings(data.settings)
+        alert('Настройки успешно сохранены!')
+      } else {
+        const error = await response.json()
+        alert(`Ошибка сохранения: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      alert('Ошибка при сохранении настроек')
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -391,16 +451,54 @@ export default function SettingsPage() {
                   Интеграции
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  Подключенные сервисы:
+                  Настройки внешних интеграций:
                 </Typography>
+                
                 <Box sx={{ mb: 2 }}>
-                  <Chip label="Mattermost - Подключено" color="success" size="small" sx={{ mr: 1 }} />
-                  <Chip label="Календарь - Настроен" color="primary" size="small" />
+                  <Chip 
+                    label={systemSettings.mattermostIntegration ? "Mattermost - Включен" : "Mattermost - Отключен"} 
+                    color={systemSettings.mattermostIntegration ? "success" : "default"} 
+                    size="small" 
+                    sx={{ mr: 1 }} 
+                  />
+                  <Chip 
+                    label={systemSettings.autoReminders ? "Напоминания - Включены" : "Напоминания - Отключены"} 
+                    color={systemSettings.autoReminders ? "primary" : "default"} 
+                    size="small" 
+                  />
                 </Box>
-                <Typography variant="body2">
+
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={systemSettings.mattermostIntegration}
+                      onChange={(e) => setSystemSettings({
+                        ...systemSettings,
+                        mattermostIntegration: e.target.checked
+                      })}
+                    />
+                  }
+                  label="Уведомления Mattermost"
+                />
+
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={systemSettings.autoReminders}
+                      onChange={(e) => setSystemSettings({
+                        ...systemSettings,
+                        autoReminders: e.target.checked
+                      })}
+                    />
+                  }
+                  label="Автоматические напоминания"
+                  sx={{ display: 'block' }}
+                />
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                   • Канал уведомлений: #360-feedback<br />
-                  • Автоматические напоминания включены<br />
-                  • Напоминания за 3 дня до завершения
+                  • Напоминания за {systemSettings.reminderDays} дня до завершения<br />
+                  • Интеграция настроена и готова к работе
                 </Typography>
               </CardContent>
             </Card>
@@ -409,18 +507,105 @@ export default function SettingsPage() {
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Параметры оценки
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Текущие настройки системы:
-                </Typography>
-                <Typography variant="body2">
-                  • Шкала оценки: 5-балльная<br />
-                  • Длительность цикла: 14 дней<br />
-                  • Email уведомления: Включены<br />
-                  • Обязательные комментарии: Да
-                </Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6" gutterBottom>
+                    Параметры оценки
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={saveSystemSettings}
+                    disabled={savingSettings}
+                    startIcon={savingSettings ? <CircularProgress size={16} /> : <Save />}
+                  >
+                    {savingSettings ? 'Сохранение...' : 'Сохранить'}
+                  </Button>
+                </Box>
+                
+                <FormControl fullWidth margin="normal" size="small">
+                  <InputLabel>Шкала оценки</InputLabel>
+                  <Select
+                    value={systemSettings.ratingScale}
+                    onChange={(e) => setSystemSettings({
+                      ...systemSettings,
+                      ratingScale: Number(e.target.value)
+                    })}
+                  >
+                    <MenuItem value={3}>3-балльная (1-3)</MenuItem>
+                    <MenuItem value={5}>5-балльная (1-5)</MenuItem>
+                    <MenuItem value={7}>7-балльная (1-7)</MenuItem>
+                    <MenuItem value={10}>10-балльная (1-10)</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  label="Длительность цикла (дни)"
+                  type="number"
+                  value={systemSettings.cycleDuration}
+                  onChange={(e) => setSystemSettings({
+                    ...systemSettings,
+                    cycleDuration: Number(e.target.value) || 14
+                  })}
+                  fullWidth
+                  margin="normal"
+                  size="small"
+                  inputProps={{ min: 1, max: 365 }}
+                />
+
+                <TextField
+                  label="Дни до напоминания"
+                  type="number"
+                  value={systemSettings.reminderDays}
+                  onChange={(e) => setSystemSettings({
+                    ...systemSettings,
+                    reminderDays: Number(e.target.value) || 3
+                  })}
+                  fullWidth
+                  margin="normal"
+                  size="small"
+                  inputProps={{ min: 1, max: 30 }}
+                />
+
+                <Box mt={2}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={systemSettings.emailNotifications}
+                        onChange={(e) => setSystemSettings({
+                          ...systemSettings,
+                          emailNotifications: e.target.checked
+                        })}
+                      />
+                    }
+                    label="Email уведомления"
+                  />
+                </Box>
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={systemSettings.requireComments}
+                      onChange={(e) => setSystemSettings({
+                        ...systemSettings,
+                        requireComments: e.target.checked
+                      })}
+                    />
+                  }
+                  label="Обязательные комментарии"
+                />
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={systemSettings.autoReminders}
+                      onChange={(e) => setSystemSettings({
+                        ...systemSettings,
+                        autoReminders: e.target.checked
+                      })}
+                    />
+                  }
+                  label="Автоматические напоминания"
+                />
               </CardContent>
             </Card>
           </Grid>
