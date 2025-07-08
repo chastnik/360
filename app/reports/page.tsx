@@ -596,18 +596,18 @@ export default function ReportsPage() {
                         <ListItemText
                           primary={question.text}
                           secondary={
-                            <Box display="flex" alignItems="center" gap={2} mt={1}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
                               {question.type === 'RATING' && renderRatingStars(question.avgRating)}
-                              <Typography variant="caption">
+                              <Typography variant="caption" component="span">
                                 {question.type === 'RATING' 
                                   ? `Средняя оценка: ${question.avgRating.toFixed(1)}`
                                   : 'Текстовый вопрос'
                                 }
                               </Typography>
-                              <Typography variant="caption">
+                              <Typography variant="caption" component="span">
                                 Ответов: {question.responsesCount}
                               </Typography>
-                            </Box>
+                            </span>
                           }
                         />
                       </ListItem>
