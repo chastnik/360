@@ -1,0 +1,21 @@
+{
+  "name": "360-assessment-system",
+  "version": "1.0.0",
+  "description": "Система 360-градусной оценки персонала",
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "db:migrate": "cd backend && npm run migrate",
+    "db:seed": "cd backend && npm run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 

@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  * {
+    border-color: #e5e7eb;
+  }
+  
+  body {
+    background-color: white;
+    color: #1f2937;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Светлая тема */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+  
+  /* Темная тема */
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+  
+  h1 {
+    @apply text-3xl md:text-4xl lg:text-5xl;
+  }
+  
+  h2 {
+    @apply text-2xl md:text-3xl lg:text-4xl;
+  }
+  
+  h3 {
+    @apply text-xl md:text-2xl lg:text-3xl;
+  }
+  
+  h4 {
+    @apply text-lg md:text-xl lg:text-2xl;
+  }
+  
+  h5 {
+    @apply text-base md:text-lg lg:text-xl;
+  }
+  
+  h6 {
+    @apply text-sm md:text-base lg:text-lg;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 h-10 px-4 py-2;
+  }
+  
+  .btn-outline {
+    @apply border border-gray-300 bg-white hover:bg-gray-50 hover:text-gray-900 h-10 px-4 py-2;
+  }
+  
+  .btn-ghost {
+    @apply hover:bg-gray-100 hover:text-gray-900 h-10 px-4 py-2;
+  }
+  
+  .btn-destructive {
+    @apply bg-red-600 text-white hover:bg-red-700 h-10 px-4 py-2;
+  }
+  
+  .btn-sm {
+    @apply h-9 rounded-md px-3;
+  }
+  
+  .btn-lg {
+    @apply h-11 rounded-md px-8;
+  }
+  
+  .card {
+    @apply rounded-lg border bg-white shadow-sm;
+  }
+  
+  .input {
+    @apply flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  
+  .label {
+    @apply text-sm font-medium leading-none;
+  }
+  
+  /* Компоненты для dark mode */
+  .dark .btn-secondary {
+    @apply bg-gray-700 text-white hover:bg-gray-600;
+  }
+  
+  .dark .btn-outline {
+    @apply border-gray-600 bg-gray-800 hover:bg-gray-700 hover:text-white;
+  }
+  
+  .dark .btn-ghost {
+    @apply hover:bg-gray-700 hover:text-white;
+  }
+  
+  .dark .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark .input {
+    @apply border-gray-600 bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500;
+  }
+  
+  .dark .label {
+    @apply text-gray-200;
+  }
+}
+
+/* Дополнительные стили для layout */
+.primary-600 {
+  color: #2563eb;
+}
+
+.primary-700 {
+  color: #1d4ed8;
+}
+
+.primary-500 {
+  color: #3b82f6;
+}
+
+.primary-100 {
+  color: #dbeafe;
+}
+
+.primary-900 {
+  color: #1e3a8a;
+}
+
+.bg-primary-600 {
+  background-color: #2563eb;
+}
+
+.bg-primary-700 {
+  background-color: #1d4ed8;
+}
+
+.bg-primary-500 {
+  background-color: #3b82f6;
+}
+
+.bg-primary-100 {
+  background-color: #dbeafe;
+}
+
+.bg-primary-900 {
+  background-color: #1e3a8a;
+}
+
+.text-primary-600 {
+  color: #2563eb;
+}
+
+.text-primary-700 {
+  color: #1d4ed8;
+}
+
+.text-primary-500 {
+  color: #3b82f6;
+}
+
+.text-primary-100 {
+  color: #dbeafe;
+}
+
+.text-primary-900 {
+  color: #1e3a8a;
+}
+
+.border-primary-500 {
+  border-color: #3b82f6;
+}
+
+.border-primary-600 {
+  border-color: #2563eb;
+}
+
+.focus\:ring-primary-500:focus {
+  --tw-ring-color: #3b82f6;
+}
+
+.focus\:border-primary-500:focus {
+  border-color: #3b82f6;
+}
+
+.hover\:bg-primary-700:hover {
+  background-color: #1d4ed8;
+}
+
+.hover\:text-primary-700:hover {
+  color: #1d4ed8;
+} 

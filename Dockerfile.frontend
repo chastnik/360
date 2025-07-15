@@ -1,0 +1,40 @@
+# Этап 1: Сборка приложения
+FROM node:18-alpine AS builder
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json и package-lock.json
+COPY frontend/package*.json ./
+
+# Устанавливаем зависимости
+RUN npm ci --only=production
+
+# Копируем исходный код
+COPY frontend/ ./
+
+# Собираем приложение
+RUN npm run build
+
+# Этап 2: Настройка nginx для production
+FROM nginx:alpine
+
+# Копируем конфигурацию nginx
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Копируем собранное приложение
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Копируем скрипт для замены переменных окружения
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Создаем конфигурационный файл для переменных окружения
+RUN touch /usr/share/nginx/html/config.js
+
+# Экспонируем порт
+EXPOSE 80
+
+# Запускаем nginx
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"] 
