@@ -39,6 +39,131 @@
 
 ## Архитектура
 
+### Схема системы
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[React UI]
+        AUTH[Authentication]
+        ADMIN[Admin Panel]
+        REPORTS[Reports & Analytics]
+        SURVEY[Survey Interface]
+    end
+
+    subgraph "Backend Layer"
+        API[Express API Server]
+        MIDDLEWARE[Auth Middleware]
+        ROUTES[API Routes]
+        SERVICES[Business Logic]
+    end
+
+    subgraph "Database Layer"
+        DB[(PostgreSQL Database)]
+        TABLES[Tables:<br/>users, roles, cycles,<br/>participants, responses,<br/>categories, questions]
+    end
+
+    subgraph "External Integrations"
+        MM[Mattermost API]
+        EMAIL[Email Service]
+        NOTIFICATIONS[Notification System]
+    end
+
+    subgraph "Infrastructure"
+        NGINX[Nginx Proxy]
+        DOCKER[Docker Containers]
+        MONITORING[Monitoring & Logs]
+    end
+
+    %% Frontend connections
+    UI --> AUTH
+    UI --> ADMIN
+    UI --> REPORTS
+    UI --> SURVEY
+
+    %% Frontend to Backend
+    AUTH --> API
+    ADMIN --> API
+    REPORTS --> API
+    SURVEY --> API
+
+    %% Backend internal
+    API --> MIDDLEWARE
+    API --> ROUTES
+    ROUTES --> SERVICES
+    SERVICES --> DB
+
+    %% Database connection
+    SERVICES --> TABLES
+    DB --> TABLES
+
+    %% External services
+    SERVICES --> MM
+    SERVICES --> EMAIL
+    SERVICES --> NOTIFICATIONS
+
+    %% Infrastructure
+    NGINX --> UI
+    NGINX --> API
+    DOCKER --> UI
+    DOCKER --> API
+    DOCKER --> DB
+    MONITORING --> API
+    MONITORING --> DB
+
+    %% Styling
+    classDef frontend fill:#e1f5fe,stroke:#0277bd
+    classDef backend fill:#f3e5f5,stroke:#7b1fa2
+    classDef database fill:#e8f5e8,stroke:#2e7d32
+    classDef external fill:#fff3e0,stroke:#ef6c00
+    classDef infrastructure fill:#fce4ec,stroke:#c2185b
+
+    class UI,AUTH,ADMIN,REPORTS,SURVEY frontend
+    class API,MIDDLEWARE,ROUTES,SERVICES backend
+    class DB,TABLES database
+    class MM,EMAIL,NOTIFICATIONS external
+    class NGINX,DOCKER,MONITORING infrastructure
+```
+
+### Поток данных системы оценки
+
+```mermaid
+flowchart TD
+    A[Admin создает цикл оценки] --> B[Назначение участников]
+    B --> C[Назначение респондентов]
+    C --> D[Запуск цикла]
+    
+    D --> E[Отправка уведомлений]
+    E --> F[Mattermost уведомления]
+    E --> G[Email уведомления]
+    
+    F --> H[Респонденты получают уведомления]
+    G --> H
+    
+    H --> I[Переход к опросу]
+    I --> J[Заполнение ответов]
+    J --> K[Сохранение в БД]
+    
+    K --> L{Все ответы получены?}
+    L -->|Нет| M[Отправка напоминаний]
+    M --> I
+    L -->|Да| N[Генерация отчетов]
+    
+    N --> O[Анонимные результаты]
+    N --> P[Полные результаты]
+    
+    O --> Q[Отправка участникам]
+    P --> R[Отправка администраторам]
+    
+    Q --> S[Финальные уведомления]
+    R --> S
+    
+    style A fill:#e1f5fe
+    style D fill:#f3e5f5
+    style N fill:#e8f5e8
+    style S fill:#fff3e0
+```
+
 ### Backend
 - **Node.js + Express**: REST API сервер
 - **PostgreSQL**: База данных
@@ -55,14 +180,118 @@
 - **Axios**: HTTP клиент
 
 ### База данных
+
+```mermaid
+erDiagram
+    USERS {
+        int id PK
+        string email
+        string password_hash
+        string first_name
+        string last_name
+        string mattermost_username
+        string role
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    CATEGORIES {
+        int id PK
+        string name
+        string description
+        int sort_order
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    QUESTIONS {
+        int id PK
+        int category_id FK
+        string question_text
+        string question_type
+        int sort_order
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ASSESSMENT_CYCLES {
+        int id PK
+        string name
+        string description
+        string status
+        timestamp start_date
+        timestamp end_date
+        int created_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ASSESSMENT_PARTICIPANTS {
+        int id PK
+        int cycle_id FK
+        int user_id FK
+        string status
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ASSESSMENT_RESPONDENTS {
+        int id PK
+        int participant_id FK
+        int respondent_id FK
+        string respondent_type
+        string status
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ASSESSMENT_RESPONSES {
+        int id PK
+        int respondent_id FK
+        int question_id FK
+        int participant_id FK
+        int rating
+        string comments
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ASSESSMENT_REPORTS {
+        int id PK
+        int cycle_id FK
+        int participant_id FK
+        json report_data
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    USERS ||--o{ ASSESSMENT_CYCLES : creates
+    USERS ||--o{ ASSESSMENT_PARTICIPANTS : participates
+    USERS ||--o{ ASSESSMENT_RESPONDENTS : responds
+    
+    CATEGORIES ||--o{ QUESTIONS : contains
+    
+    ASSESSMENT_CYCLES ||--o{ ASSESSMENT_PARTICIPANTS : includes
+    ASSESSMENT_CYCLES ||--o{ ASSESSMENT_REPORTS : generates
+    
+    ASSESSMENT_PARTICIPANTS ||--o{ ASSESSMENT_RESPONDENTS : has
+    ASSESSMENT_PARTICIPANTS ||--o{ ASSESSMENT_RESPONSES : receives
+    ASSESSMENT_PARTICIPANTS ||--o{ ASSESSMENT_REPORTS : gets
+    
+    ASSESSMENT_RESPONDENTS ||--o{ ASSESSMENT_RESPONSES : gives
+    
+    QUESTIONS ||--o{ ASSESSMENT_RESPONSES : answered_in
+```
+
+#### Описание таблиц:
 - **users**: Пользователи системы (с поддержкой mattermost_username)
-- **roles**: Роли пользователей
+- **categories**: Категории компетенций
+- **questions**: Вопросы для оценки
 - **assessment_cycles**: Циклы оценки
 - **assessment_participants**: Участники циклов
 - **assessment_respondents**: Респонденты для каждого участника
-- **categories**: Категории компетенций
-- **questions**: Вопросы для оценки
 - **assessment_responses**: Ответы на вопросы
+- **assessment_reports**: Сгенерированные отчеты
 
 ## Установка и запуск
 
