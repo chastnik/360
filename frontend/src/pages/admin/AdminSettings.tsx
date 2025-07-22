@@ -11,6 +11,20 @@ interface SystemSettings {
     include_manager_assessment: boolean;
     default_respondent_count: number;
   };
+  database: {
+    db_host: string;
+    db_port: number;
+    db_name: string;
+    db_user: string;
+    db_password: string;
+  };
+  cache: {
+    redis_enabled: boolean;
+    redis_host: string;
+    redis_port: number;
+    redis_password: string;
+    redis_db: number;
+  };
   notifications: {
     email_notifications: boolean;
     mattermost_notifications: boolean;
@@ -42,6 +56,20 @@ const AdminSettings: React.FC = () => {
       include_manager_assessment: true,
       default_respondent_count: 5
     },
+    database: {
+      db_host: 'localhost',
+      db_port: 5432,
+      db_name: 'assessment_db',
+      db_user: 'postgres',
+      db_password: ''
+    },
+    cache: {
+      redis_enabled: true,
+      redis_host: 'localhost',
+      redis_port: 6379,
+      redis_password: '',
+      redis_db: 0
+    },
     notifications: {
       email_notifications: true,
       mattermost_notifications: true,
@@ -65,7 +93,7 @@ const AdminSettings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'security'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'database' | 'cache' | 'notifications' | 'security'>('general');
 
   useEffect(() => {
     loadSettings();
@@ -74,9 +102,62 @@ const AdminSettings: React.FC = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      // Пока используем заглушку, так как API для настроек может не быть
-      // const response = await api.get('/settings');
-      // setSettings(response.data);
+      const response = await fetch('/api/settings', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Конвертируем данные API в формат компонента
+          const apiSettings = data.settings;
+          setSettings({
+            general: {
+              system_name: apiSettings.general?.system_name?.value || 'Система 360° оценки',
+              company_name: apiSettings.general?.company_name?.value || '',
+              admin_email: apiSettings.general?.admin_email?.value || '',
+              default_language: 'ru',
+              timezone: 'Europe/Moscow',
+              allow_self_assessment: true,
+              include_manager_assessment: true,
+              default_respondent_count: 5
+            },
+            database: {
+              db_host: apiSettings.database?.db_host?.value || 'localhost',
+              db_port: apiSettings.database?.db_port?.value || 5432,
+              db_name: apiSettings.database?.db_name?.value || 'assessment_db',
+              db_user: apiSettings.database?.db_user?.value || 'postgres',
+              db_password: apiSettings.database?.db_password?.value || ''
+            },
+            cache: {
+              redis_enabled: apiSettings.cache?.redis_enabled?.value || true,
+              redis_host: apiSettings.cache?.redis_host?.value || 'localhost',
+              redis_port: apiSettings.cache?.redis_port?.value || 6379,
+              redis_password: apiSettings.cache?.redis_password?.value || '',
+              redis_db: apiSettings.cache?.redis_db?.value || 0
+            },
+            notifications: {
+              email_notifications: apiSettings.notifications?.email_notifications?.value || true,
+              mattermost_notifications: apiSettings.integrations?.mattermost_notifications?.value || true,
+              reminder_frequency: 7,
+              reminder_enabled: true,
+              cycle_start_notifications: true,
+              assessment_complete_notifications: true
+            },
+            security: {
+              session_timeout: 480,
+              password_min_length: 8,
+              require_password_change: false,
+              password_change_days: 90,
+              enable_2fa: false,
+              max_login_attempts: 5,
+              lockout_duration: 30
+            }
+          });
+        }
+      }
     } catch (error) {
       console.error('Ошибка загрузки настроек:', error);
       setError('Не удалось загрузить настройки');
@@ -88,10 +169,21 @@ const AdminSettings: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
-      // const response = await api.put('/settings', settings);
-      // Заглушка для сохранения
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSuccessMessage('Настройки сохранены успешно');
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ settings })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSuccessMessage('Настройки сохранены успешно');
+      } else {
+        setError(data.error || 'Не удалось сохранить настройки');
+      }
     } catch (error: any) {
       console.error('Ошибка сохранения настроек:', error);
       setError('Не удалось сохранить настройки');
@@ -107,11 +199,20 @@ const AdminSettings: React.FC = () => {
 
     try {
       setSaving(true);
-      // const response = await api.post('/settings/reset');
-      // Заглушка для сброса
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSuccessMessage('Настройки сброшены к значениям по умолчанию');
-      loadSettings();
+      const response = await fetch('/api/settings/reset', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSuccessMessage('Настройки сброшены к значениям по умолчанию');
+        loadSettings();
+      } else {
+        setError(data.error || 'Не удалось сбросить настройки');
+      }
     } catch (error: any) {
       console.error('Ошибка сброса настроек:', error);
       setError('Не удалось сбросить настройки');
@@ -148,6 +249,91 @@ const AdminSettings: React.FC = () => {
         [field]: value
       }
     }));
+  };
+
+  const updateDatabaseSettings = (field: keyof SystemSettings['database'], value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      database: {
+        ...prev.database,
+        [field]: value
+      }
+    }));
+  };
+
+  const updateCacheSettings = (field: keyof SystemSettings['cache'], value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      cache: {
+        ...prev.cache,
+        [field]: value
+      }
+    }));
+  };
+
+  // Тестирование подключения к базе данных
+  const handleTestDatabaseConnection = async () => {
+    try {
+      setSaving(true);
+      const response = await fetch('/api/settings/test-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          host: settings.database.db_host,
+          port: settings.database.db_port,
+          database: settings.database.db_name,
+          username: settings.database.db_user,
+          password: settings.database.db_password
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSuccessMessage('Подключение к базе данных успешно!');
+      } else {
+        setError(data.error || 'Не удалось подключиться к базе данных');
+      }
+    } catch (error: any) {
+      console.error('Ошибка тестирования подключения к БД:', error);
+      setError('Ошибка при тестировании подключения к базе данных');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Тестирование подключения к Redis
+  const handleTestRedisConnection = async () => {
+    try {
+      setSaving(true);
+      const response = await fetch('/api/settings/test-redis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          host: settings.cache.redis_host,
+          port: settings.cache.redis_port,
+          password: settings.cache.redis_password,
+          db: settings.cache.redis_db
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSuccessMessage('Подключение к Redis успешно!');
+      } else {
+        setError(data.error || 'Не удалось подключиться к Redis');
+      }
+    } catch (error: any) {
+      console.error('Ошибка тестирования подключения к Redis:', error);
+      setError('Ошибка при тестировании подключения к Redis');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Очистка сообщений через 5 секунд
@@ -225,6 +411,26 @@ const AdminSettings: React.FC = () => {
               }`}
             >
               Общие
+            </button>
+            <button
+              onClick={() => setActiveTab('database')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'database'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              База данных
+            </button>
+            <button
+              onClick={() => setActiveTab('cache')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'cache'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Кэширование
             </button>
             <button
               onClick={() => setActiveTab('notifications')}
@@ -352,6 +558,193 @@ const AdminSettings: React.FC = () => {
                           className="w-20 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                         />
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Настройки базы данных */}
+          {activeTab === 'database' && (
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    Настройки PostgreSQL
+                  </h3>
+                  <button
+                    onClick={handleTestDatabaseConnection}
+                    disabled={saving}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    Тестировать подключение
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Хост базы данных
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.database.db_host}
+                      onChange={(e) => updateDatabaseSettings('db_host', e.target.value)}
+                      className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="localhost"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Порт
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="65535"
+                      value={settings.database.db_port}
+                      onChange={(e) => updateDatabaseSettings('db_port', parseInt(e.target.value))}
+                      className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="5432"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Имя базы данных
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.database.db_name}
+                      onChange={(e) => updateDatabaseSettings('db_name', e.target.value)}
+                      className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="assessment_db"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Пользователь
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.database.db_user}
+                      onChange={(e) => updateDatabaseSettings('db_user', e.target.value)}
+                      className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="postgres"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Пароль
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.database.db_password}
+                      onChange={(e) => updateDatabaseSettings('db_password', e.target.value)}
+                      className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="Введите пароль..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Настройки кэширования */}
+          {activeTab === 'cache' && (
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    Настройки Redis
+                  </h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleTestRedisConnection}
+                      disabled={saving || !settings.cache.redis_enabled}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      Тестировать подключение
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-6">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings.cache.redis_enabled}
+                      onChange={(e) => updateCacheSettings('redis_enabled', e.target.checked)}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-900 dark:text-white">
+                      Включить Redis кэширование
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Хост Redis сервера
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.cache.redis_host}
+                        onChange={(e) => updateCacheSettings('redis_host', e.target.value)}
+                        disabled={!settings.cache.redis_enabled}
+                        className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
+                        placeholder="localhost"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Порт
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={settings.cache.redis_port}
+                        onChange={(e) => updateCacheSettings('redis_port', parseInt(e.target.value))}
+                        disabled={!settings.cache.redis_enabled}
+                        className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
+                        placeholder="6379"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Пароль (опционально)
+                      </label>
+                      <input
+                        type="password"
+                        value={settings.cache.redis_password}
+                        onChange={(e) => updateCacheSettings('redis_password', e.target.value)}
+                        disabled={!settings.cache.redis_enabled}
+                        className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
+                        placeholder="Введите пароль..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Номер базы данных
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="15"
+                        value={settings.cache.redis_db}
+                        onChange={(e) => updateCacheSettings('redis_db', parseInt(e.target.value))}
+                        disabled={!settings.cache.redis_enabled}
+                        className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
+                        placeholder="0"
+                      />
                     </div>
                   </div>
                 </div>

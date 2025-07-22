@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import redisService from './services/redis';
+import databaseService from './services/database';
 
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -13,6 +15,7 @@ import cycleRoutes from './routes/cycles';
 import assessmentRoutes from './routes/assessments';
 import reportRoutes from './routes/reports';
 import mattermostRoutes from './routes/mattermost';
+import settingsRoutes from './routes/settings';
 
 config();
 
@@ -46,6 +49,7 @@ app.use('/api/cycles', cycleRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/mattermost', mattermostRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -66,10 +70,32 @@ app.use('*', (_req, res) => {
   res.status(404).json({ success: false, error: 'Маршрут не найден' });
 });
 
+// Initialize services
+async function initializeServices() {
+  try {
+    // Initialize database first
+    await databaseService.initialize();
+    console.log('✅ База данных инициализирована');
+    
+    // Then initialize Redis
+    await redisService.initialize();
+    console.log('✅ Redis инициализирован');
+    
+  } catch (error: any) {
+    console.error('❌ Ошибка инициализации сервисов:', error.message);
+    process.exit(1);
+  }
+}
+
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Сервер запущен на порту ${PORT}`);
-  console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
+initializeServices().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
+  });
+}).catch((error) => {
+  console.error('❌ Не удалось запустить сервер:', error);
+  process.exit(1);
 });
 
 export default app; 
