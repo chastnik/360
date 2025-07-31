@@ -133,7 +133,10 @@ check_database() {
 run_migrations() {
     print_info "Запуск миграций базы данных..."
     
-    if cd backend && npm run migrate; then
+    # Загружаем переменные окружения
+    source .env
+    
+    if cd backend && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run migrate; then
         print_success "Миграции выполнены успешно"
     else
         print_error "Ошибка при выполнении миграций"
@@ -146,7 +149,10 @@ run_migrations() {
 run_seeds() {
     print_info "Запуск сидов базы данных..."
     
-    if cd backend && npm run seed; then
+    # Загружаем переменные окружения
+    source .env
+    
+    if cd backend && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run seed; then
         print_success "Сиды выполнены успешно"
     else
         print_error "Ошибка при выполнении сидов"

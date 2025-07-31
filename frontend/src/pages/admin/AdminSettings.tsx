@@ -180,7 +180,7 @@ const AdminSettings: React.FC = () => {
 
       const data = await response.json();
       if (data.success) {
-        setSuccessMessage('Настройки сохранены успешно');
+      setSuccessMessage('Настройки сохранены успешно');
       } else {
         setError(data.error || 'Не удалось сохранить настройки');
       }
@@ -208,8 +208,8 @@ const AdminSettings: React.FC = () => {
 
       const data = await response.json();
       if (data.success) {
-        setSuccessMessage('Настройки сброшены к значениям по умолчанию');
-        loadSettings();
+      setSuccessMessage('Настройки сброшены к значениям по умолчанию');
+      loadSettings();
       } else {
         setError(data.error || 'Не удалось сбросить настройки');
       }

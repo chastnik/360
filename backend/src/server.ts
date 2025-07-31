@@ -89,9 +89,9 @@ async function initializeServices() {
 
 // Start server
 initializeServices().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
+app.listen(PORT, () => {
+  console.log(`🚀 Сервер запущен на порту ${PORT}`);
+  console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
   });
 }).catch((error) => {
   console.error('❌ Не удалось запустить сервер:', error);

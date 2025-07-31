@@ -2,7 +2,6 @@ import knex from '../database/connection';
 
 class RedisService {
   private client: any = null;
-  private isInitialized: boolean = false;
   private settings: any = null;
 
   /**
@@ -27,7 +26,6 @@ class RedisService {
       // Проверить, включен ли Redis
       if (!this.settings.redis_enabled) {
         console.log('Redis отключен в настройках');
-        this.isInitialized = true;
         return;
       }
 
@@ -68,12 +66,10 @@ class RedisService {
 
       // Подключиться
       await this.client.connect();
-      this.isInitialized = true;
 
     } catch (error) {
       console.error('Ошибка инициализации Redis:', error);
       this.client = null;
-      this.isInitialized = true; // Отмечаем как инициализированный даже при ошибке
     }
   }
 
@@ -210,7 +206,6 @@ class RedisService {
     }
     
     this.client = null;
-    this.isInitialized = false;
     this.settings = null;
 
     // Инициализировать заново
