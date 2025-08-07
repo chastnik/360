@@ -20,9 +20,12 @@ router.get('/test-connection', authenticateToken, async (req: AuthRequest, res):
 
     const isConnected = await mattermostService.testConnection();
     
-    res.json({ 
-      connected: isConnected,
-      message: isConnected ? 'Подключение к Mattermost успешно' : 'Ошибка подключения к Mattermost'
+    res.json({
+      success: true,
+      data: {
+        connected: isConnected,
+        message: isConnected ? 'Подключение к Mattermost успешно' : 'Ошибка подключения к Mattermost'
+      }
     });
   } catch (error) {
     console.error('Ошибка проверки подключения:', error);
@@ -373,16 +376,19 @@ router.get('/integration-stats', authenticateToken, async (req: AuthRequest, res
     const isConnected = await mattermostService.testConnection();
 
     res.json({
-      connection: {
-        status: isConnected ? 'connected' : 'disconnected',
-        message: isConnected ? 'Подключение активно' : 'Нет подключения к Mattermost'
-      },
-      users: {
-        total: Number(totalUsers?.count || 0),
-        withMattermost: Number(usersWithMattermost?.count || 0),
-        syncPercentage: Number(totalUsers?.count || 0) > 0 
-          ? Math.round((Number(usersWithMattermost?.count || 0) / Number(totalUsers?.count || 0)) * 100)
-          : 0
+      success: true,
+      data: {
+        connection: {
+          status: isConnected ? 'connected' : 'disconnected',
+          message: isConnected ? 'Подключение активно' : 'Нет подключения к Mattermost'
+        },
+        users: {
+          total: Number(totalUsers?.count || 0),
+          withMattermost: Number(usersWithMattermost?.count || 0),
+          syncPercentage: Number(totalUsers?.count || 0) > 0 
+            ? Math.round((Number(usersWithMattermost?.count || 0) / Number(totalUsers?.count || 0)) * 100)
+            : 0
+        }
       }
     });
   } catch (error) {

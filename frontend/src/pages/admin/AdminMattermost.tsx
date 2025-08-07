@@ -34,8 +34,20 @@ export const AdminMattermost: React.FC = () => {
         api.get('/cycles').catch(() => ({ data: [] }))
       ]);
 
-      setStats(statsResponse.data);
-      setCycles(cyclesResponse.data.filter((cycle: any) => cycle.status === 'active'));
+      // Преобразуем данные из API в ожидаемый формат
+      const apiData = statsResponse.data?.success ? statsResponse.data.data : statsResponse.data;
+      
+      const transformedStats: MattermostStats = {
+        connectionStatus: apiData.connection?.status === 'connected' ? 'connected' : 'disconnected',
+        lastSync: null, // API не возвращает эту информацию пока
+        users: apiData.users || { total: 0, withMattermost: 0, syncPercentage: 0 }
+      };
+
+      setStats(transformedStats);
+      
+      // Обрабатываем циклы
+      const cyclesData = cyclesResponse.data?.success ? cyclesResponse.data.data : cyclesResponse.data;
+      setCycles(Array.isArray(cyclesData) ? cyclesData.filter((cycle: any) => cycle.status === 'active') : []);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       setError('Не удалось загрузить данные интеграции');
@@ -49,7 +61,9 @@ export const AdminMattermost: React.FC = () => {
       setTesting(true);
       const response = await api.get('/mattermost/test-connection');
       
-      if (response.data.connected) {
+      const responseData = response.data?.success ? response.data.data : response.data;
+      
+      if (responseData.connected) {
         setSuccessMessage('Подключение к Mattermost работает корректно');
       } else {
         setError('Не удалось подключиться к Mattermost');

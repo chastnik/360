@@ -1,3 +1,4 @@
+.cursorignore
 # Зависимости
 node_modules/
 npm-debug.log*
