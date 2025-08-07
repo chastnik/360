@@ -82,7 +82,7 @@ const AdminDashboard: React.FC = () => {
         {
           id: 1,
           type: 'cycle_started',
-          description: 'Запущен цикл оценки "Q1 2024"',
+          description: 'Запущен цикл оценки "Q1 2025"',
           user: 'Admin',
           timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString()
         },
