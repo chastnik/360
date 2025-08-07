@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
 
 interface SystemSettings {
   general: {
@@ -102,15 +103,10 @@ const AdminSettings: React.FC = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/settings', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await api.get('/settings');
+      const data = response.data?.success ? response.data : response.data;
       
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
+      if (data.success) {
           // Конвертируем данные API в формат компонента
           const apiSettings = data.settings;
           setSettings({
@@ -169,16 +165,9 @@ const AdminSettings: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ settings })
-      });
-
-      const data = await response.json();
+      const response = await api.put('/settings', { settings });
+      const data = response.data?.success ? response.data : response.data;
+      
       if (data.success) {
         setSuccessMessage('Настройки сохранены успешно');
       } else {
@@ -186,7 +175,7 @@ const AdminSettings: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Ошибка сохранения настроек:', error);
-      setError('Не удалось сохранить настройки');
+      setError(error.response?.data?.error || 'Не удалось сохранить настройки');
     } finally {
       setSaving(false);
     }
@@ -199,14 +188,8 @@ const AdminSettings: React.FC = () => {
 
     try {
       setSaving(true);
-      const response = await fetch('/api/settings/reset', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      const data = await response.json();
+      const response = await api.post('/settings/reset');
+      const data = response.data?.success ? response.data : response.data;
       if (data.success) {
         setSuccessMessage('Настройки сброшены к значениям по умолчанию');
         loadSettings();
@@ -215,7 +198,7 @@ const AdminSettings: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Ошибка сброса настроек:', error);
-      setError('Не удалось сбросить настройки');
+      setError(error.response?.data?.error || 'Не удалось сбросить настройки');
     } finally {
       setSaving(false);
     }
@@ -279,7 +262,7 @@ const AdminSettings: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
           host: settings.database.db_host,
@@ -312,7 +295,7 @@ const AdminSettings: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
           host: settings.cache.redis_host,
