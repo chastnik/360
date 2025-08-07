@@ -170,13 +170,22 @@ const AdminUsers: React.FC = () => {
     setShowEditForm(true);
   };
 
-  const filteredUsers = Array.isArray(users) ? users.filter(user =>
-    user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+  const filteredUsers = Array.isArray(users) ? users
+    .filter(user =>
+      user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Сортировка по имени (first_name), затем по фамилии (last_name)
+      const firstNameComparison = a.first_name.localeCompare(b.first_name, 'ru');
+      if (firstNameComparison !== 0) {
+        return firstNameComparison;
+      }
+      return a.last_name.localeCompare(b.last_name, 'ru');
+    }) : [];
 
   const getRoleText = (role: string) => {
     switch (role) {
