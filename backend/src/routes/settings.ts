@@ -144,7 +144,7 @@ router.put('/', authenticateToken, async (req: AuthRequest, res): Promise<void> 
           .first();
 
         if (!existingSetting) {
-          console.warn(`Настройка ${settingKey} в категории ${category} не найдена`);
+          // Пропускаем настройки, которых нет в БД (например, UI-only настройки)
           continue;
         }
 
@@ -174,11 +174,16 @@ router.put('/', authenticateToken, async (req: AuthRequest, res): Promise<void> 
 
     // Если изменились настройки БД - попытаться переподключиться
     if (dbSettingsChanged) {
-      const reconnected = await databaseService.reconnectWithDatabaseSettings();
-      if (reconnected) {
-        message += '. Подключение к БД обновлено.';
-      } else {
-        warnings.push('Не удалось переподключиться к БД с новыми настройками');
+      try {
+        const reconnected = await databaseService.reconnectWithDatabaseSettings();
+        if (reconnected) {
+          message += '. Подключение к БД обновлено.';
+        } else {
+          warnings.push('Не удалось переподключиться к БД с новыми настройками');
+        }
+      } catch (error) {
+        console.error('Ошибка переподключения к БД:', error);
+        warnings.push('Ошибка переподключения к БД');
       }
     }
 
@@ -188,6 +193,7 @@ router.put('/', authenticateToken, async (req: AuthRequest, res): Promise<void> 
         await redisService.reconnectWithNewSettings();
         message += ' Подключение к Redis обновлено.';
       } catch (error) {
+        console.error('Ошибка переподключения к Redis:', error);
         warnings.push('Не удалось переподключиться к Redis с новыми настройками');
       }
     }
