@@ -107,52 +107,51 @@ const AdminSettings: React.FC = () => {
       const data = response.data?.success ? response.data : response.data;
       
       if (data.success) {
-          // Конвертируем данные API в формат компонента
-          const apiSettings = data.settings;
-          setSettings({
-            general: {
-              system_name: apiSettings.general?.system_name?.value || 'Система 360° оценки',
-              company_name: apiSettings.general?.company_name?.value || '',
-              admin_email: apiSettings.general?.admin_email?.value || '',
-              default_language: 'ru',
-              timezone: 'Europe/Moscow',
-              allow_self_assessment: true,
-              include_manager_assessment: true,
-              default_respondent_count: 5
-            },
-            database: {
-              db_host: apiSettings.database?.db_host?.value || 'localhost',
-              db_port: apiSettings.database?.db_port?.value || 5432,
-              db_name: apiSettings.database?.db_name?.value || 'assessment_db',
-              db_user: apiSettings.database?.db_user?.value || 'postgres',
-              db_password: apiSettings.database?.db_password?.value || ''
-            },
-            cache: {
-              redis_enabled: apiSettings.cache?.redis_enabled?.value || true,
-              redis_host: apiSettings.cache?.redis_host?.value || 'localhost',
-              redis_port: apiSettings.cache?.redis_port?.value || 6379,
-              redis_password: apiSettings.cache?.redis_password?.value || '',
-              redis_db: apiSettings.cache?.redis_db?.value || 0
-            },
-            notifications: {
-              email_notifications: apiSettings.notifications?.email_notifications?.value || true,
-              mattermost_notifications: apiSettings.integrations?.mattermost_notifications?.value || true,
-              reminder_frequency: 7,
-              reminder_enabled: true,
-              cycle_start_notifications: true,
-              assessment_complete_notifications: true
-            },
-            security: {
-              session_timeout: 480,
-              password_min_length: 8,
-              require_password_change: false,
-              password_change_days: 90,
-              enable_2fa: false,
-              max_login_attempts: 5,
-              lockout_duration: 30
-            }
-          });
-        }
+        // Конвертируем данные API в формат компонента
+        const apiSettings = data.settings;
+        setSettings({
+          general: {
+            system_name: apiSettings.general?.system_name?.value || 'Система 360° оценки',
+            company_name: apiSettings.general?.company_name?.value || '',
+            admin_email: apiSettings.general?.admin_email?.value || '',
+            default_language: 'ru',
+            timezone: 'Europe/Moscow',
+            allow_self_assessment: true,
+            include_manager_assessment: true,
+            default_respondent_count: 5
+          },
+          database: {
+            db_host: apiSettings.database?.db_host?.value || 'localhost',
+            db_port: apiSettings.database?.db_port?.value || 5432,
+            db_name: apiSettings.database?.db_name?.value || 'assessment_db',
+            db_user: apiSettings.database?.db_user?.value || 'postgres',
+            db_password: apiSettings.database?.db_password?.value || ''
+          },
+          cache: {
+            redis_enabled: apiSettings.cache?.redis_enabled?.value || true,
+            redis_host: apiSettings.cache?.redis_host?.value || 'localhost',
+            redis_port: apiSettings.cache?.redis_port?.value || 6379,
+            redis_password: apiSettings.cache?.redis_password?.value || '',
+            redis_db: apiSettings.cache?.redis_db?.value || 0
+          },
+          notifications: {
+            email_notifications: apiSettings.notifications?.email_notifications?.value || true,
+            mattermost_notifications: apiSettings.integrations?.mattermost_notifications?.value || true,
+            reminder_frequency: 7,
+            reminder_enabled: true,
+            cycle_start_notifications: true,
+            assessment_complete_notifications: true
+          },
+          security: {
+            session_timeout: 480,
+            password_min_length: 8,
+            require_password_change: false,
+            password_change_days: 90,
+            enable_2fa: false,
+            max_login_attempts: 5,
+            lockout_duration: 30
+          }
+        });
       }
     } catch (error) {
       console.error('Ошибка загрузки настроек:', error);
