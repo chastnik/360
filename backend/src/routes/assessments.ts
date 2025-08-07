@@ -20,11 +20,11 @@ router.get('/', authenticateToken, async (req: AuthRequest, res): Promise<void> 
       .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
       .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
       .join('users', 'assessment_participants.user_id', 'users.id')
-      .where('assessment_respondents.respondent_id', userId)
+      .where('assessment_respondents.respondent_user_id', userId)
       .where('assessment_cycles.status', 'active')
       .select(
         'assessment_respondents.id as respondent_id',
-        'assessment_cycles.title as cycle_title',
+        'assessment_cycles.name as cycle_title',
         'assessment_cycles.description as cycle_description',
         'assessment_cycles.end_date',
         'users.first_name as participant_first_name',
@@ -35,7 +35,10 @@ router.get('/', authenticateToken, async (req: AuthRequest, res): Promise<void> 
       )
       .orderBy('assessment_cycles.start_date', 'desc');
 
-    res.json(assessments);
+    res.json({
+      success: true,
+      data: assessments
+    });
   } catch (error) {
     console.error('Ошибка получения оценок:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });

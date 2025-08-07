@@ -1,21 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
-
-interface User {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  middle_name?: string;
-  role: 'admin' | 'manager' | 'user';
-  position?: string;
-  department?: string;
-  manager_id?: string;
-}
+import { User } from '../types/common';
 
 interface AuthContextType {
   user: User | null;
+  setUser: (user: User | null) => void;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -83,8 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       const response = await authAPI.login(email, password);
       
-      if (response.success && response.data) {
-        const { token: authToken, user: userData } = response.data;
+      if (response.success && response.token && response.user) {
+        const { token: authToken, user: userData } = response;
         setToken(authToken);
         setUser(userData);
         localStorage.setItem('auth_token', authToken);
@@ -133,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = {
     user,
+    setUser,
     token,
     login,
     logout,

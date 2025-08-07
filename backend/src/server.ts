@@ -17,6 +17,7 @@ import assessmentRoutes from './routes/assessments';
 import reportRoutes from './routes/reports';
 import mattermostRoutes from './routes/mattermost';
 import settingsRoutes from './routes/settings';
+import departmentRoutes from './routes/departments';
 
 // Загружаем переменные окружения из корневого .env файла
 config({ path: path.resolve(__dirname, '../../.env') });
@@ -34,10 +35,10 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting (увеличен лимит для разработки)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
-  max: 100, // максимум 100 запросов на IP
+  windowMs: 1 * 60 * 1000, // 1 минута
+  max: 1000, // максимум 1000 запросов на IP
   message: 'Слишком много запросов с этого IP, попробуйте позже.'
 });
 app.use('/api/', limiter);
@@ -52,6 +53,7 @@ app.use('/api/assessments', assessmentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/mattermost', mattermostRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

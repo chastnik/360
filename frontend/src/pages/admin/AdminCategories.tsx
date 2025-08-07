@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
-
-interface Category {
-  id: number;
-  name: string;
-  description: string;
-  icon: string;
-  color: string;
-  sort_order: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  question_count?: number;
-}
+import api, { categoriesAPI, questionsAPI } from '../../services/api';
+import { Category } from '../../types/common';
 
 interface CategoryFormData {
   name: string;
@@ -66,16 +54,20 @@ const AdminCategories: React.FC = () => {
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/categories');
+      const response = await categoriesAPI.getCategories();
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Ошибка загрузки категорий');
+      }
       
       // Получим количество вопросов для каждой категории
       const categoriesWithCounts = await Promise.all(
-        response.data.map(async (category: Category) => {
+        (response.data || []).map(async (category: Category) => {
           try {
-            const questionsResponse = await api.get(`/questions?category_id=${category.id}`);
+            const questionsResponse = await questionsAPI.getQuestions(category.id);
             return {
               ...category,
-              question_count: questionsResponse.data.length
+              question_count: questionsResponse.success ? (questionsResponse.data?.length || 0) : 0
             };
           } catch {
             return {
@@ -87,9 +79,9 @@ const AdminCategories: React.FC = () => {
       );
       
       setCategories(categoriesWithCounts.sort((a, b) => a.sort_order - b.sort_order));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка загрузки категорий:', error);
-      setError('Не удалось загрузить категории');
+      setError(error.message || 'Не удалось загрузить категории');
     } finally {
       setLoading(false);
     }
@@ -136,7 +128,7 @@ const AdminCategories: React.FC = () => {
     }
   };
 
-  const handleDeleteCategory = async (categoryId: number) => {
+  const handleDeleteCategory = async (categoryId: string) => {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
 
@@ -159,7 +151,7 @@ const AdminCategories: React.FC = () => {
     }
   };
 
-  const handleToggleActive = async (categoryId: number) => {
+  const handleToggleActive = async (categoryId: string) => {
     const category = categories.find(c => c.id === categoryId);
     if (!category) return;
 
@@ -175,7 +167,7 @@ const AdminCategories: React.FC = () => {
     }
   };
 
-  const handleReorder = async (categoryId: number, direction: 'up' | 'down') => {
+  const handleReorder = async (categoryId: string, direction: 'up' | 'down') => {
     const currentIndex = categories.findIndex(c => c.id === categoryId);
     if (currentIndex === -1) return;
 

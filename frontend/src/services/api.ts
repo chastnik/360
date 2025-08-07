@@ -1,6 +1,14 @@
 import axios from 'axios';
+import { 
+  ApiResponse, 
+  LoginResponse, 
+  User, 
+  Category, 
+  Question, 
+  AssessmentCycle 
+} from '../types/common';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 const api = axios.create({
@@ -38,70 +46,9 @@ api.interceptors.response.use(
   }
 );
 
-// Типы для API ответов
-interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
-}
-
-interface User {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  middle_name?: string;
-  role: 'admin' | 'manager' | 'user';
-  position?: string;
-  department?: string;
-  manager_id?: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  sort_order: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Question {
-  id: string;
-  category_id: string;
-  question_text: string;
-  description?: string;
-  question_type: 'rating' | 'text' | 'boolean';
-  min_value: number;
-  max_value: number;
-  sort_order: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface AssessmentCycle {
-  id: string;
-  name: string;
-  description?: string;
-  created_by: string;
-  start_date: string;
-  end_date: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  respondent_count: number;
-  allow_self_assessment: boolean;
-  include_manager_assessment: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 // API для авторизации
 export const authAPI = {
-  login: async (email: string, password: string): Promise<ApiResponse<{ token: string; user: User }>> => {
+  login: async (email: string, password: string): Promise<LoginResponse> => {
     try {
       const response = await api.post('/auth/login', { email, password });
       return response.data;
@@ -217,7 +164,16 @@ export const categoriesAPI = {
   getCategories: async (): Promise<ApiResponse<Category[]>> => {
     try {
       const response = await api.get('/categories');
-      return response.data;
+      // API теперь возвращает {success: true, data: [...]} формат
+      if (response.data?.success) {
+        return response.data;
+      } else {
+        // Поддержка старого формата (массив напрямую)
+        return {
+          success: true,
+          data: response.data
+        };
+      }
     } catch (error: any) {
       return {
         success: false,
@@ -261,59 +217,33 @@ export const categoriesAPI = {
       };
     }
   },
+
+  toggleActive: async (id: string): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.patch(`/categories/${id}/toggle-active`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка изменения статуса категории'
+      };
+    }
+  },
+
+  reorder: async (categories: Array<{ id: string; sort_order: number }>): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.patch('/categories/reorder', { categories });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка изменения порядка категорий'
+      };
+    }
+  }
 };
 
-// API для вопросов
-export const questionsAPI = {
-  getQuestions: async (categoryId?: string): Promise<ApiResponse<Question[]>> => {
-    try {
-      const url = categoryId ? `/questions?category_id=${categoryId}` : '/questions';
-      const response = await api.get(url);
-      return response.data;
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Ошибка получения вопросов'
-      };
-    }
-  },
 
-  createQuestion: async (questionData: Partial<Question>): Promise<ApiResponse<Question>> => {
-    try {
-      const response = await api.post('/questions', questionData);
-      return response.data;
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Ошибка создания вопроса'
-      };
-    }
-  },
-
-  updateQuestion: async (id: string, questionData: Partial<Question>): Promise<ApiResponse<Question>> => {
-    try {
-      const response = await api.put(`/questions/${id}`, questionData);
-      return response.data;
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Ошибка обновления вопроса'
-      };
-    }
-  },
-
-  deleteQuestion: async (id: string): Promise<ApiResponse<{ message: string }>> => {
-    try {
-      const response = await api.delete(`/questions/${id}`);
-      return response.data;
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Ошибка удаления вопроса'
-      };
-    }
-  },
-};
 
 // API для циклов оценки
 export const cyclesAPI = {
@@ -425,6 +355,91 @@ export const reportsAPI = {
       };
     }
   },
+};
+
+// API для вопросов
+export const questionsAPI = {
+  getQuestions: async (categoryId?: string): Promise<ApiResponse<Question[]>> => {
+    try {
+      const url = categoryId ? `/questions?category_id=${categoryId}` : '/questions';
+      const response = await api.get(url);
+      // API теперь возвращает {success: true, data: [...]} формат
+      if (response.data?.success) {
+        return response.data;
+      } else {
+        // Поддержка старого формата (массив напрямую)
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка получения вопросов'
+      };
+    }
+  },
+
+  createQuestion: async (questionData: Partial<Question>): Promise<ApiResponse<Question>> => {
+    try {
+      const response = await api.post('/questions', questionData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка создания вопроса'
+      };
+    }
+  },
+
+  updateQuestion: async (id: string, questionData: Partial<Question>): Promise<ApiResponse<Question>> => {
+    try {
+      const response = await api.put(`/questions/${id}`, questionData);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка обновления вопроса'
+      };
+    }
+  },
+
+  deleteQuestion: async (id: string): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.delete(`/questions/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка удаления вопроса'
+      };
+    }
+  },
+
+  toggleActive: async (id: string): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.patch(`/questions/${id}/toggle-active`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка изменения статуса вопроса'
+      };
+    }
+  },
+
+  reorder: async (questions: Array<{ id: string; order_index: number }>): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.patch('/questions/reorder', { questions });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка изменения порядка вопросов'
+      };
+    }
+  }
 };
 
 export default api; 

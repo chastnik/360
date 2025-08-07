@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Layout } from '../components/Layout';
+// Layout убран - компонент оборачивается в Layout на уровне роутинга
 import api from '../services/api';
 
 interface Assessment {
@@ -36,7 +36,9 @@ export const AssessmentsPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get('/assessments/available');
-      setAssessments(response.data);
+      // Обрабатываем новый формат API
+      const assessmentsData = response.data?.success ? response.data.data : response.data;
+      setAssessments(Array.isArray(assessmentsData) ? assessmentsData : []);
     } catch (error) {
       console.error('Ошибка при загрузке опросов:', error);
       setError('Не удалось загрузить опросы');
@@ -86,17 +88,14 @@ export const AssessmentsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </Layout>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Доступные опросы
@@ -243,6 +242,5 @@ export const AssessmentsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
   );
 }; 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout } from '../components/Layout';
+// Layout убран - компонент оборачивается в Layout на уровне роутинга
 import { 
   CategoryBarChart, 
   CategoryRadarChart, 
@@ -111,27 +111,22 @@ export const ReportViewPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </Layout>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
     );
   }
 
   if (error || !report || !reportData) {
     return (
-      <Layout>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error || 'Отчет не найден'}
-        </div>
-      </Layout>
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        {error || 'Отчет не найден'}
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
         {/* Заголовок */}
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -329,6 +324,5 @@ export const ReportViewPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
   );
 }; 

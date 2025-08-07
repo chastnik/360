@@ -151,7 +151,7 @@ router.post('/register', async (req, res): Promise<void> => {
     const password_hash = await bcrypt.hash(password, saltRounds);
 
     // Создать пользователя
-    const [userId] = await db('users')
+    const [newUser] = await db('users')
       .insert({
         email: email.toLowerCase(),
         password_hash,
@@ -160,12 +160,7 @@ router.post('/register', async (req, res): Promise<void> => {
         role,
         is_active: true
       })
-      .returning('id');
-
-    // Получить созданного пользователя
-    const newUser = await db('users')
-      .where({ id: userId })
-      .first();
+      .returning('*');
 
     res.status(201).json({
       success: true,

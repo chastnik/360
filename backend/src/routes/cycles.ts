@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import knex from '../database/connection';
+import db from '../database/connection';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import mattermostService from '../services/mattermost';
 
@@ -8,11 +8,14 @@ const router = Router();
 // Получить все циклы оценки
 router.get('/', authenticateToken, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const cycles = await knex('assessment_cycles')
-      .select('id', 'title', 'description', 'status', 'start_date', 'end_date', 'created_at')
+    const cycles = await db('assessment_cycles')
+      .select('id', 'name', 'description', 'status', 'start_date', 'end_date', 'created_at')
       .orderBy('created_at', 'desc');
 
-    res.json(cycles);
+    res.json({
+      success: true,
+      data: cycles
+    });
   } catch (error) {
     console.error('Ошибка получения циклов оценки:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
@@ -24,7 +27,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
   try {
     const { id } = req.params;
 
-    const cycle = await knex('assessment_cycles')
+    const cycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -34,7 +37,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
     }
 
     // Получить участников цикла
-    const participants = await knex('assessment_participants')
+    const participants = await db('assessment_participants')
       .join('users', 'assessment_participants.user_id', '=', 'users.id')
       .where('assessment_participants.cycle_id', id)
       .select(
@@ -48,8 +51,8 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
       );
 
     // Получить респондентов для каждого участника
-    const respondents = await knex('assessment_respondents')
-      .join('users', 'assessment_respondents.respondent_id', '=', 'users.id')
+    const respondents = await db('assessment_respondents')
+      .join('users', 'assessment_respondents.respondent_user_id', '=', 'users.id')
       .join('assessment_participants', 'assessment_respondents.participant_id', '=', 'assessment_participants.id')
       .where('assessment_participants.cycle_id', id)
       .select(
@@ -82,28 +85,26 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
 router.post('/', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
   try {
     const user = req.user;
-    const { title, description, start_date, end_date } = req.body;
+    const { name, description, start_date, end_date } = req.body;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr') {
+    if (user?.role !== 'admin' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
 
-    const [cycleId] = await knex('assessment_cycles')
+    const [newCycle] = await db('assessment_cycles')
       .insert({
-        title,
+        name,
         description,
         start_date,
         end_date,
         status: 'draft',
         created_by: user.userId
       })
-      .returning('id');
+      .returning('*');
 
-    const cycle = await knex('assessment_cycles')
-      .where('id', cycleId)
-      .first();
+    const cycle = newCycle;
 
     res.status(201).json(cycle);
   } catch (error) {
@@ -117,15 +118,15 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res): Promise<voi
   try {
     const user = req.user;
     const { id } = req.params;
-    const { title, description, start_date, end_date } = req.body;
+    const { name, description, start_date, end_date } = req.body;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr') {
+    if (user?.role !== 'admin' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
 
-    const cycle = await knex('assessment_cycles')
+    const cycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -140,17 +141,17 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res): Promise<voi
       return;
     }
 
-    await knex('assessment_cycles')
+    await db('assessment_cycles')
       .where('id', id)
       .update({
-        title,
+        title: name, // Сохраняем как title в БД, но принимаем как name
         description,
         start_date,
         end_date,
-        updated_at: knex.fn.now()
+        updated_at: db.fn.now()
       });
 
-    const updatedCycle = await knex('assessment_cycles')
+    const updatedCycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -166,15 +167,16 @@ router.post('/:id/participants', authenticateToken, async (req: AuthRequest, res
   try {
     const user = req.user;
     const { id } = req.params;
-    const { userIds } = req.body;
+    const { user_id } = req.body;
+    const userIds = Array.isArray(user_id) ? user_id : [user_id];
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr') {
+    if (user?.role !== 'admin' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
 
-    const cycle = await knex('assessment_cycles')
+    const cycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -190,7 +192,7 @@ router.post('/:id/participants', authenticateToken, async (req: AuthRequest, res
     }
 
     // Проверить, что пользователи существуют
-    const existingUsers = await knex('users')
+    const existingUsers = await db('users')
       .whereIn('id', userIds)
       .where('is_active', true);
 
@@ -200,13 +202,13 @@ router.post('/:id/participants', authenticateToken, async (req: AuthRequest, res
     }
 
     // Добавить участников
-    const participantData = userIds.map((userId: number) => ({
+    const participantData = userIds.map((userId: string) => ({
       cycle_id: id,
       user_id: userId,
-      status: 'pending'
+      status: 'invited'
     }));
 
-    await knex('assessment_participants')
+    await db('assessment_participants')
       .insert(participantData)
       .onConflict(['cycle_id', 'user_id'])
       .merge();
@@ -226,12 +228,12 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
     const { respondentIds } = req.body;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr') {
+    if (user?.role !== 'admin' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
 
-    const cycle = await knex('assessment_cycles')
+    const cycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -240,7 +242,7 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       return;
     }
 
-    const participant = await knex('assessment_participants')
+    const participant = await db('assessment_participants')
       .where('id', participantId)
       .where('cycle_id', id)
       .first();
@@ -256,29 +258,74 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       return;
     }
 
+    // Получаем информацию об участнике, включая его руководителя
+    const participantUser = await db('users')
+      .where('id', participant.user_id)
+      .first();
+
+    // Создаем список респондентов, включая руководителя (если есть)
+    let allRespondentIds = [...respondentIds];
+    
+    if (participantUser?.manager_id && !allRespondentIds.includes(participantUser.manager_id)) {
+      // Проверяем, что руководитель активен
+      const manager = await db('users')
+        .where('id', participantUser.manager_id)
+        .where('is_active', true)
+        .first();
+      
+      if (manager) {
+        allRespondentIds.push(participantUser.manager_id);
+      }
+    }
+
     // Проверить, что респонденты существуют
-    const existingUsers = await knex('users')
-      .whereIn('id', respondentIds)
+    const existingUsers = await db('users')
+      .whereIn('id', allRespondentIds)
       .where('is_active', true);
 
-    if (existingUsers.length !== respondentIds.length) {
+    if (existingUsers.length !== allRespondentIds.length) {
       res.status(400).json({ error: 'Один или несколько респондентов не найдены' });
       return;
     }
 
-    // Добавить респондентов
-    const respondentData = respondentIds.map((respondentId: number) => ({
-      participant_id: participantId,
-      respondent_id: respondentId,
-      status: 'pending'
-    }));
+    // Добавить респондентов (включая руководителя)
+    const respondentData = allRespondentIds.map((respondentId: string) => {
+      // Определяем тип респондента
+      let respondentType = 'peer'; // по умолчанию коллега
+      
+      if (respondentId === participant.user_id) {
+        respondentType = 'self';
+      } else if (respondentId === participantUser?.manager_id) {
+        respondentType = 'manager';
+      }
+      
+      return {
+        participant_id: participantId,
+        respondent_user_id: respondentId, // исправляем поле на правильное
+        respondent_type: respondentType,
+        status: 'invited'
+      };
+    });
 
-    await knex('assessment_respondents')
+    await db('assessment_respondents')
       .insert(respondentData)
-      .onConflict(['participant_id', 'respondent_id'])
+      .onConflict(['participant_id', 'respondent_user_id'])
       .merge();
 
-    res.json({ message: 'Респонденты успешно добавлены' });
+    // Формируем сообщение с информацией о добавленных респондентах
+    let message = 'Респонденты успешно добавлены';
+    if (participantUser?.manager_id && allRespondentIds.includes(participantUser.manager_id)) {
+      const manager = existingUsers.find(u => u.id === participantUser.manager_id);
+      if (manager) {
+        message += `. Руководитель ${manager.first_name} ${manager.last_name} добавлен автоматически`;
+      }
+    }
+    
+    res.json({ 
+      message,
+      totalRespondents: allRespondentIds.length,
+      managerAdded: participantUser?.manager_id && allRespondentIds.includes(participantUser.manager_id)
+    });
   } catch (error) {
     console.error('Ошибка добавления респондентов:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
@@ -292,12 +339,12 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
     const { id } = req.params;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr') {
+    if (user?.role !== 'admin' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
 
-    const cycle = await knex('assessment_cycles')
+    const cycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -312,7 +359,7 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
     }
 
     // Проверить, что есть участники
-    const participantsCount = await knex('assessment_participants')
+    const participantsCount = await db('assessment_participants')
       .where('cycle_id', id)
       .count('id as count')
       .first();
@@ -323,22 +370,22 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
     }
 
     // Запустить цикл
-    await knex('assessment_cycles')
+    await db('assessment_cycles')
       .where('id', id)
       .update({
         status: 'active',
-        start_date: knex.fn.now()
+        start_date: db.fn.now()
       });
 
     // Обновить статус участников
-    await knex('assessment_participants')
+    await db('assessment_participants')
       .where('cycle_id', id)
       .update({ status: 'active' });
 
     // Обновить статус респондентов
-    await knex('assessment_respondents')
+    await db('assessment_respondents')
       .whereIn('participant_id', 
-        knex('assessment_participants')
+        db('assessment_participants')
           .where('cycle_id', id)
           .select('id')
       )
@@ -347,7 +394,7 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
     // Отправить уведомления в Mattermost
     try {
       // Получить участников с Mattermost username
-      const participants = await knex('assessment_participants')
+      const participants = await db('assessment_participants')
         .join('users', 'assessment_participants.user_id', 'users.id')
         .where('assessment_participants.cycle_id', id)
         .whereNotNull('users.mattermost_username')
@@ -364,7 +411,7 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
       }
 
       // Получить респондентов с Mattermost username
-      const respondents = await knex('assessment_respondents')
+      const respondents = await db('assessment_respondents')
         .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
         .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
         .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
@@ -410,12 +457,12 @@ router.delete('/:id/participants/:participantId', authenticateToken, async (req:
     const { id, participantId } = req.params;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr') {
+    if (user?.role !== 'admin' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
 
-    const cycle = await knex('assessment_cycles')
+    const cycle = await db('assessment_cycles')
       .where('id', id)
       .first();
 
@@ -431,12 +478,12 @@ router.delete('/:id/participants/:participantId', authenticateToken, async (req:
     }
 
     // Удалить респондентов участника
-    await knex('assessment_respondents')
+    await db('assessment_respondents')
       .where('participant_id', participantId)
       .del();
 
     // Удалить участника
-    await knex('assessment_participants')
+    await db('assessment_participants')
       .where('id', participantId)
       .where('cycle_id', id)
       .del();

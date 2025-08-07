@@ -1,34 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
-
-interface Category {
-  id: number;
-  name: string;
-  description: string;
-  color: string;
-  icon: string;
-  is_active: boolean;
-}
-
-interface Question {
-  id: number;
-  category_id: number;
-  text: string;
-  description?: string;
-  type: 'rating' | 'text' | 'boolean';
-  min_value: number;
-  max_value: number;
-  order_index: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  category?: Category;
-}
+import api, { questionsAPI, categoriesAPI } from '../../services/api';
+import { Category, Question } from '../../types/common';
 
 interface QuestionFormData {
   text: string;
   description: string;
-  category_id: number;
+  category_id: string;
   type: 'rating' | 'text' | 'boolean';
   min_value: number;
   max_value: number;
@@ -45,12 +22,12 @@ const AdminQuestions: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<QuestionFormData>({
     text: '',
     description: '',
-    category_id: 0,
+    category_id: '',
     type: 'rating',
     min_value: 1,
     max_value: 5,
@@ -66,24 +43,32 @@ const AdminQuestions: React.FC = () => {
     try {
       setLoading(true);
       const [questionsResponse, categoriesResponse] = await Promise.all([
-        api.get('/questions'),
-        api.get('/categories')
+        questionsAPI.getQuestions(),
+        categoriesAPI.getCategories()
       ]);
 
-      const questionsWithCategories = questionsResponse.data.map((question: Question) => ({
+      // Проверяем успешность ответов
+      if (!questionsResponse.success) {
+        throw new Error(questionsResponse.error || 'Ошибка загрузки вопросов');
+      }
+      if (!categoriesResponse.success) {
+        throw new Error(categoriesResponse.error || 'Ошибка загрузки категорий');
+      }
+
+      const questionsWithCategories = (questionsResponse.data || []).map((question: Question) => ({
         ...question,
-        category: categoriesResponse.data.find((cat: Category) => cat.id === question.category_id)
+        category: (categoriesResponse.data || []).find((cat: Category) => cat.id === question.category_id)
       }));
 
       setQuestions(questionsWithCategories.sort((a: Question, b: Question) => 
         a.category_id === b.category_id ? 
           a.order_index - b.order_index : 
-          a.category_id - b.category_id
+          a.category_id.localeCompare(b.category_id)
       ));
-      setCategories(categoriesResponse.data.filter((cat: Category) => cat.is_active));
-    } catch (error) {
+      setCategories((categoriesResponse.data || []).filter((cat: Category) => cat.is_active));
+    } catch (error: any) {
       console.error('Ошибка загрузки данных:', error);
-      setError('Не удалось загрузить данные');
+      setError(error.message || 'Не удалось загрузить данные');
     } finally {
       setLoading(false);
     }
@@ -130,7 +115,7 @@ const AdminQuestions: React.FC = () => {
     }
   };
 
-  const handleDeleteQuestion = async (questionId: number) => {
+  const handleDeleteQuestion = async (questionId: string) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот вопрос?')) {
       return;
     }
@@ -145,7 +130,7 @@ const AdminQuestions: React.FC = () => {
     }
   };
 
-  const handleToggleActive = async (questionId: number) => {
+  const handleToggleActive = async (questionId: string) => {
     const question = questions.find(q => q.id === questionId);
     if (!question) return;
 
@@ -161,7 +146,7 @@ const AdminQuestions: React.FC = () => {
     }
   };
 
-  const handleReorder = async (questionId: number, direction: 'up' | 'down') => {
+  const handleReorder = async (questionId: string, direction: 'up' | 'down') => {
     const question = questions.find(q => q.id === questionId);
     if (!question) return;
 
@@ -212,7 +197,7 @@ const AdminQuestions: React.FC = () => {
     setFormData({
       text: '',
       description: '',
-      category_id: categories.length > 0 ? categories[0].id : 0,
+      category_id: categories.length > 0 ? categories[0].id : '',
       type: 'rating',
       min_value: 1,
       max_value: 5,
@@ -255,7 +240,7 @@ const AdminQuestions: React.FC = () => {
     }
     acc[categoryId].push(question);
     return acc;
-  }, {} as Record<number, Question[]>);
+  }, {} as Record<string, Question[]>);
 
   // Очистка сообщений через 5 секунд
   useEffect(() => {
@@ -320,7 +305,7 @@ const AdminQuestions: React.FC = () => {
           <select
             id="category-filter"
             value={selectedCategory || ''}
-            onChange={(e) => setSelectedCategory(e.target.value ? parseInt(e.target.value) : null)}
+            onChange={(e) => setSelectedCategory(e.target.value || null)}
             className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
           >
             <option value="">Все категории</option>
@@ -336,7 +321,7 @@ const AdminQuestions: React.FC = () => {
       {/* Список вопросов по категориям */}
       <div className="space-y-6">
         {Object.entries(groupedQuestions).map(([categoryId, categoryQuestions]) => {
-          const category = categories.find(c => c.id === parseInt(categoryId));
+          const category = categories.find(c => c.id === categoryId);
           if (!category) return null;
 
           return (
@@ -490,7 +475,7 @@ const AdminQuestions: React.FC = () => {
                 </label>
                 <select
                   value={formData.category_id}
-                  onChange={(e) => setFormData({...formData, category_id: parseInt(e.target.value)})}
+                  onChange={(e) => setFormData({...formData, category_id: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                   required
                 >

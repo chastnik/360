@@ -54,23 +54,23 @@ const AdminDashboard: React.FC = () => {
         api.get('/mattermost/integration-stats').catch(() => ({ data: { connection: { status: 'disconnected' }, users: { withMattermost: 0 } } }))
       ]);
 
-      // Подсчитываем статистику
-      const users = usersResponse.data;
-      const cycles = cyclesResponse.data;
-      const assessments = assessmentsResponse.data;
-      const questions = questionsResponse.data;
-      const categories = categoriesResponse.data;
+      // Подсчитываем статистику - обрабатываем новый формат API
+      const users = usersResponse.data?.success ? usersResponse.data.data : usersResponse.data;
+      const cycles = cyclesResponse.data?.success ? cyclesResponse.data.data : cyclesResponse.data;
+      const assessments = assessmentsResponse.data?.success ? assessmentsResponse.data.data : assessmentsResponse.data;
+      const questions = questionsResponse.data?.success ? questionsResponse.data.data : questionsResponse.data;
+      const categories = categoriesResponse.data?.success ? categoriesResponse.data.data : categoriesResponse.data;
       const mattermostData = mattermostResponse.data;
 
       const dashboardStats: DashboardStats = {
-        totalUsers: users.length,
-        activeUsers: users.filter((user: any) => user.is_active).length,
-        totalCycles: cycles.length,
-        activeCycles: cycles.filter((cycle: any) => cycle.status === 'active').length,
-        completedAssessments: assessments.filter((assessment: any) => assessment.status === 'completed').length,
-        pendingAssessments: assessments.filter((assessment: any) => assessment.status === 'pending' || assessment.status === 'in_progress').length,
-        totalQuestions: questions.length,
-        totalCategories: categories.length,
+        totalUsers: Array.isArray(users) ? users.length : 0,
+        activeUsers: Array.isArray(users) ? users.filter((user: any) => user.is_active).length : 0,
+        totalCycles: Array.isArray(cycles) ? cycles.length : 0,
+        activeCycles: Array.isArray(cycles) ? cycles.filter((cycle: any) => cycle.status === 'active').length : 0,
+        completedAssessments: Array.isArray(assessments) ? assessments.filter((assessment: any) => assessment.status === 'completed').length : 0,
+        pendingAssessments: Array.isArray(assessments) ? assessments.filter((assessment: any) => assessment.status === 'pending' || assessment.status === 'in_progress').length : 0,
+        totalQuestions: Array.isArray(questions) ? questions.length : 0,
+        totalCategories: Array.isArray(categories) ? categories.length : 0,
         mattermostConnection: mattermostData.connection?.status === 'connected',
         mattermostUsers: mattermostData.users?.withMattermost || 0
       };

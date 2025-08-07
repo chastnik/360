@@ -1,36 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-
-interface User {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  middle_name?: string;
-  role: 'admin' | 'hr' | 'user';
-  position?: string;
-  department?: string;
-  manager_id?: number;
-  mattermost_username?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import { User, Department } from '../../types/common';
 
 interface UserFormData {
   email: string;
   first_name: string;
   last_name: string;
   middle_name: string;
-  role: 'admin' | 'hr' | 'user';
+  role: 'admin' | 'hr' | 'manager' | 'user';
   position: string;
-  department: string;
+  department: string; // старое поле для совместимости
+  department_id: string; // новое поле - ID отдела
   manager_id: string;
   mattermost_username: string;
 }
 
 const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,6 +34,7 @@ const AdminUsers: React.FC = () => {
     role: 'user',
     position: '',
     department: '',
+    department_id: '',
     manager_id: '',
     mattermost_username: ''
   });
@@ -58,11 +46,19 @@ const AdminUsers: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/users');
-      setUsers(response.data);
+      const [usersResponse, departmentsResponse] = await Promise.all([
+        api.get('/users'),
+        api.get('/departments')
+      ]);
+      // Проверяем формат ответа API
+      const usersData = usersResponse.data?.success ? usersResponse.data.data : usersResponse.data;
+      const departmentsData = departmentsResponse.data?.success ? departmentsResponse.data.data : departmentsResponse.data;
+      
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
     } catch (error) {
-      console.error('Ошибка загрузки пользователей:', error);
-      setError('Не удалось загрузить пользователей');
+      console.error('Ошибка загрузки данных:', error);
+      setError('Не удалось загрузить данные');
     } finally {
       setLoading(false);
     }
@@ -73,10 +69,11 @@ const AdminUsers: React.FC = () => {
     try {
       const userData = {
         ...formData,
-        manager_id: formData.manager_id ? parseInt(formData.manager_id) : undefined
+        department_id: formData.department_id || undefined,
+        manager_id: formData.manager_id || undefined
       };
       
-      const response = await api.post('/auth/register', userData);
+      const response = await api.post('/users', userData);
       
       if (response.data.success) {
         setSuccessMessage(`Пользователь создан. Временный пароль: ${response.data.temporary_password}`);
@@ -89,6 +86,7 @@ const AdminUsers: React.FC = () => {
           role: 'user',
           position: '',
           department: '',
+          department_id: '',
           manager_id: '',
           mattermost_username: ''
         });
@@ -109,7 +107,8 @@ const AdminUsers: React.FC = () => {
     try {
       const userData = {
         ...formData,
-        manager_id: formData.manager_id ? parseInt(formData.manager_id) : undefined
+        department_id: formData.department_id || undefined,
+        manager_id: formData.manager_id || undefined
       };
       
       const response = await api.put(`/users/${selectedUser.id}`, userData);
@@ -128,7 +127,7 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const handleDeactivateUser = async (userId: number) => {
+  const handleDeactivateUser = async (userId: string) => {
     if (!window.confirm('Вы уверены, что хотите деактивировать этого пользователя?')) {
       return;
     }
@@ -143,7 +142,7 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const handleActivateUser = async (userId: number) => {
+  const handleActivateUser = async (userId: string) => {
     try {
       await api.patch(`/users/${userId}/activate`);
       setSuccessMessage('Пользователь активирован');
@@ -164,19 +163,20 @@ const AdminUsers: React.FC = () => {
       role: user.role,
       position: user.position || '',
       department: user.department || '',
-      manager_id: user.manager_id?.toString() || '',
+      department_id: user.department_id || '',
+      manager_id: user.manager_id || '',
       mattermost_username: user.mattermost_username || ''
     });
     setShowEditForm(true);
   };
 
-  const filteredUsers = users.filter(user =>
+  const filteredUsers = Array.isArray(users) ? users.filter(user =>
     user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const getRoleText = (role: string) => {
     switch (role) {
@@ -316,6 +316,12 @@ const AdminUsers: React.FC = () => {
                             <p>{user.department}</p>
                           </>
                         )}
+                        {user.manager_id && (
+                          <>
+                            <span className="mx-2">•</span>
+                            <p>Рук.: {Array.isArray(users) ? users.find(u => u.id === user.manager_id)?.first_name + ' ' + users.find(u => u.id === user.manager_id)?.last_name || 'Не найден' : 'Загрузка...'}</p>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -443,12 +449,38 @@ const AdminUsers: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Отдел
                 </label>
-                <input
-                  type="text"
-                  value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
+                <select
+                  value={formData.department_id}
+                  onChange={(e) => setFormData({...formData, department_id: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                />
+                >
+                  <option value="">Выберите отдел</option>
+                  {departments.filter(dept => dept.is_active).map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Руководитель
+                </label>
+                <select
+                  value={formData.manager_id}
+                  onChange={(e) => setFormData({...formData, manager_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">Выберите руководителя</option>
+                  {Array.isArray(users) ? users
+                    .filter(user => user.is_active && user.id !== selectedUser?.id && (user.role === 'admin' || user.role === 'hr' || user.role === 'manager'))
+                    .map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.first_name} {user.last_name} ({user.position || user.role})
+                    </option>
+                  )) : null}
+                </select>
               </div>
               
               <div>

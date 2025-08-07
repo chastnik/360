@@ -20,6 +20,7 @@ import { ReportViewPage } from './pages/ReportViewPage';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminDepartments from './pages/admin/AdminDepartments';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminQuestions from './pages/admin/AdminQuestions';
 import AdminMattermost from './pages/admin/AdminMattermost';
@@ -28,8 +29,8 @@ import AdminSettings from './pages/admin/AdminSettings';
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <Router>
+      <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <AuthProvider>
           <div className="min-h-screen bg-background text-foreground">
             <Routes>
               {/* Публичные маршруты */}
@@ -104,6 +105,14 @@ function App() {
                 </PrivateRoute>
               } />
               
+              <Route path="/admin/departments" element={
+                <PrivateRoute requiredRole="admin">
+                  <AdminLayout>
+                    <AdminDepartments />
+                  </AdminLayout>
+                </PrivateRoute>
+              } />
+              
               <Route path="/admin/categories" element={
                 <PrivateRoute requiredRole="admin">
                   <AdminLayout>
@@ -169,8 +178,8 @@ function App() {
               } />
             </Routes>
           </div>
-        </Router>
-      </AuthProvider>
+        </AuthProvider>
+      </Router>
     </ThemeProvider>
   );
 }
