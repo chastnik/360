@@ -121,7 +121,7 @@ router.post('/register', async (req, res) => {
         const password = generateRandomPassword();
         const saltRounds = 10;
         const password_hash = await bcryptjs_1.default.hash(password, saltRounds);
-        const [userId] = await (0, connection_1.default)('users')
+        const [newUser] = await (0, connection_1.default)('users')
             .insert({
             email: email.toLowerCase(),
             password_hash,
@@ -130,10 +130,7 @@ router.post('/register', async (req, res) => {
             role,
             is_active: true
         })
-            .returning('id');
-        const newUser = await (0, connection_1.default)('users')
-            .where({ id: userId })
-            .first();
+            .returning('*');
         res.status(201).json({
             success: true,
             message: 'Пользователь успешно зарегистрирован',

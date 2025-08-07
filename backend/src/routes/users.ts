@@ -28,7 +28,7 @@ const router = Router();
 router.get('/', authenticateToken, async (_req: any, res: any): Promise<void> => {
   try {
     const users = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager')
       .where('is_active', true)
       .orderBy('last_name', 'first_name');
     
@@ -43,12 +43,12 @@ router.get('/', authenticateToken, async (_req: any, res: any): Promise<void> =>
 });
 
 // Получить пользователя по ID
-router.get('/:id', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
   try {
     const { id } = req.params;
     
     const user = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager')
       .where('id', id)
       .first();
     
@@ -101,7 +101,7 @@ router.put('/profile', authenticateToken, async (req: any, res: any): Promise<vo
 
     // Получаем обновленные данные пользователя
     const updatedUser = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department as department', 'department_id', 'created_at', 'updated_at')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at')
       .where('id', userId)
       .first();
 
@@ -270,7 +270,8 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
       department, // старое поле для совместимости
       department_id, // новое поле - ID отдела
       manager_id,
-      mattermost_username
+      mattermost_username,
+      is_manager
     } = req.body;
 
     // Проверяем существование пользователя
@@ -316,12 +317,13 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
         department_id: department_id && department_id.trim() !== '' ? department_id : null,
         manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
         mattermost_username,
+        is_manager: is_manager === true || is_manager === 'true',
         updated_at: new Date()
       });
 
     // Получаем обновленные данные
     const updatedUser = await db('users')
-      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_active', 'created_at', 'updated_at'])
+      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at'])
       .where('id', userId)
       .first();
 

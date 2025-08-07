@@ -13,6 +13,7 @@ interface UserFormData {
   department_id: string; // новое поле - ID отдела
   manager_id: string;
   mattermost_username: string;
+  is_manager: boolean;
 }
 
 const AdminUsers: React.FC = () => {
@@ -36,7 +37,8 @@ const AdminUsers: React.FC = () => {
     department: '',
     department_id: '',
     manager_id: '',
-    mattermost_username: ''
+    mattermost_username: '',
+    is_manager: false
   });
 
   useEffect(() => {
@@ -88,7 +90,8 @@ const AdminUsers: React.FC = () => {
           department: '',
           department_id: '',
           manager_id: '',
-          mattermost_username: ''
+          mattermost_username: '',
+          is_manager: false
         });
         loadUsers();
       } else {
@@ -165,7 +168,8 @@ const AdminUsers: React.FC = () => {
       department: user.department || '',
       department_id: user.department_id || '',
       manager_id: user.manager_id || '',
-      mattermost_username: user.mattermost_username || ''
+      mattermost_username: user.mattermost_username || '',
+      is_manager: user.is_manager || false
     });
     setShowEditForm(true);
   };
@@ -483,7 +487,7 @@ const AdminUsers: React.FC = () => {
                 >
                   <option value="">Выберите руководителя</option>
                   {Array.isArray(users) ? users
-                    .filter(user => user.is_active && user.id !== selectedUser?.id && (user.role === 'admin' || user.role === 'hr' || user.role === 'manager'))
+                    .filter(user => user.is_active && user.id !== selectedUser?.id && user.is_manager)
                     .map((user) => (
                     <option key={user.id} value={user.id}>
                       {user.first_name} {user.last_name} ({user.position || user.role})
@@ -503,6 +507,23 @@ const AdminUsers: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                   placeholder="@username"
                 />
+              </div>
+              
+              <div>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_manager}
+                    onChange={(e) => setFormData({...formData, is_manager: e.target.checked})}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-600 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Является руководителем
+                  </span>
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Пользователи с этой отметкой будут доступны для выбора в качестве руководителей других сотрудников
+                </p>
               </div>
               
               <div className="flex justify-end space-x-3 pt-4">

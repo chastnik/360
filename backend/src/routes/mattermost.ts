@@ -2,8 +2,21 @@ import { Router } from 'express';
 import knex from '../database/connection';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import mattermostService from '../services/mattermost';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
+
+/**
+ * Генерация случайного пароля
+ */
+function generatePassword(length: number = 12): string {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+}
 
 /**
  * Проверка подключения к Mattermost
@@ -34,7 +47,7 @@ router.get('/test-connection', authenticateToken, async (req: AuthRequest, res):
 });
 
 /**
- * Синхронизация пользователей с Mattermost
+ * Синхронизация пользователей с Mattermost (все пользователи)
  */
 router.post('/sync-users', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
   try {
@@ -46,8 +59,8 @@ router.post('/sync-users', authenticateToken, async (req: AuthRequest, res): Pro
       return;
     }
 
-    // Получить пользователей из Mattermost
-    const mattermostUsers = await mattermostService.getTeamUsers();
+    // Получить всех пользователей из Mattermost (не только членов команды)
+    const mattermostUsers = await mattermostService.getAllUsers();
     
     if (mattermostUsers.length === 0) {
       res.status(400).json({ error: 'Не удалось получить пользователей из Mattermost' });
@@ -66,11 +79,12 @@ router.post('/sync-users', authenticateToken, async (req: AuthRequest, res): Pro
           .first();
 
         if (existingUser) {
-          // Обновить mattermost_username
+          // Обновить mattermost_username и mattermost_user_id
           await knex('users')
             .where('id', existingUser.id)
             .update({
-              mattermost_username: mmUser.username,
+              mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+              mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
               updated_at: knex.fn.now()
             });
           updatedCount++;
@@ -80,7 +94,8 @@ router.post('/sync-users', authenticateToken, async (req: AuthRequest, res): Pro
             email: mmUser.email.toLowerCase(),
             first_name: mmUser.first_name || '',
             last_name: mmUser.last_name || '',
-            mattermost_username: mmUser.username,
+            mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+            mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
             role: 'user',
             password_hash: '', // Пароль будет установлен при первом входе
             is_active: true
@@ -105,6 +120,84 @@ router.post('/sync-users', authenticateToken, async (req: AuthRequest, res): Pro
     });
   } catch (error) {
     console.error('Ошибка синхронизации пользователей:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Синхронизация только членов команды с Mattermost
+ */
+router.post('/sync-team-users', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const user = req.user;
+    
+    // Проверить права доступа
+    if (user?.role !== 'admin') {
+      res.status(403).json({ error: 'Недостаточно прав доступа' });
+      return;
+    }
+
+    // Получить только членов команды из Mattermost
+    const mattermostUsers = await mattermostService.getTeamUsers();
+    
+    if (mattermostUsers.length === 0) {
+      res.status(400).json({ error: 'Не удалось получить пользователей команды из Mattermost' });
+      return;
+    }
+
+    let syncedCount = 0;
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    for (const mmUser of mattermostUsers) {
+      try {
+        // Найти пользователя в базе данных по email
+        const existingUser = await knex('users')
+          .where('email', mmUser.email.toLowerCase())
+          .first();
+
+        if (existingUser) {
+          // Обновить mattermost_username и mattermost_user_id
+          await knex('users')
+            .where('id', existingUser.id)
+            .update({
+              mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+              mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
+              updated_at: knex.fn.now()
+            });
+          updatedCount++;
+        } else {
+          // Создать нового пользователя
+          await knex('users').insert({
+            email: mmUser.email.toLowerCase(),
+            first_name: mmUser.first_name || '',
+            last_name: mmUser.last_name || '',
+            mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+            mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
+            role: 'user',
+            password_hash: '', // Пароль будет установлен при первом входе
+            is_active: true
+          });
+          syncedCount++;
+        }
+      } catch (error) {
+        console.error(`Ошибка синхронизации пользователя ${mmUser.email}:`, error);
+        errorCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Синхронизация членов команды завершена',
+      stats: {
+        total: mattermostUsers.length,
+        synced: syncedCount,
+        updated: updatedCount,
+        errors: errorCount
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка синхронизации членов команды:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
@@ -393,6 +486,149 @@ router.get('/integration-stats', authenticateToken, async (req: AuthRequest, res
     });
   } catch (error) {
     console.error('Ошибка получения статистики интеграции:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Поиск пользователей для выбора респондентов
+ */
+router.post('/search-respondents', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const { query } = req.body;
+    
+    if (!query || query.trim().length < 2) {
+      res.status(400).json({ error: 'Запрос должен содержать минимум 2 символа' });
+      return;
+    }
+
+    const users = await mattermostService.searchUsers(query.trim());
+    
+    res.json({
+      success: true,
+      data: users.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        position: user.position
+      }))
+    });
+  } catch (error) {
+    console.error('Ошибка поиска респондентов:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Подтверждение респондента
+ */
+router.post('/confirm-respondent/:participantId/:respondentId', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const { participantId, respondentId } = req.params;
+    
+    // Найти участника
+    const participant = await knex('assessment_participants')
+      .where('id', participantId)
+      .first();
+    
+    if (!participant) {
+      res.status(404).json({ error: 'Участник не найден' });
+      return;
+    }
+
+    // Найти пользователя-респондента в нашей системе или создать
+    let respondentUser = await knex('users')
+      .where('mattermost_user_id', respondentId)
+      .first();
+
+    if (!respondentUser) {
+      // Получить данные из Mattermost по ID
+      const mmUser = await mattermostService.getUserById(respondentId);
+      
+      if (!mmUser) {
+        res.status(404).json({ error: 'Респондент не найден в Mattermost' });
+        return;
+      }
+
+      // Сгенерировать пароль для нового пользователя
+      const tempPassword = generatePassword(12);
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+      // Создать пользователя в нашей системе
+      const [newUser] = await knex('users').insert({
+        email: mmUser.email.toLowerCase(),
+        first_name: mmUser.first_name || '',
+        last_name: mmUser.last_name || '',
+        mattermost_username: mmUser.username,
+        mattermost_user_id: mmUser.id,
+        role: 'user',
+        password_hash: passwordHash,
+        is_active: true
+      }).returning('*');
+      
+      respondentUser = newUser;
+
+      // Отправить пароль в Mattermost
+      await mattermostService.sendNotification({
+        recipientUsername: mmUser.username,
+        title: '🔑 Доступ к системе 360° оценки',
+        message: `Для вас создан аккаунт в системе 360° оценки.\n\n**Данные для входа:**\nЛогин: ${mmUser.email}\nПароль: \`${tempPassword}\`\n\nРекомендуем сменить пароль после первого входа в систему.`,
+        actionUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+        actionText: 'Войти в систему'
+      });
+    }
+
+    // Добавить респондента
+    await knex('assessment_respondents').insert({
+      participant_id: participantId,
+      respondent_id: respondentUser.id,
+      status: 'pending'
+    });
+
+    res.json({
+      success: true,
+      message: 'Респондент добавлен'
+    });
+  } catch (error) {
+    console.error('Ошибка подтверждения респондента:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Тестирование создания прямых каналов
+ */
+router.post('/test-direct-channels', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const user = req.user;
+    
+    // Проверить права доступа
+    if (user?.role !== 'admin') {
+      res.status(403).json({ error: 'Недостаточно прав доступа' });
+      return;
+    }
+
+    const { usernames } = req.body;
+    
+    if (!usernames || !Array.isArray(usernames)) {
+      res.status(400).json({ error: 'Необходимо указать массив usernames' });
+      return;
+    }
+
+    const results: { [key: string]: boolean } = {};
+
+    for (const username of usernames) {
+      results[username] = await mattermostService.testDirectChannelCreation(username);
+    }
+
+    res.json({
+      success: true,
+      results: results
+    });
+  } catch (error) {
+    console.error('Ошибка тестирования каналов:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });

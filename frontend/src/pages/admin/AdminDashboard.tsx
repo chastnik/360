@@ -60,7 +60,7 @@ const AdminDashboard: React.FC = () => {
       const assessments = assessmentsResponse.data?.success ? assessmentsResponse.data.data : assessmentsResponse.data;
       const questions = questionsResponse.data?.success ? questionsResponse.data.data : questionsResponse.data;
       const categories = categoriesResponse.data?.success ? categoriesResponse.data.data : categoriesResponse.data;
-      const mattermostData = mattermostResponse.data;
+      const mattermostData = mattermostResponse.data?.success ? mattermostResponse.data.data : mattermostResponse.data;
 
       const dashboardStats: DashboardStats = {
         totalUsers: Array.isArray(users) ? users.length : 0,

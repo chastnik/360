@@ -88,7 +88,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res): Promise<void>
     const { name, description, start_date, end_date } = req.body;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'manager') {
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -121,7 +121,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res): Promise<voi
     const { name, description, start_date, end_date } = req.body;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'manager') {
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -144,7 +144,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res): Promise<voi
     await db('assessment_cycles')
       .where('id', id)
       .update({
-        title: name, // Сохраняем как title в БД, но принимаем как name
+        name: name, // Исправляем: сохраняем как name
         description,
         start_date,
         end_date,
@@ -171,7 +171,7 @@ router.post('/:id/participants', authenticateToken, async (req: AuthRequest, res
     const userIds = Array.isArray(user_id) ? user_id : [user_id];
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'manager') {
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -228,7 +228,7 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
     const { respondentIds } = req.body;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'manager') {
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -339,7 +339,7 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
     const { id } = req.params;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'manager') {
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -391,22 +391,24 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
       )
       .update({ status: 'active' });
 
-    // Отправить уведомления в Mattermost
+    // Отправить запросы на выбор респондентов участникам
     try {
       // Получить участников с Mattermost username
       const participants = await db('assessment_participants')
         .join('users', 'assessment_participants.user_id', 'users.id')
         .where('assessment_participants.cycle_id', id)
         .whereNotNull('users.mattermost_username')
-        .select('users.mattermost_username');
+        .select('users.mattermost_username', 'assessment_participants.id as participant_id');
 
-      // Отправить уведомления участникам
+      // Отправить запросы на выбор респондентов участникам
       for (const participant of participants) {
-        mattermostService.notifyAssessmentCycleStart(
+        mattermostService.requestRespondentSelection(
           participant.mattermost_username,
-          cycle.title
+          cycle.name, // Используем name вместо title
+          participant.participant_id.toString(),
+          4 // Минимум 4 респондента
         ).catch(error => {
-          console.error(`Ошибка отправки уведомления участнику ${participant.mattermost_username}:`, error);
+          console.error(`Ошибка отправки запроса участнику ${participant.mattermost_username}:`, error);
         });
       }
 
@@ -457,7 +459,7 @@ router.delete('/:id/participants/:participantId', authenticateToken, async (req:
     const { id, participantId } = req.params;
 
     // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'manager') {
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }

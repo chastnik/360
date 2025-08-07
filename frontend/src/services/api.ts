@@ -106,6 +106,30 @@ export const authAPI = {
       };
     }
   },
+
+  forgotPassword: async (email: string): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка запроса сброса пароля'
+      };
+    }
+  },
+
+  resetPassword: async (token: string, password: string): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.post('/auth/reset-password', { token, password });
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Ошибка сброса пароля'
+      };
+    }
+  },
 };
 
 // API для пользователей

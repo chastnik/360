@@ -10,7 +10,8 @@ export interface User {
     manager_id?: string;
     mattermost_username?: string;
     mattermost_user_id?: string;
-    role: 'admin' | 'manager' | 'user';
+    role: 'admin' | 'hr' | 'manager' | 'user';
+    is_manager: boolean;
     is_active: boolean;
     last_login?: Date;
     created_at: Date;

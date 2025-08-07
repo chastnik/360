@@ -51,6 +51,16 @@ class MattermostService {
             return null;
         }
     }
+    async getUserById(userId) {
+        try {
+            const response = await this.client.get(`/users/${userId}`);
+            return response.data;
+        }
+        catch (error) {
+            console.error(`Ошибка получения пользователя ${userId}:`, error);
+            return null;
+        }
+    }
     async getTeamUsers() {
         try {
             const response = await this.client.get(`/teams/${this.teamId}/members`);
@@ -63,6 +73,30 @@ class MattermostService {
         }
         catch (error) {
             console.error('Ошибка получения пользователей команды:', error);
+            return [];
+        }
+    }
+    async getAllUsers() {
+        try {
+            const users = [];
+            let page = 0;
+            const perPage = 100;
+            while (true) {
+                const response = await this.client.get(`/users?page=${page}&per_page=${perPage}&active=true`);
+                const pageUsers = response.data;
+                if (pageUsers.length === 0) {
+                    break;
+                }
+                users.push(...pageUsers);
+                if (pageUsers.length < perPage) {
+                    break;
+                }
+                page++;
+            }
+            return users;
+        }
+        catch (error) {
+            console.error('Ошибка получения всех пользователей:', error);
             return [];
         }
     }
@@ -196,6 +230,78 @@ class MattermostService {
             }
         }
         return { success, failed };
+    }
+    async requestRespondentSelection(participantUsername, cycleTitle, participantId, minRespondents = 4) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const actionUrl = `${frontendUrl}/assessments/select-respondents/${participantId}`;
+        return this.sendNotification({
+            recipientUsername: participantUsername,
+            title: '👥 Необходимо выбрать респондентов',
+            message: `Для участия в цикле оценки "${cycleTitle}" вам необходимо выбрать минимум ${minRespondents} респондентов, которые смогут дать вам оценку.\n\nВы можете указать респондентов по:\n• Email адресу\n• Имени в Mattermost (@username)\n• Полному имени\n\nБот поможет найти и подтвердить каждого респондента.`,
+            actionUrl: actionUrl,
+            actionText: 'Выбрать респондентов'
+        });
+    }
+    async searchUsers(query) {
+        try {
+            const results = [];
+            if (query.startsWith('@')) {
+                const username = query.substring(1);
+                const user = await this.getUserByUsername(username);
+                if (user)
+                    results.push(user);
+            }
+            if (query.includes('@') && !query.startsWith('@')) {
+                const user = await this.getUserByEmail(query);
+                if (user)
+                    results.push(user);
+            }
+            const searchResponse = await this.client.post('/users/search', {
+                term: query,
+                allow_inactive: false
+            });
+            if (searchResponse.data && Array.isArray(searchResponse.data)) {
+                results.push(...searchResponse.data);
+            }
+            const uniqueResults = results.filter((user, index, self) => index === self.findIndex(u => u.id === user.id));
+            return uniqueResults;
+        }
+        catch (error) {
+            console.error('Ошибка поиска пользователей:', error);
+            return [];
+        }
+    }
+    async confirmRespondent(participantUsername, foundUser, participantId, query) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const confirmUrl = `${frontendUrl}/api/assessments/confirm-respondent/${participantId}/${foundUser.id}`;
+        const rejectUrl = `${frontendUrl}/api/assessments/reject-respondent/${participantId}/${foundUser.id}`;
+        return this.sendNotification({
+            recipientUsername: participantUsername,
+            title: '✅ Найден пользователь',
+            message: `По запросу "${query}" найден пользователь:\n\n**${foundUser.first_name} ${foundUser.last_name}**\n@${foundUser.username}\n${foundUser.email}\n${foundUser.position || 'Должность не указана'}\n\nЭто тот человек, которого вы хотели добавить в качестве респондента?`,
+            actionUrl: confirmUrl,
+            actionText: 'Да, добавить'
+        });
+    }
+    async testDirectChannelCreation(username) {
+        try {
+            const user = await this.getUserByUsername(username);
+            if (!user) {
+                console.log(`❌ Пользователь ${username} не найден`);
+                return false;
+            }
+            const channel = await this.createDirectChannel(user.id);
+            if (!channel) {
+                console.log(`❌ Не удалось создать канал с ${username}`);
+                return false;
+            }
+            console.log(`✅ Прямой канал с ${username} создан успешно`);
+            return true;
+        }
+        catch (error) {
+            console.error(`❌ Ошибка создания канала с ${username}:`, error);
+            return false;
+        }
     }
 }
 exports.default = new MattermostService();

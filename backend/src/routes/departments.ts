@@ -46,7 +46,7 @@ router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => 
 
           return {
             ...department,
-            employee_count: parseInt(employeeCount?.count || '0'),
+            employee_count: parseInt(String(employeeCount?.count || '0')),
             head_name: department.head_first_name && department.head_last_name 
               ? `${department.head_first_name} ${department.head_last_name}`
               : null
@@ -100,7 +100,7 @@ router.get('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
 
     const result = {
       ...department,
-      employee_count: parseInt(employeeCount?.count || '0'),
+      employee_count: parseInt(String(employeeCount?.count || '0')),
       head_name: department.head_first_name && department.head_last_name 
         ? `${department.head_first_name} ${department.head_last_name}`
         : null
@@ -370,7 +370,7 @@ router.delete('/:id', authenticateToken, async (req: any, res: any): Promise<voi
       .count('id as count')
       .first();
 
-    if (parseInt(employeeCount?.count || '0') > 0) {
+    if (parseInt(String(employeeCount?.count || '0')) > 0) {
       res.status(400).json({ 
         error: 'Невозможно удалить отдел, в котором есть сотрудники. Сначала переместите или удалите всех сотрудников.' 
       });

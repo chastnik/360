@@ -150,9 +150,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </div>
           <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
             <div className="px-4">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                Администрирование
-              </h2>
+              <Link 
+                to="/admin"
+                onClick={() => setSidebarOpen(false)}
+                className="block hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md p-2 -m-2 transition-colors"
+              >
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
+                  Администрирование
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Система 360° оценки
+                </p>
+              </Link>
             </div>
             <nav className="mt-5 px-2 space-y-1">
               {adminNavigation.map((item) => (
@@ -183,12 +192,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <div className="flex flex-col flex-1 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
               <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
                 <div className="px-4">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-                    Администрирование
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Система 360° оценки
-                  </p>
+                  <Link 
+                    to="/admin"
+                    className="block hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md p-2 -m-2 transition-colors"
+                  >
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
+                      Администрирование
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Система 360° оценки
+                    </p>
+                  </Link>
                 </div>
                 <nav className="mt-5 flex-1 px-2 space-y-1">
                   {adminNavigation.map((item) => (

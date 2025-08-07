@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authAPI } from '../services/api';
 
-export const LoginPage: React.FC = () => {
+export const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  const { login, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   // Если уже авторизован, перенаправляем на dashboard
   if (isAuthenticated) {
@@ -22,13 +22,58 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const response = await authAPI.forgotPassword(email);
+      
+      if (response.success) {
+        setSuccess(true);
+      } else {
+        setError(response.error || 'Произошла ошибка');
+      }
     } catch (err: any) {
-      setError(err.message || 'Ошибка авторизации');
+      setError('Произошла ошибка при отправке запроса');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-dark-100 dark:to-dark-200 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          {/* Логотип и заголовок */}
+          <div className="text-center mb-8">
+            <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+              <span className="text-2xl text-white">✅</span>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Запрос отправлен
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Проверьте вашу электронную почту
+            </p>
+          </div>
+
+          {/* Сообщение об успехе */}
+          <div className="card p-8 shadow-large">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+              <p className="text-sm text-green-600 dark:text-green-400">
+                Если пользователь с таким email существует, на него будет отправлено письмо с инструкциями по сбросу пароля.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <Link 
+                to="/login" 
+                className="text-primary-600 hover:text-primary-500 font-medium"
+              >
+                Вернуться к входу
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-dark-100 dark:to-dark-200 flex items-center justify-center p-4">
@@ -36,17 +81,17 @@ export const LoginPage: React.FC = () => {
         {/* Логотип и заголовок */}
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mb-4">
-                            <span className="text-2xl text-white">🏢</span>
+            <span className="text-2xl text-white">🔑</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            360° Оценка
+            Забыли пароль?
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Система оценки персонала
+            Введите ваш email для получения инструкций по сбросу пароля
           </p>
         </div>
 
-        {/* Форма входа */}
+        {/* Форма сброса пароля */}
         <div className="card p-8 shadow-large">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
@@ -61,9 +106,9 @@ export const LoginPage: React.FC = () => {
                 Email
               </label>
               <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-400">📧</span>
-            </div>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-400">📧</span>
+                </div>
                 <input
                   id="email"
                   type="email"
@@ -77,41 +122,7 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Password поле */}
-            <div>
-              <label htmlFor="password" className="label block mb-2">
-                Пароль
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-400">🔒</span>
-                </div>
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-10 pr-10"
-                  placeholder="Введите пароль"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  disabled={isLoading}
-                >
-                  {showPassword ? (
-                    <span className="text-gray-400 hover:text-gray-600">🙈</span>
-                  ) : (
-                    <span className="text-gray-400 hover:text-gray-600">👁️</span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Кнопка входа */}
+            {/* Кнопка отправки */}
             <button
               type="submit"
               disabled={isLoading}
@@ -120,32 +131,22 @@ export const LoginPage: React.FC = () => {
               {isLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="loading-spinner w-5 h-5 mr-2"></div>
-                  Вход...
+                  Отправка...
                 </div>
               ) : (
-                'Войти'
+                'Отправить инструкции'
               )}
             </button>
 
-            {/* Забыли пароль */}
-            <div className="text-center">
-              <Link 
-                to="/forgot-password" 
-                className="text-sm text-primary-600 hover:text-primary-500 font-medium"
-              >
-                Забыли пароль?
-              </Link>
-            </div>
-
-            {/* Ссылка на регистрацию */}
+            {/* Ссылка на вход */}
             <div className="text-center">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Нет аккаунта?{' '}
+                Вспомнили пароль?{' '}
                 <Link 
-                  to="/register" 
+                  to="/login" 
                   className="text-primary-600 hover:text-primary-500 font-medium"
                 >
-                  Зарегистрироваться
+                  Войти
                 </Link>
               </p>
             </div>
@@ -161,4 +162,4 @@ export const LoginPage: React.FC = () => {
       </div>
     </div>
   );
-}; 
+};

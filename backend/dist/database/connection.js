@@ -6,8 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.db = void 0;
 const knex_1 = __importDefault(require("knex"));
 const dotenv_1 = require("dotenv");
-(0, dotenv_1.config)();
-const knexConfig = {
+const path_1 = __importDefault(require("path"));
+(0, dotenv_1.config)({ path: path_1.default.resolve(__dirname, '../../.env') });
+const db = (0, knex_1.default)({
     client: 'postgresql',
     connection: {
         host: process.env.DB_HOST || 'localhost',
@@ -27,7 +28,7 @@ const knexConfig = {
     seeds: {
         directory: './seeds'
     }
-};
-exports.db = (0, knex_1.default)(knexConfig);
-exports.default = exports.db;
+});
+exports.db = db;
+exports.default = db;
 //# sourceMappingURL=connection.js.map

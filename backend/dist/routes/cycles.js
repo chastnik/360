@@ -11,9 +11,12 @@ const router = (0, express_1.Router)();
 router.get('/', auth_1.authenticateToken, async (_req, res) => {
     try {
         const cycles = await (0, connection_1.default)('assessment_cycles')
-            .select('id', 'title', 'description', 'status', 'start_date', 'end_date', 'created_at')
+            .select('id', 'name', 'description', 'status', 'start_date', 'end_date', 'created_at')
             .orderBy('created_at', 'desc');
-        res.json(cycles);
+        res.json({
+            success: true,
+            data: cycles
+        });
     }
     catch (error) {
         console.error('Ошибка получения циклов оценки:', error);
@@ -35,7 +38,7 @@ router.get('/:id', auth_1.authenticateToken, async (req, res) => {
             .where('assessment_participants.cycle_id', id)
             .select('assessment_participants.id', 'users.first_name', 'users.last_name', 'users.email', 'users.role', 'users.mattermost_username', 'assessment_participants.status');
         const respondents = await (0, connection_1.default)('assessment_respondents')
-            .join('users', 'assessment_respondents.respondent_id', '=', 'users.id')
+            .join('users', 'assessment_respondents.respondent_user_id', '=', 'users.id')
             .join('assessment_participants', 'assessment_respondents.participant_id', '=', 'assessment_participants.id')
             .where('assessment_participants.cycle_id', id)
             .select('assessment_respondents.id', 'assessment_respondents.participant_id', 'users.first_name', 'users.last_name', 'users.email', 'users.mattermost_username', 'assessment_respondents.status');
@@ -56,24 +59,22 @@ router.get('/:id', auth_1.authenticateToken, async (req, res) => {
 router.post('/', auth_1.authenticateToken, async (req, res) => {
     try {
         const user = req.user;
-        const { title, description, start_date, end_date } = req.body;
-        if (user?.role !== 'admin' && user?.role !== 'hr') {
+        const { name, description, start_date, end_date } = req.body;
+        if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }
-        const [cycleId] = await (0, connection_1.default)('assessment_cycles')
+        const [newCycle] = await (0, connection_1.default)('assessment_cycles')
             .insert({
-            title,
+            name,
             description,
             start_date,
             end_date,
             status: 'draft',
             created_by: user.userId
         })
-            .returning('id');
-        const cycle = await (0, connection_1.default)('assessment_cycles')
-            .where('id', cycleId)
-            .first();
+            .returning('*');
+        const cycle = newCycle;
         res.status(201).json(cycle);
     }
     catch (error) {
@@ -85,8 +86,8 @@ router.put('/:id', auth_1.authenticateToken, async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
-        const { title, description, start_date, end_date } = req.body;
-        if (user?.role !== 'admin' && user?.role !== 'hr') {
+        const { name, description, start_date, end_date } = req.body;
+        if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }
@@ -104,7 +105,7 @@ router.put('/:id', auth_1.authenticateToken, async (req, res) => {
         await (0, connection_1.default)('assessment_cycles')
             .where('id', id)
             .update({
-            title,
+            name: name,
             description,
             start_date,
             end_date,
@@ -124,8 +125,9 @@ router.post('/:id/participants', auth_1.authenticateToken, async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
-        const { userIds } = req.body;
-        if (user?.role !== 'admin' && user?.role !== 'hr') {
+        const { user_id } = req.body;
+        const userIds = Array.isArray(user_id) ? user_id : [user_id];
+        if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }
@@ -150,7 +152,7 @@ router.post('/:id/participants', auth_1.authenticateToken, async (req, res) => {
         const participantData = userIds.map((userId) => ({
             cycle_id: id,
             user_id: userId,
-            status: 'pending'
+            status: 'invited'
         }));
         await (0, connection_1.default)('assessment_participants')
             .insert(participantData)
@@ -168,7 +170,7 @@ router.post('/:id/participants/:participantId/respondents', auth_1.authenticateT
         const user = req.user;
         const { id, participantId } = req.params;
         const { respondentIds } = req.body;
-        if (user?.role !== 'admin' && user?.role !== 'hr') {
+        if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }
@@ -191,23 +193,57 @@ router.post('/:id/participants/:participantId/respondents', auth_1.authenticateT
             res.status(400).json({ error: 'Нельзя добавлять респондентов в активный цикл' });
             return;
         }
+        const participantUser = await (0, connection_1.default)('users')
+            .where('id', participant.user_id)
+            .first();
+        let allRespondentIds = [...respondentIds];
+        if (participantUser?.manager_id && !allRespondentIds.includes(participantUser.manager_id)) {
+            const manager = await (0, connection_1.default)('users')
+                .where('id', participantUser.manager_id)
+                .where('is_active', true)
+                .first();
+            if (manager) {
+                allRespondentIds.push(participantUser.manager_id);
+            }
+        }
         const existingUsers = await (0, connection_1.default)('users')
-            .whereIn('id', respondentIds)
+            .whereIn('id', allRespondentIds)
             .where('is_active', true);
-        if (existingUsers.length !== respondentIds.length) {
+        if (existingUsers.length !== allRespondentIds.length) {
             res.status(400).json({ error: 'Один или несколько респондентов не найдены' });
             return;
         }
-        const respondentData = respondentIds.map((respondentId) => ({
-            participant_id: participantId,
-            respondent_id: respondentId,
-            status: 'pending'
-        }));
+        const respondentData = allRespondentIds.map((respondentId) => {
+            let respondentType = 'peer';
+            if (respondentId === participant.user_id) {
+                respondentType = 'self';
+            }
+            else if (respondentId === participantUser?.manager_id) {
+                respondentType = 'manager';
+            }
+            return {
+                participant_id: participantId,
+                respondent_user_id: respondentId,
+                respondent_type: respondentType,
+                status: 'invited'
+            };
+        });
         await (0, connection_1.default)('assessment_respondents')
             .insert(respondentData)
-            .onConflict(['participant_id', 'respondent_id'])
+            .onConflict(['participant_id', 'respondent_user_id'])
             .merge();
-        res.json({ message: 'Респонденты успешно добавлены' });
+        let message = 'Респонденты успешно добавлены';
+        if (participantUser?.manager_id && allRespondentIds.includes(participantUser.manager_id)) {
+            const manager = existingUsers.find(u => u.id === participantUser.manager_id);
+            if (manager) {
+                message += `. Руководитель ${manager.first_name} ${manager.last_name} добавлен автоматически`;
+            }
+        }
+        res.json({
+            message,
+            totalRespondents: allRespondentIds.length,
+            managerAdded: participantUser?.manager_id && allRespondentIds.includes(participantUser.manager_id)
+        });
     }
     catch (error) {
         console.error('Ошибка добавления респондентов:', error);
@@ -218,7 +254,7 @@ router.post('/:id/start', auth_1.authenticateToken, async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
-        if (user?.role !== 'admin' && user?.role !== 'hr') {
+        if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }
@@ -260,10 +296,10 @@ router.post('/:id/start', auth_1.authenticateToken, async (req, res) => {
                 .join('users', 'assessment_participants.user_id', 'users.id')
                 .where('assessment_participants.cycle_id', id)
                 .whereNotNull('users.mattermost_username')
-                .select('users.mattermost_username');
+                .select('users.mattermost_username', 'assessment_participants.id as participant_id');
             for (const participant of participants) {
-                mattermost_1.default.notifyAssessmentCycleStart(participant.mattermost_username, cycle.title).catch(error => {
-                    console.error(`Ошибка отправки уведомления участнику ${participant.mattermost_username}:`, error);
+                mattermost_1.default.requestRespondentSelection(participant.mattermost_username, cycle.name, participant.participant_id.toString(), 4).catch(error => {
+                    console.error(`Ошибка отправки запроса участнику ${participant.mattermost_username}:`, error);
                 });
             }
             const respondents = await (0, connection_1.default)('assessment_respondents')
@@ -295,7 +331,7 @@ router.delete('/:id/participants/:participantId', auth_1.authenticateToken, asyn
     try {
         const user = req.user;
         const { id, participantId } = req.params;
-        if (user?.role !== 'admin' && user?.role !== 'hr') {
+        if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }

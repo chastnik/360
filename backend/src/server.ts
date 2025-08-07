@@ -7,6 +7,7 @@ import path from 'path';
 import rateLimit from 'express-rate-limit';
 import redisService from './services/redis';
 import databaseService from './services/database';
+import schedulerService from './services/scheduler';
 
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -85,6 +86,10 @@ async function initializeServices() {
     await redisService.initialize();
     console.log('✅ Redis инициализирован');
     
+    // Start scheduler
+    schedulerService.start();
+    console.log('✅ Планировщик задач запущен');
+    
   } catch (error: any) {
     console.error('❌ Ошибка инициализации сервисов:', error.message);
     process.exit(1);
@@ -100,6 +105,19 @@ initializeServices().then(() => {
 }).catch((error) => {
   console.error('❌ Не удалось запустить сервер:', error);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Получен сигнал SIGINT, завершение работы...');
+  schedulerService.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Получен сигнал SIGTERM, завершение работы...');
+  schedulerService.stop();
+  process.exit(0);
 });
 
 export default app; 

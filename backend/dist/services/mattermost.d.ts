@@ -75,7 +75,9 @@ declare class MattermostService {
     testConnection(): Promise<boolean>;
     getUserByUsername(username: string): Promise<MattermostUser | null>;
     getUserByEmail(email: string): Promise<MattermostUser | null>;
+    getUserById(userId: string): Promise<MattermostUser | null>;
     getTeamUsers(): Promise<MattermostUser[]>;
+    getAllUsers(): Promise<MattermostUser[]>;
     createDirectChannel(userId: string): Promise<MattermostChannel | null>;
     private getBotUserId;
     sendMessage(channelId: string, message: string, props?: any): Promise<MattermostPost | null>;
@@ -89,6 +91,10 @@ declare class MattermostService {
         success: number;
         failed: number;
     }>;
+    requestRespondentSelection(participantUsername: string, cycleTitle: string, participantId: string, minRespondents?: number): Promise<boolean>;
+    searchUsers(query: string): Promise<MattermostUser[]>;
+    confirmRespondent(participantUsername: string, foundUser: MattermostUser, participantId: string, query: string): Promise<boolean>;
+    testDirectChannelCreation(username: string): Promise<boolean>;
 }
 declare const _default: MattermostService;
 export default _default;

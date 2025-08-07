@@ -7,7 +7,16 @@ const express_1 = require("express");
 const connection_1 = __importDefault(require("../database/connection"));
 const auth_1 = require("../middleware/auth");
 const mattermost_1 = __importDefault(require("../services/mattermost"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const router = (0, express_1.Router)();
+function generatePassword(length = 12) {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+}
 router.get('/test-connection', auth_1.authenticateToken, async (req, res) => {
     try {
         const user = req.user;
@@ -17,8 +26,11 @@ router.get('/test-connection', auth_1.authenticateToken, async (req, res) => {
         }
         const isConnected = await mattermost_1.default.testConnection();
         res.json({
-            connected: isConnected,
-            message: isConnected ? 'Подключение к Mattermost успешно' : 'Ошибка подключения к Mattermost'
+            success: true,
+            data: {
+                connected: isConnected,
+                message: isConnected ? 'Подключение к Mattermost успешно' : 'Ошибка подключения к Mattermost'
+            }
         });
     }
     catch (error) {
@@ -33,7 +45,7 @@ router.post('/sync-users', auth_1.authenticateToken, async (req, res) => {
             res.status(403).json({ error: 'Недостаточно прав доступа' });
             return;
         }
-        const mattermostUsers = await mattermost_1.default.getTeamUsers();
+        const mattermostUsers = await mattermost_1.default.getAllUsers();
         if (mattermostUsers.length === 0) {
             res.status(400).json({ error: 'Не удалось получить пользователей из Mattermost' });
             return;
@@ -50,7 +62,8 @@ router.post('/sync-users', auth_1.authenticateToken, async (req, res) => {
                     await (0, connection_1.default)('users')
                         .where('id', existingUser.id)
                         .update({
-                        mattermost_username: mmUser.username,
+                        mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+                        mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
                         updated_at: connection_1.default.fn.now()
                     });
                     updatedCount++;
@@ -60,7 +73,8 @@ router.post('/sync-users', auth_1.authenticateToken, async (req, res) => {
                         email: mmUser.email.toLowerCase(),
                         first_name: mmUser.first_name || '',
                         last_name: mmUser.last_name || '',
-                        mattermost_username: mmUser.username,
+                        mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+                        mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
                         role: 'user',
                         password_hash: '',
                         is_active: true
@@ -86,6 +100,71 @@ router.post('/sync-users', auth_1.authenticateToken, async (req, res) => {
     }
     catch (error) {
         console.error('Ошибка синхронизации пользователей:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.post('/sync-team-users', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        if (user?.role !== 'admin') {
+            res.status(403).json({ error: 'Недостаточно прав доступа' });
+            return;
+        }
+        const mattermostUsers = await mattermost_1.default.getTeamUsers();
+        if (mattermostUsers.length === 0) {
+            res.status(400).json({ error: 'Не удалось получить пользователей команды из Mattermost' });
+            return;
+        }
+        let syncedCount = 0;
+        let updatedCount = 0;
+        let errorCount = 0;
+        for (const mmUser of mattermostUsers) {
+            try {
+                const existingUser = await (0, connection_1.default)('users')
+                    .where('email', mmUser.email.toLowerCase())
+                    .first();
+                if (existingUser) {
+                    await (0, connection_1.default)('users')
+                        .where('id', existingUser.id)
+                        .update({
+                        mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+                        mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
+                        updated_at: connection_1.default.fn.now()
+                    });
+                    updatedCount++;
+                }
+                else {
+                    await (0, connection_1.default)('users').insert({
+                        email: mmUser.email.toLowerCase(),
+                        first_name: mmUser.first_name || '',
+                        last_name: mmUser.last_name || '',
+                        mattermost_username: (mmUser.username && mmUser.username.trim()) || null,
+                        mattermost_user_id: (mmUser.id && mmUser.id.trim()) || null,
+                        role: 'user',
+                        password_hash: '',
+                        is_active: true
+                    });
+                    syncedCount++;
+                }
+            }
+            catch (error) {
+                console.error(`Ошибка синхронизации пользователя ${mmUser.email}:`, error);
+                errorCount++;
+            }
+        }
+        res.json({
+            success: true,
+            message: 'Синхронизация членов команды завершена',
+            stats: {
+                total: mattermostUsers.length,
+                synced: syncedCount,
+                updated: updatedCount,
+                errors: errorCount
+            }
+        });
+    }
+    catch (error) {
+        console.error('Ошибка синхронизации членов команды:', error);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });
@@ -279,21 +358,130 @@ router.get('/integration-stats', auth_1.authenticateToken, async (req, res) => {
             .first();
         const isConnected = await mattermost_1.default.testConnection();
         res.json({
-            connection: {
-                status: isConnected ? 'connected' : 'disconnected',
-                message: isConnected ? 'Подключение активно' : 'Нет подключения к Mattermost'
-            },
-            users: {
-                total: Number(totalUsers?.count || 0),
-                withMattermost: Number(usersWithMattermost?.count || 0),
-                syncPercentage: Number(totalUsers?.count || 0) > 0
-                    ? Math.round((Number(usersWithMattermost?.count || 0) / Number(totalUsers?.count || 0)) * 100)
-                    : 0
+            success: true,
+            data: {
+                connection: {
+                    status: isConnected ? 'connected' : 'disconnected',
+                    message: isConnected ? 'Подключение активно' : 'Нет подключения к Mattermost'
+                },
+                users: {
+                    total: Number(totalUsers?.count || 0),
+                    withMattermost: Number(usersWithMattermost?.count || 0),
+                    syncPercentage: Number(totalUsers?.count || 0) > 0
+                        ? Math.round((Number(usersWithMattermost?.count || 0) / Number(totalUsers?.count || 0)) * 100)
+                        : 0
+                }
             }
         });
     }
     catch (error) {
         console.error('Ошибка получения статистики интеграции:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.post('/search-respondents', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { query } = req.body;
+        if (!query || query.trim().length < 2) {
+            res.status(400).json({ error: 'Запрос должен содержать минимум 2 символа' });
+            return;
+        }
+        const users = await mattermost_1.default.searchUsers(query.trim());
+        res.json({
+            success: true,
+            data: users.map(user => ({
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                position: user.position
+            }))
+        });
+    }
+    catch (error) {
+        console.error('Ошибка поиска респондентов:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.post('/confirm-respondent/:participantId/:respondentId', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { participantId, respondentId } = req.params;
+        const participant = await (0, connection_1.default)('assessment_participants')
+            .where('id', participantId)
+            .first();
+        if (!participant) {
+            res.status(404).json({ error: 'Участник не найден' });
+            return;
+        }
+        let respondentUser = await (0, connection_1.default)('users')
+            .where('mattermost_user_id', respondentId)
+            .first();
+        if (!respondentUser) {
+            const mmUser = await mattermost_1.default.getUserById(respondentId);
+            if (!mmUser) {
+                res.status(404).json({ error: 'Респондент не найден в Mattermost' });
+                return;
+            }
+            const tempPassword = generatePassword(12);
+            const passwordHash = await bcryptjs_1.default.hash(tempPassword, 10);
+            const [newUser] = await (0, connection_1.default)('users').insert({
+                email: mmUser.email.toLowerCase(),
+                first_name: mmUser.first_name || '',
+                last_name: mmUser.last_name || '',
+                mattermost_username: mmUser.username,
+                mattermost_user_id: mmUser.id,
+                role: 'user',
+                password_hash: passwordHash,
+                is_active: true
+            }).returning('*');
+            respondentUser = newUser;
+            await mattermost_1.default.sendNotification({
+                recipientUsername: mmUser.username,
+                title: '🔑 Доступ к системе 360° оценки',
+                message: `Для вас создан аккаунт в системе 360° оценки.\n\n**Данные для входа:**\nЛогин: ${mmUser.email}\nПароль: \`${tempPassword}\`\n\nРекомендуем сменить пароль после первого входа в систему.`,
+                actionUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+                actionText: 'Войти в систему'
+            });
+        }
+        await (0, connection_1.default)('assessment_respondents').insert({
+            participant_id: participantId,
+            respondent_id: respondentUser.id,
+            status: 'pending'
+        });
+        res.json({
+            success: true,
+            message: 'Респондент добавлен'
+        });
+    }
+    catch (error) {
+        console.error('Ошибка подтверждения респондента:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.post('/test-direct-channels', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        if (user?.role !== 'admin') {
+            res.status(403).json({ error: 'Недостаточно прав доступа' });
+            return;
+        }
+        const { usernames } = req.body;
+        if (!usernames || !Array.isArray(usernames)) {
+            res.status(400).json({ error: 'Необходимо указать массив usernames' });
+            return;
+        }
+        const results = {};
+        for (const username of usernames) {
+            results[username] = await mattermost_1.default.testDirectChannelCreation(username);
+        }
+        res.json({
+            success: true,
+            results: results
+        });
+    }
+    catch (error) {
+        console.error('Ошибка тестирования каналов:', error);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });
