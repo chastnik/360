@@ -1,7 +1,9 @@
 import knex, { Knex } from 'knex';
 import { config } from 'dotenv';
+import path from 'path';
 
-config();
+// Загружаем переменные окружения из корневого .env файла
+config({ path: path.resolve(__dirname, '../../.env') });
 
 interface DatabaseSettings {
   host: string;
@@ -128,42 +130,35 @@ class DatabaseService {
       // 2. Проверяем подключение
       await this.envConnection.raw('SELECT 1');
 
-      // 3. Пытаемся получить настройки из БД (только если таблица существует)
+      // 3. Пытаемся получить настройки из БД
       try {
-        // Проверяем, существует ли таблица system_settings
-        const tableExists = await this.envConnection.schema.hasTable('system_settings');
+        const dbSettings = await this.getSettingsFromDatabase(this.envConnection);
         
-        if (tableExists) {
-          const dbSettings = await this.getSettingsFromDatabase(this.envConnection);
-          
-          if (dbSettings) {
-            // 4. Проверяем, отличаются ли настройки от .env
-            const envSettings: DatabaseSettings = {
-              host: process.env.DB_HOST || 'localhost',
-              port: parseInt(process.env.DB_PORT || '5432'),
-              database: process.env.DB_NAME || 'assessment_db', 
-              user: process.env.DB_USER || 'postgres',
-              password: process.env.DB_PASSWORD || ''
-            };
+        if (dbSettings) {
+          // 4. Проверяем, отличаются ли настройки от .env
+          const envSettings: DatabaseSettings = {
+            host: process.env.DB_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT || '5432'),
+            database: process.env.DB_NAME || 'assessment_db', 
+            user: process.env.DB_USER || 'postgres',
+            password: process.env.DB_PASSWORD || ''
+          };
 
-            const isDifferent = this.compareSettings(envSettings, dbSettings);
+          const isDifferent = this.compareSettings(envSettings, dbSettings);
+          
+          if (isDifferent) {
+            console.log('🔄 Найдены отличающиеся настройки БД в system_settings');
             
-            if (isDifferent) {
-              console.log('🔄 Найдены отличающиеся настройки БД в system_settings');
-              
-              // 5. Создаем новое подключение с настройками из БД
-              const testConnection = this.createConnectionFromSettings(dbSettings);
-              await testConnection.raw('SELECT 1');
-              
-              this.runtimeConnection = testConnection;
-              console.log('✅ Переключение на настройки БД из system_settings');
-              
-              this.isInitialized = true;
-              return this.runtimeConnection;
-            }
+            // 5. Создаем новое подключение с настройками из БД
+            const testConnection = this.createConnectionFromSettings(dbSettings);
+            await testConnection.raw('SELECT 1');
+            
+            this.runtimeConnection = testConnection;
+            console.log('✅ Переключение на настройки БД из system_settings');
+            
+            this.isInitialized = true;
+            return this.runtimeConnection;
           }
-        } else {
-          console.log('📋 Таблица system_settings не найдена, используем .env настройки');
         }
       } catch (error) {
         console.warn('Не удалось использовать настройки из БД, используем .env:', error);

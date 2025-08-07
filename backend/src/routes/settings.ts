@@ -3,7 +3,7 @@ import knex from '../database/connection';
 import { databaseService } from '../database/connection';
 import redisService from '../services/redis';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
-// import bcrypt from 'bcryptjs'; // Не используется
+// import bcrypt from 'bcryptjs'; // Временно закомментировано
 
 const router = Router();
 

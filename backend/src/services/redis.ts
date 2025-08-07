@@ -1,7 +1,8 @@
-import knex from '../database/connection';
+import databaseService from './database';
 
 class RedisService {
   private client: any = null;
+  // private isInitialized: boolean = false; // Временно закомментировано
   private settings: any = null;
 
   /**
@@ -10,7 +11,13 @@ class RedisService {
   async initialize(): Promise<void> {
     try {
       // Получить настройки Redis из базы данных
-      const redisSettings = await knex('system_settings')
+      const connection = databaseService.getCurrentConnection();
+      if (!connection) {
+        console.log('База данных не инициализирована, пропускаю настройку Redis');
+        return;
+      }
+      
+      const redisSettings = await connection('system_settings')
         .whereIn('setting_key', [
           'redis_enabled', 'redis_host', 'redis_port', 
           'redis_password', 'redis_db'

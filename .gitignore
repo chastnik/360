@@ -1,37 +1,84 @@
-.DS_Store
+# Зависимости
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
 
-# Environment variables
+# Переменные окружения
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Dependencies
-node_modules/
-*/node_modules/
-
-# Build outputs
-build/
-dist/
-*/build/
-*/dist/
-
-# Logs
+# Логи
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 
-# Runtime data
-pids
+# Временные файлы
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# Сборка
+build/
+dist/
+out/
+
+# Frontend (React)
+# Сборка React
+/frontend/build
+/frontend/.eslintcache
+
+# Backend (Node.js)
+# Скомпилированные файлы TypeScript
+/backend/dist/
+/backend/build/
+
+# База данных
+*.sqlite
+*.sqlite3
+*.db
+database.sqlite
+
+# Uploads и загруженные файлы
+uploads/
+/backend/uploads/
+
+# Логи приложения
+/backend/logs/
+*.log
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Системные файлы
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Временные файлы операционной системы
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage directory используемый инструментами вроде istanbul
 coverage/
+*.lcov
 
 # nyc test coverage
 .nyc_output
@@ -39,17 +86,17 @@ coverage/
 # Dependency directories
 jspm_packages/
 
+# TypeScript v1 declaration files
+typings/
+
+# TypeScript cache
+*.tsbuildinfo
+
 # Optional npm cache directory
 .npm
 
 # Optional eslint cache
 .eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
 
 # Optional REPL history
 .node_repl_history
@@ -61,45 +108,57 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-.env
+.env.test
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
 
-# next.js build output
+# Next.js build output
 .next
 
-# nuxt.js build output
+# Nuxt.js build / generate output
 .nuxt
+dist
 
-# vuepress build output
-.vuepress/dist
+# Gatsby files
+.cache/
+public
 
-# Serverless directories
-.serverless
+# Storybook build outputs
+.out
+.storybook-out
 
-# FuseBox cache
-.fusebox/
+# Temporary folders
+tmp/
+temp/
 
-# DynamoDB Local files
-.dynamodb/
+# Docker
+Dockerfile.dev
+docker-compose.dev.yml
 
-# TernJS port file
-.tern-port
+# Backup files
+*.bak
+*.backup
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# SSL certificates
+*.pem
+*.key
+*.crt
 
-# OS generated files
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# Monitoring и метрики
+.pm2/
 
-# Temporary files
-*.tmp
-*.temp
+# Redis dump file
+dump.rdb
+
+# Локальные настройки разработки
+.local
+local.json
+
+# Файлы конфигурации для специфичных сред
+config/local.js
+config/local.json
+
+# Sentry
+.sentryclirc

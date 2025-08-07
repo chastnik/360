@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from 'dotenv';
+import path from 'path';
 import rateLimit from 'express-rate-limit';
 import redisService from './services/redis';
 import databaseService from './services/database';
@@ -17,7 +18,8 @@ import reportRoutes from './routes/reports';
 import mattermostRoutes from './routes/mattermost';
 import settingsRoutes from './routes/settings';
 
-config();
+// Загружаем переменные окружения из корневого .env файла
+config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -89,9 +91,9 @@ async function initializeServices() {
 
 // Start server
 initializeServices().then(() => {
-app.listen(PORT, () => {
-  console.log(`🚀 Сервер запущен на порту ${PORT}`);
-  console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
+  app.listen(PORT, () => {
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
   });
 }).catch((error) => {
   console.error('❌ Не удалось запустить сервер:', error);
