@@ -225,6 +225,48 @@ export const ComparisonChart: React.FC<ComparisonChartProps> = ({ data, title })
   );
 };
 
+interface OverlayRadarProps {
+  data: Array<{
+    participantId: string;
+    participantName: string;
+    categoryAverages: CategoryAverage[];
+  }>;
+  title: string;
+}
+
+export const OverlayRadarChart: React.FC<OverlayRadarProps> = ({ data, title }) => {
+  // Собираем все категории как в ComparisonChart
+  const categories = data[0]?.categoryAverages || [];
+  const radarData = categories.map(category => {
+    const point: any = { category: category.name };
+    data.forEach(p => {
+      const pc = p.categoryAverages.find(c => c.id === category.id);
+      point[p.participantName] = pc?.average || 0;
+    });
+    return point;
+  });
+
+  const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6'];
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={400}>
+        <RadarChart data={radarData}>
+          <PolarGrid />
+          <PolarAngleAxis dataKey="category" tick={{ fontSize: 12 }} />
+          <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
+          {data.map((p, idx) => (
+            <Radar key={p.participantId} name={p.participantName} dataKey={p.participantName} stroke={colors[idx % colors.length]} fill={colors[idx % colors.length]} fillOpacity={0.15} />
+          ))}
+          <Tooltip />
+          <Legend />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 interface OverallScoreProps {
   score: number;
   title: string;

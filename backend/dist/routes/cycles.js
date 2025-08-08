@@ -196,7 +196,7 @@ router.post('/:id/participants/:participantId/respondents', auth_1.authenticateT
         const participantUser = await (0, connection_1.default)('users')
             .where('id', participant.user_id)
             .first();
-        let allRespondentIds = [...respondentIds];
+        const allRespondentIds = [...respondentIds];
         if (participantUser?.manager_id && !allRespondentIds.includes(participantUser.manager_id)) {
             const manager = await (0, connection_1.default)('users')
                 .where('id', participantUser.manager_id)
@@ -304,18 +304,18 @@ router.post('/:id/start', auth_1.authenticateToken, async (req, res) => {
             }
             const respondents = await (0, connection_1.default)('assessment_respondents')
                 .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
-                .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
+                .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
                 .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
                 .where('assessment_participants.cycle_id', id)
                 .whereNotNull('respondent_users.mattermost_username')
                 .select('assessment_respondents.id as respondent_id', 'respondent_users.mattermost_username as respondent_username', 'participant_users.first_name as participant_first_name', 'participant_users.last_name as participant_last_name');
             for (const respondent of respondents) {
                 const participantName = `${respondent.participant_first_name} ${respondent.participant_last_name}`;
-                mattermost_1.default.notifyRespondentAssessment(respondent.respondent_username, participantName, cycle.title, respondent.respondent_id).catch(error => {
+                mattermost_1.default.notifyRespondentAssessment(respondent.respondent_username, participantName, cycle.name, respondent.respondent_id).catch(error => {
                     console.error(`Ошибка отправки уведомления респонденту ${respondent.respondent_username}:`, error);
                 });
             }
-            console.log(`Уведомления отправлены для цикла "${cycle.title}": ${participants.length} участников, ${respondents.length} респондентов`);
+            console.log(`Уведомления отправлены для цикла "${cycle.name}": ${participants.length} участников, ${respondents.length} респондентов`);
         }
         catch (error) {
             console.error('Ошибка отправки уведомлений Mattermost:', error);

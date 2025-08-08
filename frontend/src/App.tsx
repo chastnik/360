@@ -18,6 +18,7 @@ import { AssessmentsPage } from './pages/AssessmentsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SurveyPage } from './pages/SurveyPage';
 import { ReportViewPage } from './pages/ReportViewPage';
+import EmployeeAnalyticsPage from './pages/EmployeeAnalyticsPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -88,6 +89,14 @@ function App() {
                 <PrivateRoute>
                   <Layout>
                     <ReportsPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/employee/:userId" element={
+                <PrivateRoute>
+                  <Layout>
+                    <EmployeeAnalyticsPage />
                   </Layout>
                 </PrivateRoute>
               } />
