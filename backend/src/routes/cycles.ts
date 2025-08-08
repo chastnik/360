@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+/* eslint-disable no-console */
 import { Router, Response } from 'express';
 import db from '../database/connection';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
@@ -264,7 +266,7 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       .first();
 
     // Создаем список респондентов, включая руководителя (если есть)
-    let allRespondentIds = [...respondentIds];
+    const allRespondentIds = [...respondentIds];
     
     if (participantUser?.manager_id && !allRespondentIds.includes(participantUser.manager_id)) {
       // Проверяем, что руководитель активен
@@ -415,7 +417,7 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
       // Получить респондентов с Mattermost username
       const respondents = await db('assessment_respondents')
         .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
-        .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
+        .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
         .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
         .where('assessment_participants.cycle_id', id)
         .whereNotNull('respondent_users.mattermost_username')
@@ -432,14 +434,14 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
         mattermostService.notifyRespondentAssessment(
           respondent.respondent_username,
           participantName,
-          cycle.title,
+          cycle.name,
           respondent.respondent_id
         ).catch(error => {
           console.error(`Ошибка отправки уведомления респонденту ${respondent.respondent_username}:`, error);
         });
       }
 
-      console.log(`Уведомления отправлены для цикла "${cycle.title}": ${participants.length} участников, ${respondents.length} респондентов`);
+      console.log(`Уведомления отправлены для цикла "${cycle.name}": ${participants.length} участников, ${respondents.length} респондентов`);
     } catch (error) {
       console.error('Ошибка отправки уведомлений Mattermost:', error);
       // Не останавливаем выполнение, так как цикл уже запущен

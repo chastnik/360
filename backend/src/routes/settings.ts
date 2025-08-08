@@ -1,6 +1,7 @@
+/* eslint-disable no-console */
 import { Router } from 'express';
 import knex from '../database/connection';
-import { databaseService } from '../database/connection';
+import databaseService from '../services/database';
 import redisService from '../services/redis';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 // import bcrypt from 'bcryptjs'; // Временно закомментировано

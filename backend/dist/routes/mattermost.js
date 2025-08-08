@@ -196,7 +196,7 @@ router.post('/notify-cycle-start/:cycleId', auth_1.authenticateToken, async (req
         let failedCount = 0;
         for (const participant of participants) {
             try {
-                const success = await mattermost_1.default.notifyAssessmentCycleStart(participant.mattermost_username, cycle.title);
+                const success = await mattermost_1.default.notifyAssessmentCycleStart(participant.mattermost_username, cycle.name);
                 if (success) {
                     successCount++;
                 }
@@ -241,10 +241,10 @@ router.post('/notify-respondents/:cycleId', auth_1.authenticateToken, async (req
         }
         const respondents = await (0, connection_1.default)('assessment_respondents')
             .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
-            .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
+            .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
             .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
             .where('assessment_participants.cycle_id', cycleId)
-            .where('assessment_respondents.status', 'active')
+            .where('assessment_respondents.status', 'invited')
             .where('respondent_users.mattermost_username', '!=', null)
             .select('assessment_respondents.id as respondent_id', 'respondent_users.mattermost_username as respondent_username', 'participant_users.first_name as participant_first_name', 'participant_users.last_name as participant_last_name');
         if (respondents.length === 0) {
@@ -256,7 +256,7 @@ router.post('/notify-respondents/:cycleId', auth_1.authenticateToken, async (req
         for (const respondent of respondents) {
             try {
                 const participantName = `${respondent.participant_first_name} ${respondent.participant_last_name}`;
-                const success = await mattermost_1.default.notifyRespondentAssessment(respondent.respondent_username, participantName, cycle.title, respondent.respondent_id);
+                const success = await mattermost_1.default.notifyRespondentAssessment(respondent.respondent_username, participantName, cycle.name, respondent.respondent_id);
                 if (success) {
                     successCount++;
                 }
@@ -301,7 +301,7 @@ router.post('/send-reminders/:cycleId', auth_1.authenticateToken, async (req, re
         }
         const pendingRespondents = await (0, connection_1.default)('assessment_respondents')
             .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
-            .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
+            .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
             .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
             .where('assessment_participants.cycle_id', cycleId)
             .where('assessment_respondents.status', 'in_progress')
@@ -316,7 +316,7 @@ router.post('/send-reminders/:cycleId', auth_1.authenticateToken, async (req, re
         for (const respondent of pendingRespondents) {
             try {
                 const participantName = `${respondent.participant_first_name} ${respondent.participant_last_name}`;
-                const success = await mattermost_1.default.sendAssessmentReminder(respondent.respondent_username, participantName, cycle.title, respondent.respondent_id);
+                const success = await mattermost_1.default.sendAssessmentReminder(respondent.respondent_username, participantName, cycle.name, respondent.respondent_id);
                 if (success) {
                     successCount++;
                 }
@@ -406,7 +406,12 @@ router.post('/search-respondents', auth_1.authenticateToken, async (req, res) =>
 });
 router.post('/confirm-respondent/:participantId/:respondentId', auth_1.authenticateToken, async (req, res) => {
     try {
-        const { participantId, respondentId } = req.params;
+        const participantId = req.params.participantId;
+        const respondentId = req.params.respondentId;
+        if (!participantId || !respondentId) {
+            res.status(400).json({ error: 'Некорректные параметры participantId/respondentId' });
+            return;
+        }
         const participant = await (0, connection_1.default)('assessment_participants')
             .where('id', participantId)
             .first();

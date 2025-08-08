@@ -38,9 +38,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Токен истек или недействителен
+      const requestUrl: string | undefined = error.config?.url;
+      const isLoginRequest = requestUrl?.includes('/auth/login');
+      const isOnLoginPage = window.location.pathname === '/login';
+
+      // Очищаем просроченный токен, но избегаем жёсткого редиректа во время логина
       localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+
+      if (!isLoginRequest && !isOnLoginPage) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

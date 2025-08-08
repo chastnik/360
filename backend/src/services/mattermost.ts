@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import axios, { AxiosInstance } from 'axios';
 import dotenv from 'dotenv';
 
@@ -179,24 +180,16 @@ class MattermostService {
       const users: MattermostUser[] = [];
       let page = 0;
       const perPage = 100;
-      
-      while (true) {
+      let pageUsers: MattermostUser[] = [];
+
+      do {
         const response = await this.client.get(`/users?page=${page}&per_page=${perPage}&active=true`);
-        const pageUsers = response.data;
-        
-        if (pageUsers.length === 0) {
-          break;
+        pageUsers = response.data as MattermostUser[];
+        if (Array.isArray(pageUsers) && pageUsers.length > 0) {
+          users.push(...pageUsers);
         }
-        
-        users.push(...pageUsers);
-        
-        // Если получили меньше пользователей, чем запрашивали, значит это последняя страница
-        if (pageUsers.length < perPage) {
-          break;
-        }
-        
         page++;
-      }
+      } while (Array.isArray(pageUsers) && pageUsers.length === perPage);
       
       return users;
     } catch (error) {
@@ -471,7 +464,6 @@ class MattermostService {
   ): Promise<boolean> {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const confirmUrl = `${frontendUrl}/api/assessments/confirm-respondent/${participantId}/${foundUser.id}`;
-    const rejectUrl = `${frontendUrl}/api/assessments/reject-respondent/${participantId}/${foundUser.id}`;
     
     return this.sendNotification({
       recipientUsername: participantUsername,

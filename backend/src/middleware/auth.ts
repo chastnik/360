@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { AuthTokenPayload } from '../types';

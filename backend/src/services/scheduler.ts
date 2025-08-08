@@ -1,9 +1,10 @@
-import cron from 'node-cron';
+/* eslint-disable no-console */
+import { schedule, ScheduledTask } from 'node-cron';
 import knex from '../database/connection';
 import mattermostService from './mattermost';
 
 class SchedulerService {
-  private jobs: Map<string, cron.ScheduledTask> = new Map();
+  private jobs: Map<string, ScheduledTask> = new Map();
 
   /**
    * Запустить планировщик задач
@@ -12,23 +13,17 @@ class SchedulerService {
     console.log('🕐 Запуск планировщика задач...');
 
     // Ежедневные напоминания в 10:00
-    const dailyReminders = cron.schedule('0 10 * * *', () => {
+    const dailyReminders = schedule('0 10 * * *', () => {
       this.sendDailyReminders();
-    }, {
-      scheduled: false,
-      timezone: 'Europe/Moscow'
-    });
+    }, { timezone: 'Europe/Moscow' });
 
     this.jobs.set('daily-reminders', dailyReminders);
     dailyReminders.start();
 
     // Проверка завершенных оценок каждый час
-    const checkCompletions = cron.schedule('0 * * * *', () => {
+    const checkCompletions = schedule('0 * * * *', () => {
       this.checkCompletedAssessments();
-    }, {
-      scheduled: false,
-      timezone: 'Europe/Moscow'
-    });
+    }, { timezone: 'Europe/Moscow' });
 
     this.jobs.set('check-completions', checkCompletions);
     checkCompletions.start();
@@ -84,15 +79,9 @@ class SchedulerService {
       for (const respondent of pendingRespondents) {
         try {
           const participantName = `${respondent.participant_first_name} ${respondent.participant_last_name}`;
-          const endDate = new Date(respondent.end_date);
-          const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
-          let urgencyMessage = '';
-          if (daysLeft <= 1) {
-            urgencyMessage = '⚠️ **СРОЧНО!** Опрос завершается сегодня!';
-          } else if (daysLeft <= 3) {
-            urgencyMessage = `⏰ Остался${daysLeft === 1 ? 'ся' : 'ось'} ${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}`;
-          }
+          // Можно вычислять оставшееся время до дедлайна при необходимости:
+          // const endDate = new Date(respondent.end_date);
+          // const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
           const success = await mattermostService.sendAssessmentReminder(
             respondent.respondent_username,
@@ -222,7 +211,7 @@ class SchedulerService {
     const status: { [key: string]: boolean } = {};
     
     for (const [name, job] of this.jobs) {
-      status[name] = job.running;
+      status[name] = job.getStatus() === 'scheduled';
     }
     
     return status;

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { Router } from 'express';
 import db from '../database/connection';
 import { authenticateToken } from '../middleware/auth';

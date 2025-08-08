@@ -81,18 +81,15 @@ class MattermostService {
             const users = [];
             let page = 0;
             const perPage = 100;
-            while (true) {
+            let pageUsers = [];
+            do {
                 const response = await this.client.get(`/users?page=${page}&per_page=${perPage}&active=true`);
-                const pageUsers = response.data;
-                if (pageUsers.length === 0) {
-                    break;
-                }
-                users.push(...pageUsers);
-                if (pageUsers.length < perPage) {
-                    break;
+                pageUsers = response.data;
+                if (Array.isArray(pageUsers) && pageUsers.length > 0) {
+                    users.push(...pageUsers);
                 }
                 page++;
-            }
+            } while (Array.isArray(pageUsers) && pageUsers.length === perPage);
             return users;
         }
         catch (error) {
@@ -274,7 +271,6 @@ class MattermostService {
     async confirmRespondent(participantUsername, foundUser, participantId, query) {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const confirmUrl = `${frontendUrl}/api/assessments/confirm-respondent/${participantId}/${foundUser.id}`;
-        const rejectUrl = `${frontendUrl}/api/assessments/reject-respondent/${participantId}/${foundUser.id}`;
         return this.sendNotification({
             recipientUsername: participantUsername,
             title: '✅ Найден пользователь',

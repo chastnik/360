@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { User, Department } from '../types/common';
@@ -31,12 +31,7 @@ export const ProfilePage: React.FC = () => {
     confirm_password: ''
   });
 
-  // Загрузка дополнительных данных
-  useEffect(() => {
-    loadAdditionalData();
-  }, [user]);
-
-  const loadAdditionalData = async () => {
+const loadAdditionalData = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -92,7 +87,12 @@ export const ProfilePage: React.FC = () => {
     } catch (error) {
       console.error('Ошибка загрузки дополнительных данных:', error);
     }
-  };
+  }, [user, setUser]);
+
+  // Загрузка дополнительных данных
+  useEffect(() => {
+    loadAdditionalData();
+  }, [loadAdditionalData]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -585,7 +585,7 @@ export const ProfilePage: React.FC = () => {
                   <strong>Автоматическое включение руководителя:</strong> При прохождении 360° оценки ваш руководитель будет автоматически добавлен в список респондентов, даже если вы его не выберете.
                 </p>
                 <p>
-                  <strong>Конфиденциальность:</strong> Все оценки анонимны, и руководитель не будет знать, кто именно его оценивал.
+                  <strong>Конфиденциальность:</strong> Все оценки анонимны, и даже руководитель не будет знать, кто именно его оценивал.
                 </p>
                 <p>
                   <strong>Цель:</strong> Это обеспечивает более полную картину ваших профессиональных качеств для развития и планирования карьеры.

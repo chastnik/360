@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import knex, { Knex } from 'knex';
 import { config } from 'dotenv';
 import path from 'path';

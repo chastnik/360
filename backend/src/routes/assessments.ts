@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { Router } from 'express';
 import knex from '../database/connection';
 import { authenticateToken, AuthRequest } from '../middleware/auth';

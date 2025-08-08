@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { Router } from 'express';
 import knex from '../database/connection';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
@@ -246,7 +247,7 @@ router.post('/notify-cycle-start/:cycleId', authenticateToken, async (req: AuthR
       try {
         const success = await mattermostService.notifyAssessmentCycleStart(
           participant.mattermost_username,
-          cycle.title
+          cycle.name
         );
         
         if (success) {
@@ -302,10 +303,10 @@ router.post('/notify-respondents/:cycleId', authenticateToken, async (req: AuthR
     // Получить всех респондентов со статусом active
     const respondents = await knex('assessment_respondents')
       .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
-      .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
+      .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
       .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
       .where('assessment_participants.cycle_id', cycleId)
-      .where('assessment_respondents.status', 'active')
+      .where('assessment_respondents.status', 'invited')
       .where('respondent_users.mattermost_username', '!=', null)
       .select(
         'assessment_respondents.id as respondent_id',
@@ -330,7 +331,7 @@ router.post('/notify-respondents/:cycleId', authenticateToken, async (req: AuthR
         const success = await mattermostService.notifyRespondentAssessment(
           respondent.respondent_username,
           participantName,
-          cycle.title,
+          cycle.name,
           respondent.respondent_id
         );
         
@@ -387,7 +388,7 @@ router.post('/send-reminders/:cycleId', authenticateToken, async (req: AuthReque
     // Получить респондентов с незавершенными опросами
     const pendingRespondents = await knex('assessment_respondents')
       .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
-      .join('users as respondent_users', 'assessment_respondents.respondent_id', 'respondent_users.id')
+      .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
       .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
       .where('assessment_participants.cycle_id', cycleId)
       .where('assessment_respondents.status', 'in_progress')
@@ -415,7 +416,7 @@ router.post('/send-reminders/:cycleId', authenticateToken, async (req: AuthReque
         const success = await mattermostService.sendAssessmentReminder(
           respondent.respondent_username,
           participantName,
-          cycle.title,
+          cycle.name,
           respondent.respondent_id
         );
         
@@ -526,7 +527,13 @@ router.post('/search-respondents', authenticateToken, async (req: AuthRequest, r
  */
 router.post('/confirm-respondent/:participantId/:respondentId', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
   try {
-    const { participantId, respondentId } = req.params;
+    const participantId = req.params.participantId as string;
+    const respondentId = req.params.respondentId as string;
+    
+    if (!participantId || !respondentId) {
+      res.status(400).json({ error: 'Некорректные параметры participantId/respondentId' });
+      return;
+    }
     
     // Найти участника
     const participant = await knex('assessment_participants')
