@@ -28,6 +28,53 @@
 - **Recharts** - графики и диаграммы
 - **Tailwind CSS** - стилизация
 
+## 🧩 Архитектура
+
+```mermaid
+graph TD
+  A[Пользователь в браузере] --> B[Frontend (React, порт 3000)]
+  B -->|Axios /api/*| C[Backend (Express, порт 3001)]
+  C --> D[(PostgreSQL)]
+  C --> E[(Redis)]
+  C --> F[ Mattermost API ]
+  B -->|JWT в localStorage| B
+  C -->|CRON нотификации| F
+```
+
+### JWT аутентификация (последовательность)
+
+```mermaid
+sequenceDiagram
+  participant U as Пользователь
+  participant FE as Frontend
+  participant BE as Backend
+  participant DB as PostgreSQL
+
+  U->>FE: Вводит email/пароль
+  FE->>BE: POST /api/auth/login {email, password}
+  BE->>DB: Проверка пользователя и hash пароля
+  DB-->>BE: OK
+  BE-->>FE: 200 {token}
+  FE->>FE: Сохраняет JWT в localStorage
+  U->>FE: Переходит на защищённые страницы
+  FE->>BE: GET /api/* c Authorization: Bearer <token>
+  BE-->>FE: 200 данные или 401/403
+```
+
+### Потоки данных отчетов и аналитики
+
+```mermaid
+flowchart LR
+  FE[ReportsPage / Dashboard] -->|/api/reports/summary| BE
+  FE -->|/api/reports/cycle/:id/analytics| BE
+  FE -->|/api/reports/user/:userId/analytics?cycleId=| BE
+  FE -->|POST /api/reports/compare-items| BE
+  FE -->|/api/reports/departments/compare| BE
+  BE --> DB[(PostgreSQL)]
+  BE --> FE
+  FE --> Charts[Recharts: Bar, Radar, Trend, Distribution]
+```
+
 ## 📦 Установка и запуск
 
 ### Предварительные требования
@@ -98,6 +145,9 @@ FRONTEND_PORT=3000
 
 # JWT
 JWT_SECRET=your-secret-key
+
+# Frontend
+REACT_APP_API_URL=http://localhost:3001/api
 
 # Mattermost интеграция
 MATTERMOST_URL=https://your-mattermost-server.com
@@ -172,7 +222,12 @@ npm run lint
 - `GET /api/users` - Список пользователей
 - `GET /api/cycles` - Циклы оценки
 - `POST /api/assessments` - Создание оценки
-- `GET /api/reports/:id` - Отчеты
+- `GET /api/reports/:id` - Получение сохраненного отчета
+- `GET /api/reports/summary` - Сводка для дашборда (пользователи, циклы, участники, ответы, общий средний)
+- `GET /api/reports/cycle/:cycleId/analytics` - Аналитика по конкретному циклу
+- `GET /api/reports/user/:userId/analytics?cycleId=` - Аналитика по одному сотруднику (последний цикл или указанный)
+- `POST /api/reports/compare-items` - Сравнение нескольких сотрудников (в т.ч. из разных циклов)
+- `GET /api/reports/departments/compare?cycleId=&departmentIds=` - Сравнение отделов
 
 ### Примеры запросов
 
@@ -191,6 +246,27 @@ POST /api/cycles
   "start_date": "2024-01-01",
   "end_date": "2024-03-31"
 }
+
+// Аналитика цикла
+GET /api/reports/cycle/a544e33a-dee5-45cd-91ab-ba478b05bd8d/analytics
+
+// Аналитика сотрудника (последний цикл)
+GET /api/reports/user/550e8400-e29b-41d4-a716-446655440200/analytics
+
+// Аналитика сотрудника в указанном цикле
+GET /api/reports/user/550e8400-e29b-41d4-a716-446655440200/analytics?cycleId=a544e33a-dee5-45cd-91ab-ba478b05bd8d
+
+// Сравнение произвольного набора сотрудников
+POST /api/reports/compare-items
+{
+  "items": [
+    {"userId": "...", "cycleId": "..."},
+    {"userId": "..."}
+  ]
+}
+
+// Сравнение отделов
+GET /api/reports/departments/compare?cycleId=...&departmentIds=dep1,dep2
 ```
 
 ## 🤖 Интеграция с Mattermost
@@ -269,6 +345,16 @@ NODE_ENV=production npm start
 - [ ] Расширенная аналитика
 - [ ] Multi-tenant поддержка
 - [ ] API v2 с GraphQL
+
+## 🖥 UI и страницы
+
+- `/dashboard` — дашборд со сводкой и графиками.
+- `/reports` — отчеты и аналитика:
+  - вкладка «Аналитика цикла»
+  - вкладка «Аналитика сотрудника» (поиск, выбор цикла, графики, ответы)
+  - вкладка «Сравнение сотрудников» (в т.ч. радар с наложением)
+  - вкладка «Сравнение отделов»
+- `/employee/:userId` — детальная аналитика сотрудника.
 
 ---
 
