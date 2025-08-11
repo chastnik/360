@@ -538,8 +538,6 @@ sequenceDiagram
     MM->>Admin: Отчеты по циклу готовы
   end
   
-  style MM fill:#e1f5fe
-  style System fill:#f1f8e9
 ```
 
 ## 📦 Установка и запуск
