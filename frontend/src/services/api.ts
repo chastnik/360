@@ -190,6 +190,58 @@ export const usersAPI = {
   },
 };
 
+// API для ролей
+export const rolesAPI = {
+  list: async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const response = await api.get('/roles');
+      return response.data;
+    } catch (error: any) {
+      return { success: false, error: error.response?.data?.error || 'Ошибка получения ролей' };
+    }
+  },
+  create: async (data: { key: string; name: string; description?: string }): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.post('/roles', data);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, error: error.response?.data?.error || 'Ошибка создания роли' };
+    }
+  },
+  update: async (id: string, data: { name?: string; description?: string }): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.put(`/roles/${id}`, data);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, error: error.response?.data?.error || 'Ошибка обновления роли' };
+    }
+  },
+  remove: async (id: string): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await api.delete(`/roles/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, error: error.response?.data?.error || 'Ошибка удаления роли' };
+    }
+  },
+  getPermissions: async (id: string): Promise<ApiResponse<string[]>> => {
+    try {
+      const response = await api.get(`/roles/${id}/permissions`);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, error: error.response?.data?.error || 'Ошибка получения прав роли' } as any;
+    }
+  },
+  setPermissions: async (id: string, permissions: string[]): Promise<ApiResponse<string[]>> => {
+    try {
+      const response = await api.put(`/roles/${id}/permissions`, { permissions });
+      return response.data;
+    } catch (error: any) {
+      return { success: false, error: error.response?.data?.error || 'Ошибка обновления прав роли' } as any;
+    }
+  }
+};
+
 // API для категорий
 export const categoriesAPI = {
   getCategories: async (): Promise<ApiResponse<Category[]>> => {
@@ -384,6 +436,26 @@ export const reportsAPI = {
         success: false,
         error: error.response?.data?.error || 'Ошибка получения отчетов организации'
       };
+    }
+  },
+
+  // AI рекомендации по сотруднику
+  getEmployeeRecommendations: async (userId: string, cycleId?: string): Promise<{ participantId: string | null; cycleId: string | null; recommendations: string | null } | { error: string }> => {
+    try {
+      const response = await api.get(`/reports/user/${userId}/recommendations`, { params: { cycleId } });
+      return response.data;
+    } catch (error: any) {
+      return { error: error.response?.data?.error || 'Ошибка получения рекомендаций' };
+    }
+  },
+
+  generateEmployeeRecommendations: async (userId: string, cycleId?: string): Promise<{ participantId: string; cycleId: string; recommendations: string } | { error: string }> => {
+    try {
+      // Увеличиваем таймаут, так как генерация через LLM может занимать до 20-60 секунд
+      const response = await api.post(`/reports/user/${userId}/recommendations`, { cycleId }, { timeout: 120000 });
+      return response.data;
+    } catch (error: any) {
+      return { error: error.response?.data?.error || 'Ошибка генерации рекомендаций' };
     }
   },
 };

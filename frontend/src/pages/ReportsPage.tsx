@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
 // import { Link } from 'react-router-dom';
 // Layout убран - компонент оборачивается в Layout на уровне роутинга
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +11,7 @@ import {
   OverlayRadarChart,
   ScoreDistributionChart
 } from '../components/ReportCharts';
-import api from '../services/api';
+import api, { reportsAPI } from '../services/api';
 
 interface Report {
   id: number;
@@ -74,6 +75,15 @@ export const ReportsPage: React.FC = () => {
   const [employeeUserId, setEmployeeUserId] = useState<string | null>(null);
   const [employeeCycleId, setEmployeeCycleId] = useState<string | null>(null);
   const [employeeData, setEmployeeData] = useState<any | null>(null);
+  const [employeeAiText, setEmployeeAiText] = useState<string | null>(null);
+  const [employeeAiLoading, setEmployeeAiLoading] = useState<boolean>(false);
+  // Фильтры/сортировка для ответов сотрудника (вкладка employee)
+  const [employeeCategoryFilter, setEmployeeCategoryFilter] = useState<string>('');
+  const [employeeScoreFilter, setEmployeeScoreFilter] = useState<string>('');
+  const [employeeRespondentQuery, setEmployeeRespondentQuery] = useState<string>('');
+  const [employeeQuestionQuery, setEmployeeQuestionQuery] = useState<string>('');
+  const [employeeSortKey, setEmployeeSortKey] = useState<'category'|'score'|'respondent'|'question'>('category');
+  const [employeeSortDir, setEmployeeSortDir] = useState<'asc'|'desc'>('asc');
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const [cycleAnalytics, setCycleAnalytics] = useState<CycleAnalytics | null>(null);
@@ -154,15 +164,69 @@ export const ReportsPage: React.FC = () => {
     if (!employeeUserId) return;
     try {
       setEmployeeData(null);
+      setEmployeeAiText(null);
       const res = await api.get(`/reports/user/${employeeUserId}/analytics`, {
         params: { cycleId: employeeCycleId || undefined }
       });
       setEmployeeData(res.data);
+      // Подтянуть сохраненные рекомендации
+      try {
+        const rec = await reportsAPI.getEmployeeRecommendations(employeeUserId, employeeCycleId || undefined);
+        if ((rec as any)?.recommendations) setEmployeeAiText((rec as any).recommendations as string);
+      } catch (_) {
+        // игнорируем, если не удалось
+      }
+      // Сброс фильтров при новой загрузке
+      setEmployeeCategoryFilter('');
+      setEmployeeScoreFilter('');
+      setEmployeeRespondentQuery('');
+      setEmployeeQuestionQuery('');
+      setEmployeeSortKey('category');
+      setEmployeeSortDir('asc');
     } catch (e) {
       console.error('Ошибка аналитики сотрудника:', e);
       setError('Не удалось загрузить аналитику сотрудника');
     }
   };
+
+  const employeeUniqueCategories: string[] = useMemo(() => {
+    const set = new Set<string>();
+    if (Array.isArray(employeeData?.responses)) {
+      for (const r of employeeData.responses) {
+        if (r?.category) set.add(r.category);
+      }
+    }
+    return Array.from(set).sort((a,b)=>a.localeCompare(b));
+  }, [employeeData]);
+
+  const employeeVisibleResponses = useMemo(() => {
+    let items: any[] = Array.isArray(employeeData?.responses) ? [...employeeData.responses] : [];
+    if (employeeCategoryFilter) items = items.filter(r => (r.category||'') === employeeCategoryFilter);
+    if (employeeScoreFilter) {
+      const sf = Number(employeeScoreFilter);
+      items = items.filter(r => Number(r.score) === sf);
+    }
+    if (employeeRespondentQuery.trim()) {
+      const q = employeeRespondentQuery.toLowerCase();
+      items = items.filter(r => (r.respondent||'').toLowerCase().includes(q));
+    }
+    if (employeeQuestionQuery.trim()) {
+      const q = employeeQuestionQuery.toLowerCase();
+      items = items.filter(r => (r.question||'').toLowerCase().includes(q));
+    }
+    items.sort((a,b)=>{
+      let cmp = 0;
+      switch (employeeSortKey) {
+        case 'category': cmp = String(a.category||'').localeCompare(String(b.category||'')); break;
+        case 'respondent': cmp = String(a.respondent||'').localeCompare(String(b.respondent||'')); break;
+        case 'question': cmp = String(a.question||'').localeCompare(String(b.question||'')); break;
+        case 'score': cmp = Number(a.score||0) - Number(b.score||0); break;
+        default: cmp = 0;
+      }
+      return employeeSortDir === 'asc' ? cmp : -cmp;
+    });
+    return items;
+  }, [employeeData, employeeCategoryFilter, employeeScoreFilter, employeeRespondentQuery, employeeQuestionQuery, employeeSortKey, employeeSortDir]);
 
   const loadCycles = async () => {
     try {
@@ -626,10 +690,96 @@ export const ReportsPage: React.FC = () => {
                     <CategoryBarChart data={(employeeData?.avgScores||[]).map((x:any,i:number)=>({id:i,name:x.category,color:x.color,average:Number(x.avgScore||0),count:0}))} title="Средние оценки по категориям" />
                     <CategoryRadarChart data={(employeeData?.avgScores||[]).map((x:any,i:number)=>({id:i,name:x.category,color:x.color,average:Number(x.avgScore||0),count:0}))} title="Профиль компетенций" />
                   </div>
+                  {/* AI рекомендации — перед блоком ответов */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">AI рекомендации</h3>
+                      <button
+                        onClick={async () => {
+                          if (!employeeUserId) return;
+                          try {
+                            setEmployeeAiLoading(true);
+                            const res = await reportsAPI.generateEmployeeRecommendations(employeeUserId, employeeCycleId || undefined);
+                            console.log('🔍 Ответ от API:', res);
+                            if ('recommendations' in res && res.recommendations) {
+                              setEmployeeAiText(res.recommendations);
+                            } else {
+                              // Фолбэк: вытягиваем уже сохранённые рекомендации
+                              const cached = await reportsAPI.getEmployeeRecommendations(employeeUserId, employeeCycleId || undefined);
+                              if ('recommendations' in cached && cached.recommendations) {
+                                setEmployeeAiText(cached.recommendations);
+                              } else if ('error' in res) {
+                                console.error('Ошибка генерации:', res.error);
+                                alert('Ошибка генерации рекомендаций: ' + res.error);
+                              } else {
+                                console.error('Неожиданный ответ:', res);
+                                alert('Неожиданный ответ от сервера');
+                              }
+                            }
+                          } catch (e) {
+                            console.error('Ошибка запроса:', e);
+                            alert('Не удалось сгенерировать рекомендации');
+                          } finally {
+                            setEmployeeAiLoading(false);
+                          }
+                        }}
+                        className="px-3 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded disabled:opacity-50"
+                        disabled={employeeAiLoading}
+                      >
+                        {employeeAiLoading ? 'Генерация…' : (employeeAiText ? 'Перегенерировать' : 'Сгенерировать')}
+                      </button>
+                    </div>
+                    {employeeAiText ? (
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown>{employeeAiText}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 dark:text-gray-400 text-sm">Рекомендации ещё не сформированы.</div>
+                    )}
+                  </div>
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Ответы респондентов</h3>
+                    {/* Панель фильтрации/сортировки */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Категория</label>
+                        <select value={employeeCategoryFilter} onChange={e=>setEmployeeCategoryFilter(e.target.value)} className="w-full px-2 py-2 border rounded dark:bg-gray-700 dark:text-white">
+                          <option value="">Все</option>
+                          {employeeUniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Оценка</label>
+                        <select value={employeeScoreFilter} onChange={e=>setEmployeeScoreFilter(e.target.value)} className="w-full px-2 py-2 border rounded dark:bg-gray-700 dark:text-white">
+                          <option value="">Все</option>
+                          {[1,2,3,4,5].map(s=> <option key={s} value={String(s)}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Респондент</label>
+                        <input value={employeeRespondentQuery} onChange={e=>setEmployeeRespondentQuery(e.target.value)} placeholder="Поиск по ФИО" className="w-full px-2 py-2 border rounded dark:bg-gray-700 dark:text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Вопрос</label>
+                        <input value={employeeQuestionQuery} onChange={e=>setEmployeeQuestionQuery(e.target.value)} placeholder="Поиск по тексту вопроса" className="w-full px-2 py-2 border rounded dark:bg-gray-700 dark:text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Сортировка</label>
+                        <div className="flex gap-2">
+                          <select value={employeeSortKey} onChange={e=>setEmployeeSortKey(e.target.value as any)} className="flex-1 px-2 py-2 border rounded dark:bg-gray-700 dark:text-white">
+                            <option value="category">Категория</option>
+                            <option value="score">Оценка</option>
+                            <option value="respondent">Респондент</option>
+                            <option value="question">Вопрос</option>
+                          </select>
+                          <button onClick={()=> setEmployeeSortDir(d=> d==='asc'?'desc':'asc')} className="px-3 py-2 border rounded dark:bg-gray-700 dark:text-white">
+                            {employeeSortDir==='asc' ? '↑' : '↓'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {Array.isArray(employeeData?.responses) && employeeData.responses.length>0 ? employeeData.responses.map((r:any,idx:number)=>(
+                      {employeeVisibleResponses.length>0 ? employeeVisibleResponses.map((r:any,idx:number)=>(
                         <div key={idx} className="py-3">
                           <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
                           <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>

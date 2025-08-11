@@ -187,6 +187,7 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
       last_name, 
       middle_name, 
       role, 
+      role_id,
       position, 
       department, // старое поле для совместимости
       department_id, // новое поле - ID отдела
@@ -228,6 +229,7 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
         last_name,
         middle_name,
         role: role || 'user',
+        role_id: role_id && role_id.trim() !== '' ? role_id : null,
         position,
         old_department: department, // старое поле для совместимости
         department_id: department_id && department_id.trim() !== '' ? department_id : null,
@@ -313,6 +315,7 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
         last_name,
         middle_name,
         role,
+        role_id: req.body.role_id && String(req.body.role_id).trim() !== '' ? req.body.role_id : null,
         position,
         old_department: department, // старое поле для совместимости
         department_id: department_id && department_id.trim() !== '' ? department_id : null,

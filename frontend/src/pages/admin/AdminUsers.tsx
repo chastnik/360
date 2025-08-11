@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import RoleSelect from './RoleSelect';
 import api from '../../services/api';
 import { User, Department } from '../../types/common';
 
@@ -8,6 +9,7 @@ interface UserFormData {
   last_name: string;
   middle_name: string;
   role: 'admin' | 'hr' | 'manager' | 'user';
+  role_id?: string;
   position: string;
   department: string; // старое поле для совместимости
   department_id: string; // новое поле - ID отдела
@@ -33,6 +35,7 @@ const AdminUsers: React.FC = () => {
     last_name: '',
     middle_name: '',
     role: 'user',
+    role_id: '',
     position: '',
     department: '',
     department_id: '',
@@ -86,6 +89,7 @@ const AdminUsers: React.FC = () => {
           last_name: '',
           middle_name: '',
           role: 'user',
+          role_id: '',
           position: '',
           department: '',
           department_id: '',
@@ -164,6 +168,7 @@ const AdminUsers: React.FC = () => {
       last_name: user.last_name,
       middle_name: user.middle_name || '',
       role: user.role,
+      role_id: (user as any).role_id || '',
       position: user.position || '',
       department: user.department || '',
       department_id: user.department_id || '',
@@ -432,18 +437,9 @@ const AdminUsers: React.FC = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Роль *
+                  Роль (из справочника)
                 </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value as 'admin' | 'hr' | 'user'})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                  required
-                >
-                  <option value="user">Пользователь</option>
-                  <option value="hr">HR</option>
-                  <option value="admin">Администратор</option>
-                </select>
+                <RoleSelect value={formData.role_id || ''} onChange={(id)=> setFormData({...formData, role_id: id})} />
               </div>
               
               <div>

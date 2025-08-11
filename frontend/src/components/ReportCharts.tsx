@@ -288,9 +288,9 @@ export const OverallScoreDisplay: React.FC<OverallScoreProps> = ({ score, title 
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full">
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
-      <div className="text-center">
+      <div className="flex-1 flex flex-col items-center justify-center text-center">
         <div className={`text-6xl font-bold mb-2 ${getScoreColor(score)}`}>
           {score.toFixed(1)}
         </div>

@@ -20,6 +20,8 @@ import reportRoutes from './routes/reports';
 import mattermostRoutes from './routes/mattermost';
 import settingsRoutes from './routes/settings';
 import departmentRoutes from './routes/departments';
+import roleRoutes from './routes/roles';
+import adminRoutes from './routes/admin';
 
 // Загружаем переменные окружения из корневого .env файла
 config({ path: path.resolve(__dirname, '../../.env') });
@@ -56,6 +58,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/mattermost', mattermostRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

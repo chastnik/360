@@ -41,6 +41,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: 'Настройки',
       path: '/admin/settings',
       icon: '⚙️'
+    },
+    {
+      name: 'Роли',
+      path: '/admin/roles',
+      icon: '🛡️'
     }
   ];
 

@@ -28,6 +28,7 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminQuestions from './pages/admin/AdminQuestions';
 import AdminMattermost from './pages/admin/AdminMattermost';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminRoles from './pages/admin/AdminRoles';
 
 function App() {
   return (
@@ -170,6 +171,14 @@ function App() {
                 <PrivateRoute requiredRole="admin">
                   <AdminLayout>
                     <AdminSettings />
+                  </AdminLayout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/admin/roles" element={
+                <PrivateRoute requiredRole="admin">
+                  <AdminLayout>
+                    <AdminRoles />
                   </AdminLayout>
                 </PrivateRoute>
               } />

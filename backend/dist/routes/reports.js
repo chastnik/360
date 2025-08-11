@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const connection_1 = __importDefault(require("../database/connection"));
 const auth_1 = require("../middleware/auth");
+const llm_1 = require("../services/llm");
 const router = (0, express_1.Router)();
 router.get('/saved', auth_1.authenticateToken, async (_req, res) => {
     try {
@@ -20,6 +21,78 @@ router.get('/saved', auth_1.authenticateToken, async (_req, res) => {
     catch (error) {
         console.error('Ошибка получения сохраненных отчетов:', error);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.post('/user/:userId/recommendations', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { cycleId } = req.body;
+        let participantQuery = (0, connection_1.default)('assessment_participants')
+            .where('assessment_participants.user_id', userId)
+            .join('users', 'assessment_participants.user_id', 'users.id')
+            .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+            .select('assessment_participants.id as participant_id', 'users.first_name', 'users.last_name', 'assessment_cycles.id as cycle_id', 'assessment_cycles.name as cycle_name')
+            .orderBy('assessment_participants.created_at', 'desc');
+        if (cycleId)
+            participantQuery = participantQuery.where('assessment_participants.cycle_id', cycleId);
+        const participant = await participantQuery.first();
+        if (!participant) {
+            res.status(404).json({ error: 'Участник не найден' });
+            return;
+        }
+        console.log('🔄 Принудительная генерация новых рекомендаций для участника:', participant.participant_id);
+        const avgScores = await (0, connection_1.default)('assessment_responses')
+            .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+            .join('questions', 'assessment_responses.question_id', 'questions.id')
+            .join('categories', 'questions.category_id', 'categories.id')
+            .select('categories.name as category_name')
+            .avg('assessment_responses.rating_value as avg_score')
+            .where('assessment_respondents.participant_id', participant.participant_id)
+            .groupBy('categories.id', 'categories.name')
+            .orderBy('categories.name');
+        const overallAverage = avgScores.length > 0
+            ? Math.round((avgScores.reduce((s, a) => s + Number(a.avg_score || 0), 0) / avgScores.length) * 100) / 100
+            : 0;
+        const responses = await (0, connection_1.default)('assessment_responses')
+            .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+            .join('questions', 'assessment_responses.question_id', 'questions.id')
+            .join('categories', 'questions.category_id', 'categories.id')
+            .select('categories.name as category_name', 'questions.question_text as question_text', 'assessment_responses.rating_value as score', 'assessment_responses.comment as comment')
+            .where('assessment_respondents.participant_id', participant.participant_id)
+            .orderBy('categories.name');
+        const llmText = await (0, llm_1.generateEmployeeRecommendations)({
+            employeeFullName: `${participant.first_name} ${participant.last_name}`.trim(),
+            cycleName: participant.cycle_name,
+            overallAverage,
+            categories: avgScores.map((r) => ({ category: r.category_name, avgScore: Math.round(Number(r.avg_score || 0) * 100) / 100 })),
+            responses: responses.map((r) => ({ category: r.category_name, question: r.question_text, score: Number(r.score || 0), comment: r.comment }))
+        });
+        const existingReport = await (0, connection_1.default)('assessment_reports')
+            .where('participant_id', participant.participant_id)
+            .first();
+        if (existingReport) {
+            await (0, connection_1.default)('assessment_reports')
+                .where('id', existingReport.id)
+                .update({
+                recommendations: llmText,
+                updated_at: connection_1.default.fn.now()
+            });
+            console.log('✅ Рекомендации обновлены в БД');
+        }
+        else {
+            await (0, connection_1.default)('assessment_reports').insert({
+                participant_id: participant.participant_id,
+                recommendations: llmText,
+                status: 'completed',
+                generated_at: connection_1.default.fn.now()
+            });
+            console.log('✅ Рекомендации сохранены в БД');
+        }
+        res.json({ participantId: participant.participant_id, cycleId: participant.cycle_id, recommendations: llmText });
+    }
+    catch (error) {
+        console.error('Ошибка генерации рекомендаций:', error?.message || error);
+        res.status(500).json({ error: 'Не удалось сгенерировать рекомендации' });
     }
 });
 router.get('/user/:userId/analytics', auth_1.authenticateToken, async (req, res) => {
@@ -88,6 +161,31 @@ router.get('/user/:userId/analytics', auth_1.authenticateToken, async (req, res)
     }
     catch (error) {
         console.error('Ошибка аналитики сотрудника:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.get('/user/:userId/recommendations', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { cycleId } = req.query;
+        let participantQuery = (0, connection_1.default)('assessment_participants')
+            .where('assessment_participants.user_id', userId)
+            .select('assessment_participants.id as participant_id', 'assessment_participants.cycle_id')
+            .orderBy('assessment_participants.created_at', 'desc');
+        if (cycleId)
+            participantQuery = participantQuery.where('assessment_participants.cycle_id', cycleId);
+        const participant = await participantQuery.first();
+        if (!participant) {
+            res.json({ participantId: null, cycleId: cycleId || null, recommendations: null });
+            return;
+        }
+        const report = await (0, connection_1.default)('assessment_reports')
+            .where('participant_id', participant.participant_id)
+            .first();
+        res.json({ participantId: participant.participant_id, cycleId: participant.cycle_id, recommendations: report?.recommendations || null });
+    }
+    catch (error) {
+        console.error('Ошибка получения рекомендаций:', error);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });

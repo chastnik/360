@@ -77,32 +77,15 @@ const AdminDashboard: React.FC = () => {
 
       setStats(dashboardStats);
 
-      // Генерируем недавнюю активность (мок-данные)
-      const activities: RecentActivity[] = [
-        {
-          id: 1,
-          type: 'cycle_started',
-          description: 'Запущен цикл оценки "Q1 2025"',
-          user: 'Admin',
-          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-        },
-        {
-          id: 2,
-          type: 'assessment_completed',
-          description: 'Завершена оценка для Иванова И.И.',
-          user: 'Петров П.П.',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
-        },
-        {
-          id: 3,
-          type: 'user_registered',
-          description: 'Зарегистрирован новый пользователь',
-          user: 'HR Manager',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString()
-        }
-      ];
-
-      setRecentActivity(activities);
+      // Недавняя активность — реальные данные
+      try {
+        const activityRes = await api.get('/admin/recent-activity');
+        const list = activityRes.data?.success ? activityRes.data.data : [];
+        setRecentActivity(list);
+      } catch (e) {
+        console.warn('Не удалось получить недавнюю активность, оставляем пусто');
+        setRecentActivity([]);
+      }
     } catch (error) {
       console.error('Ошибка загрузки данных дашборда:', error);
       setError('Не удалось загрузить данные');
