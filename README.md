@@ -497,8 +497,8 @@ sequenceDiagram
   actor Admin
   participant System
   participant MM
-  participant Participant
-  participant Respondent
+  participant Subject
+  participant Reviewer
   
   rect rgb(240, 248, 255)
     note right of Admin: Этап 1: Создание цикла
@@ -510,31 +510,31 @@ sequenceDiagram
   rect rgb(248, 255, 240)
     note right of System: Этап 2: Уведомления участников
     System->>MM: Отправляет список участников
-    MM->>Participant: Начался цикл оценки. Выберите респондентов
-    Participant->>MM: Вводит критерии поиска username email ФИО
+    MM->>Subject: Начался цикл оценки. Выберите респондентов
+    Subject->>MM: Вводит критерии поиска username email ФИО
     MM->>System: Запрос поиска пользователей
     System->>MM: Возвращает найденных пользователей
-    MM->>Participant: Показывает варианты для выбора
-    Participant->>MM: Подтверждает выбранных респондентов
+    MM->>Subject: Показывает варианты для выбора
+    Subject->>MM: Подтверждает выбранных респондентов
     MM->>System: Сохраняет список респондентов
   end
   
   rect rgb(255, 248, 240)
     note right of System: Этап 3: Уведомления респондентов
     System->>MM: Генерирует токены для оценки
-    MM->>Respondent: Вас пригласили для оценки участника
-    MM->>Respondent: Отправляет ссылку с токеном
-    Respondent->>System: Переходит по ссылке
-    Respondent->>System: Заполняет форму оценки
+    MM->>Reviewer: Вас пригласили для оценки участника
+    MM->>Reviewer: Отправляет ссылку с токеном
+    Reviewer->>System: Переходит по ссылке
+    Reviewer->>System: Заполняет форму оценки
     System->>MM: Уведомление о завершении
   end
   
   rect rgb(255, 240, 248)
     note right of System: Этап 4: Напоминания и отчеты
     System->>MM: Ежедневные напоминания 10 00
-    MM->>Respondent: Напоминание о незавершенной оценке
+    MM->>Reviewer: Напоминание о незавершенной оценке
     System->>MM: Уведомление о готовности отчета
-    MM->>Participant: Ваш отчет готов
+    MM->>Subject: Ваш отчет готов
     MM->>Admin: Отчеты по циклу готовы
   end
   
