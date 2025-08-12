@@ -10,7 +10,8 @@ import {
   OverallScoreDisplay, 
   ComparisonChart,
   OverlayRadarChart,
-  ScoreDistributionChart
+  ScoreDistributionChart,
+  TrendChart
 } from '../components/ReportCharts';
 import api, { reportsAPI } from '../services/api';
 
@@ -63,7 +64,7 @@ interface CycleAnalytics {
 
 export const ReportsPage: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'cycle' | 'users' | 'departments' | 'employee'>('cycle');
+  const [activeTab, setActiveTab] = useState<'cycle' | 'users' | 'departments' | 'employee' | 'employeeTrend'>('cycle');
   const [userCompareItems, setUserCompareItems] = useState<Array<{ userId: string; cycleId?: string }>>([]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [departmentsData, setDepartmentsData] = useState<any[]>([]);
@@ -387,6 +388,7 @@ export const ReportsPage: React.FC = () => {
             {[
               { key: 'cycle', label: 'Аналитика цикла' },
               { key: 'employee', label: 'Аналитика сотрудника' },
+              { key: 'employeeTrend', label: 'Динамика сотрудника' },
               { key: 'users', label: 'Сравнение сотрудников' },
               { key: 'departments', label: 'Сравнение отделов' }
             ].map(tab => (
@@ -794,6 +796,114 @@ export const ReportsPage: React.FC = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'employeeTrend' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Выбор сотрудника */}
+            <div className="lg:col-span-1">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор сотрудника</h3>
+                <input
+                  value={usersQuery}
+                  onChange={e => setUsersQuery(e.target.value)}
+                  className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+                  placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
+                />
+                <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
+                  {usersAll
+                    .filter(u => {
+                      if (!usersQuery.trim()) return true;
+                      const q = usersQuery.toLowerCase();
+                      const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                      return hay.includes(q);
+                    })
+                    .slice(0, 20)
+                    .map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => { setEmployeeUserId(u.id); }}
+                        className={`w-full text-left px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700 ${employeeUserId===u.id?'bg-gray-100 dark:bg-gray-700':''}`}
+                      >
+                        <div className="text-sm text-gray-900 dark:text-white font-medium">{u.first_name} {u.last_name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
+                      </button>
+                  ))}
+                </div>
+                <button onClick={async ()=>{
+                  if (!employeeUserId) return;
+                  try {
+                    setGenerating('trend');
+                    const res = await reportsAPI.getEmployeeTrend(employeeUserId, true);
+                    setEmployeeData(res);
+                    setError(null);
+                  } catch (e) {
+                    setError('Не удалось загрузить динамику');
+                  } finally {
+                    setGenerating(null);
+                  }
+                }} disabled={!employeeUserId} className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Показать динамику</button>
+              </div>
+            </div>
+            {/* Вывод динамики */}
+            <div className="lg:col-span-2 space-y-6">
+              {(() => {
+                const items = (employeeData as any)?.items as Array<any> | undefined;
+                if (!Array.isArray(items)) {
+                  return <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">Выберите сотрудника и нажмите "Показать динамику"</div>;
+                }
+                if (items.length === 0) {
+                  return <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">Нет данных по выбранному сотруднику</div>;
+                }
+                // Линейный график общих средних по циклам
+                const trendData = items.map((it:any) => ({ date: it.cycleName, score: Number(it.overallAverage || 0) }));
+                return (
+                  <>
+                    <OverallScoreDisplay score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
+                    <div className="grid grid-cols-1 gap-6">
+                      <ScoreDistributionChart title="Распределение оценок (последний цикл)" distribution={(()=>{const init:any={1:0,2:0,3:0,4:0,5:0}; return init;})()} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-6">
+                      <TrendChart data={trendData} title="Динамика общего среднего по циклам" />
+                    </div>
+                    {/* Табличное представление по циклам до уровня ответов */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Детализация по циклам</h3>
+                      <div className="space-y-6">
+                        {items.map((it:any, idx:number)=> (
+                          <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded p-4">
+                            <div className="flex justify-between items-center mb-3">
+                              <div className="font-medium text-gray-900 dark:text-white">{it.cycleName}</div>
+                              <div className="text-primary-600 font-bold">{Number(it.overallAverage||0).toFixed(2)}</div>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              <CategoryBarChart data={(it.categories||[]).map((c:any,i:number)=>({id:i,name:c.category,color:c.color,average:Number(c.avgScore||0),count:0}))} title="Категории" />
+                              <CategoryRadarChart data={(it.categories||[]).map((c:any,i:number)=>({id:i,name:c.category,color:c.color,average:Number(c.avgScore||0),count:0}))} title="Профиль" />
+                            </div>
+                            {Array.isArray(it.responses) && it.responses.length>0 && (
+                              <div className="mt-4 divide-y divide-gray-200 dark:divide-gray-700">
+                                {it.responses.map((r:any,i:number)=> (
+                                  <div key={i} className="py-2">
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
+                                    <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent?` • ${r.respondent}`:''}{r.respondentType?` • ${r.respondentType}`:''}</div>
+                                    {r.comment && (<div className="mt-1 text-sm text-gray-700 dark:text-gray-300">Комментарий: {r.comment}</div>)}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}

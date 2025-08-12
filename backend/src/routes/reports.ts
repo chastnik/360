@@ -222,6 +222,127 @@ router.get('/user/:userId/analytics', authenticateToken, async (req: any, res: a
   }
 });
 
+// Динамика сотрудника по циклам (тренд): общий средний, по категориям и (опц.) ответы
+router.get('/user/:userId/trend', authenticateToken, async (req: any, res: any): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { includeResponses } = req.query as { includeResponses?: string };
+
+    // Все участия пользователя в циклах (по дате цикла)
+    const participants = await knex('assessment_participants')
+      .where('assessment_participants.user_id', userId)
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .select(
+        'assessment_participants.id as participant_id',
+        'assessment_cycles.id as cycle_id',
+        'assessment_cycles.name as cycle_name',
+        'assessment_cycles.start_date as cycle_start',
+        'assessment_cycles.end_date as cycle_end'
+      )
+      .orderBy('assessment_cycles.start_date', 'asc');
+
+    if (!participants || participants.length === 0) {
+      res.json({ userId, items: [] });
+      return;
+    }
+
+    const participantIds = participants.map((p: any) => p.participant_id);
+
+    // Общий средний балл по каждому участию (cycle)
+    const overallRows = await knex('assessment_responses')
+      .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+      .select('assessment_respondents.participant_id')
+      .avg<{ participant_id: string; avg_score: string }>('assessment_responses.rating_value as avg_score')
+      .whereIn('assessment_respondents.participant_id', participantIds)
+      .groupBy('assessment_respondents.participant_id');
+
+    const overallByParticipant: Record<string, number> = {};
+    for (const row of overallRows as any[]) {
+      overallByParticipant[String(row.participant_id)] = Math.round(Number(row.avg_score || 0) * 100) / 100;
+    }
+
+    // Средние по категориям в разрезе участий (cycle)
+    const byCategoryRows = await knex('assessment_responses')
+      .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+      .join('questions', 'assessment_responses.question_id', 'questions.id')
+      .join('categories', 'questions.category_id', 'categories.id')
+      .select(
+        'assessment_respondents.participant_id',
+        'categories.id as category_id',
+        'categories.name as category_name',
+        'categories.color as category_color'
+      )
+      .avg('assessment_responses.rating_value as avg_score')
+      .whereIn('assessment_respondents.participant_id', participantIds)
+      .groupBy(
+        'assessment_respondents.participant_id',
+        'categories.id', 'categories.name', 'categories.color'
+      )
+      .orderBy('categories.name');
+
+    const categoriesByParticipant: Record<string, Array<{ category: string; color: string; avgScore: number }>> = {};
+    for (const row of byCategoryRows as any[]) {
+      const pid = String(row.participant_id);
+      (categoriesByParticipant[pid] = categoriesByParticipant[pid] || []).push({
+        category: row.category_name,
+        color: row.category_color,
+        avgScore: Math.round(Number(row.avg_score || 0) * 100) / 100
+      });
+    }
+
+    // При необходимости подтягиваем ответы по каждому участию (cycle)
+    let responsesByParticipant: Record<string, any[]> = {};
+    if (String(includeResponses).toLowerCase() === 'true') {
+      const responseRows = await knex('assessment_responses')
+        .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+        .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
+        .join('questions', 'assessment_responses.question_id', 'questions.id')
+        .join('categories', 'questions.category_id', 'categories.id')
+        .select(
+          'assessment_respondents.participant_id',
+          'categories.name as category',
+          'categories.color as color',
+          'questions.question_text as question',
+          'assessment_responses.rating_value as score',
+          'assessment_responses.comment as comment',
+          'respondent_users.first_name as respondent_first_name',
+          'respondent_users.last_name as respondent_last_name',
+          'assessment_respondents.respondent_type as respondent_type'
+        )
+        .whereIn('assessment_respondents.participant_id', participantIds)
+        .orderBy('categories.name');
+
+      for (const r of responseRows as any[]) {
+        const pid = String(r.participant_id);
+        (responsesByParticipant[pid] = responsesByParticipant[pid] || []).push({
+          category: r.category,
+          color: r.color,
+          question: r.question,
+          score: Number(r.score || 0),
+          comment: r.comment,
+          respondent: `${r.respondent_first_name || ''} ${r.respondent_last_name || ''}`.trim(),
+          respondentType: r.respondent_type,
+        });
+      }
+    }
+
+    const items = participants.map((p: any) => ({
+      cycleId: p.cycle_id,
+      cycleName: p.cycle_name,
+      start_date: p.cycle_start,
+      end_date: p.cycle_end,
+      overallAverage: overallByParticipant[String(p.participant_id)] || 0,
+      categories: categoriesByParticipant[String(p.participant_id)] || [],
+      responses: responsesByParticipant[String(p.participant_id)] || []
+    }));
+
+    res.json({ userId, items });
+  } catch (error) {
+    console.error('Ошибка тренда сотрудника:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 // Получение сохранённых рекомендаций (без генерации)
 router.get('/user/:userId/recommendations', authenticateToken, async (req: any, res: any): Promise<void> => {
   try {

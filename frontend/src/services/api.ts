@@ -459,6 +459,15 @@ export const reportsAPI = {
       return { error: error.response?.data?.error || 'Ошибка генерации рекомендаций' };
     }
   },
+  // Динамика сотрудника по циклам
+  getEmployeeTrend: async (userId: string, includeResponses = false): Promise<{ items: Array<{ cycleId: string; cycleName: string; start_date?: string; end_date?: string; overallAverage: number; categories: Array<{ category: string; color: string; avgScore: number }>; responses?: Array<{ category: string; color: string; question: string; score: number; comment?: string; respondent?: string; respondentType?: string }> }> } | { error: string }> => {
+    try {
+      const response = await api.get(`/reports/user/${userId}/trend`, { params: { includeResponses } });
+      return response.data;
+    } catch (error: any) {
+      return { error: error.response?.data?.error || 'Ошибка получения динамики' } as any;
+    }
+  },
 };
 
 // API для вопросов
