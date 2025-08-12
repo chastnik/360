@@ -271,9 +271,10 @@ export const OverlayRadarChart: React.FC<OverlayRadarProps> = ({ data, title }) 
 interface OverallScoreProps {
   score: number;
   title: string;
+  compact?: boolean;
 }
 
-export const OverallScoreDisplay: React.FC<OverallScoreProps> = ({ score, title }) => {
+export const OverallScoreDisplay: React.FC<OverallScoreProps> = ({ score, title, compact = false }) => {
   const getScoreColor = (score: number) => {
     if (score >= 4.5) return 'text-green-600';
     if (score >= 3.5) return 'text-blue-600';
@@ -288,11 +289,16 @@ export const OverallScoreDisplay: React.FC<OverallScoreProps> = ({ score, title 
     return 'Требует улучшения';
   };
 
+  const containerBase = "bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700";
+  const containerClass = compact ? containerBase : `${containerBase} flex flex-col h-full`;
+  const innerClass = compact ? "flex flex-col items-center justify-center text-center" : "flex-1 flex flex-col items-center justify-center text-center";
+  const scoreTextClass = compact ? "text-4xl" : "text-6xl";
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full">
+    <div className={containerClass}>
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
-      <div className="flex-1 flex flex-col items-center justify-center text-center">
-        <div className={`text-6xl font-bold mb-2 ${getScoreColor(score)}`}>
+      <div className={innerClass}>
+        <div className={`${scoreTextClass} font-bold mb-2 ${getScoreColor(score)}`}>
           {score.toFixed(1)}
         </div>
         <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">из 5.0</div>

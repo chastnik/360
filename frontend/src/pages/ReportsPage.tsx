@@ -864,7 +864,7 @@ export const ReportsPage: React.FC = () => {
                 const trendData = items.map((it:any) => ({ date: it.cycleName, score: Number(it.overallAverage || 0) }));
                 return (
                   <>
-                    <OverallScoreDisplay score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
+                    <OverallScoreDisplay compact score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
                     <div className="grid grid-cols-1 gap-6">
                       <ScoreDistributionChart title="Распределение оценок (последний цикл)" distribution={(()=>{const init:any={1:0,2:0,3:0,4:0,5:0}; return init;})()} />
                     </div>
