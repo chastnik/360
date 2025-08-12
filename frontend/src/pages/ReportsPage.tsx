@@ -11,7 +11,8 @@ import {
   ComparisonChart,
   OverlayRadarChart,
   ScoreDistributionChart,
-  TrendChart
+  TrendChart,
+  DistributionRankTrendChart
 } from '../components/ReportCharts';
 import api, { reportsAPI } from '../services/api';
 
@@ -867,16 +868,36 @@ export const ReportsPage: React.FC = () => {
                     <OverallScoreDisplay compact score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
                     <div className="grid grid-cols-1 gap-6">
                       {(() => {
-                        const last = items[items.length - 1];
-                        const dist: any = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-                        if (Array.isArray(last?.responses)) {
-                          last.responses.forEach((r: any) => {
-                            const s = Number(r?.score || 0);
-                            if (s >= 1 && s <= 5) dist[s] = (dist[s] || 0) + 1;
+                        // Считаем ранги (места) каждой оценки 1..5 по каждому циклу
+                        // Ранг 1 — самая частая оценка в цикле; 5 — наименее частая
+                        const toRankData = (arr: any[]) => {
+                          return arr.map((it:any) => {
+                            const counts: Record<number, number> = {1:0,2:0,3:0,4:0,5:0};
+                            if (Array.isArray(it.responses)) {
+                              it.responses.forEach((r:any)=>{
+                                const s = Number(r?.score||0);
+                                if (s>=1 && s<=5) counts[s] = (counts[s]||0) + 1;
+                              });
+                            }
+                            // Преобразуем в массив и сортируем по убыванию частоты
+                            const pairs = [1,2,3,4,5].map(s=>({ score: s, count: counts[s]||0 }));
+                            pairs.sort((a,b)=> b.count - a.count || a.score - b.score);
+                            // Назначаем ранги (1..5); при равенстве — одинаковый порядок сохранится по score
+                            const scoreToRank: Record<number, number> = {};
+                            pairs.forEach((p, idx) => { scoreToRank[p.score] = idx + 1; });
+                            return {
+                              label: it.cycleName,
+                              s1: scoreToRank[1] || 5,
+                              s2: scoreToRank[2] || 5,
+                              s3: scoreToRank[3] || 5,
+                              s4: scoreToRank[4] || 5,
+                              s5: scoreToRank[5] || 5,
+                            };
                           });
-                        }
+                        };
+                        const trendRankData = toRankData(items);
                         return (
-                          <ScoreDistributionChart title="Распределение оценок (последний цикл)" distribution={dist} />
+                          <DistributionRankTrendChart title="Динамика распределения оценок" data={trendRankData} />
                         );
                       })()}
                     </div>

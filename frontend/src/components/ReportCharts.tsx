@@ -342,3 +342,47 @@ export const TrendChart: React.FC<TrendChartProps> = ({ data, title }) => {
     </div>
   );
 }; 
+
+interface DistributionRankTrendChartProps {
+  data: Array<{
+    label: string;
+    s1: number; // rank for score 1
+    s2: number;
+    s3: number;
+    s4: number;
+    s5: number;
+  }>;
+  title: string;
+}
+
+// Линейная диаграмма рангов распределения оценок (1..5) по периодам (циклами)
+export const DistributionRankTrendChart: React.FC<DistributionRankTrendChartProps> = ({ data, title }) => {
+  const colors = {
+    s1: '#EF4444',
+    s2: '#F59E0B',
+    s3: '#EAB308',
+    s4: '#3B82F6',
+    s5: '#10B981',
+  } as const;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+          <YAxis domain={[1, 5]} reversed tickCount={5} allowDecimals={false} />
+          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка ${name.slice(1)}`]} />
+          <Legend />
+          <Line type="monotone" name="1" dataKey="s1" stroke={colors.s1} strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="monotone" name="2" dataKey="s2" stroke={colors.s2} strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="monotone" name="3" dataKey="s3" stroke={colors.s3} strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="monotone" name="4" dataKey="s4" stroke={colors.s4} strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="monotone" name="5" dataKey="s5" stroke={colors.s5} strokeWidth={2} dot={{ r: 3 }} />
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">Чем меньше значение по оси Y, тем выше место (1 — первое место по частоте оценок).</div>
+    </div>
+  );
+};
