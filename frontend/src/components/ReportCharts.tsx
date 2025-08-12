@@ -373,7 +373,7 @@ export const DistributionRankTrendChart: React.FC<DistributionRankTrendChartProp
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="label" tick={{ fontSize: 12 }} />
           <YAxis domain={[1, 5]} reversed tickCount={5} allowDecimals={false} />
-          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка #${name}`]} />
+          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка ${name}`]} />
           <Legend />
           <Line type="monotone" name="1" dataKey="s1" stroke={colors.s1} strokeWidth={2} dot={{ r: 3 }} />
           <Line type="monotone" name="2" dataKey="s2" stroke={colors.s2} strokeWidth={2} dot={{ r: 3 }} />
@@ -383,6 +383,65 @@ export const DistributionRankTrendChart: React.FC<DistributionRankTrendChartProp
         </LineChart>
       </ResponsiveContainer>
       <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">Чем меньше значение по оси Y, тем выше место (1 — первое место по частоте оценок).</div>
+    </div>
+  );
+};
+
+interface HeatmapGridProps {
+  rows: string[];
+  columns: string[];
+  values: Record<string, Record<string, number>>; // values[row][col] = score 0..5
+  title: string;
+}
+
+// Простейшая тепловая карта на основе таблицы, шкала 1..5 от красного к зеленому
+export const HeatmapGrid: React.FC<HeatmapGridProps> = ({ rows, columns, values, title }) => {
+  const getBgColor = (score?: number) => {
+    const s = typeof score === 'number' ? Math.max(0, Math.min(5, score)) : 0;
+    const t = s / 5; // 0..1
+    const r = t < 0.5 ? 255 : Math.round(255 * (1 - (t - 0.5) * 2));
+    const g = t < 0.5 ? Math.round(255 * (t * 2)) : 255;
+    const b = 80;
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <div className="overflow-auto">
+        <table className="min-w-full border-collapse">
+          <thead>
+            <tr>
+              <th className="sticky left-0 bg-white dark:bg-gray-800 z-10 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 px-2 py-1 border-b border-gray-200 dark:border-gray-700">Компетенция</th>
+              {columns.map((col) => (
+                <th key={col} className="text-xs font-semibold text-gray-500 dark:text-gray-300 px-2 py-1 border-b border-gray-200 dark:border-gray-700 text-center whitespace-nowrap">{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row}>
+                <td className="sticky left-0 bg-white dark:bg-gray-800 z-10 text-sm text-gray-900 dark:text-white px-2 py-1 border-b border-gray-100 dark:border-gray-700 whitespace-nowrap">{row}</td>
+                {columns.map((col) => {
+                  const v = values[row]?.[col];
+                  return (
+                    <td key={col} className="px-1 py-1 border-b border-gray-100 dark:border-gray-700">
+                      <div
+                        className="h-8 rounded flex items-center justify-center text-white text-xs font-semibold"
+                        style={{ backgroundColor: getBgColor(v) }}
+                        title={typeof v === 'number' ? v.toFixed(2) : '—'}
+                      >
+                        {typeof v === 'number' ? v.toFixed(1) : '—'}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">Шкала: 1 (красный) → 5 (зелено-желтый).</div>
     </div>
   );
 };

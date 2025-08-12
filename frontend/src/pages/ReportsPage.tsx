@@ -12,7 +12,8 @@ import {
   OverlayRadarChart,
   ScoreDistributionChart,
   TrendChart,
-  DistributionRankTrendChart
+  DistributionRankTrendChart,
+  HeatmapGrid
 } from '../components/ReportCharts';
 import api, { reportsAPI } from '../services/api';
 
@@ -696,6 +697,32 @@ export const ReportsPage: React.FC = () => {
                     <CategoryBarChart data={(employeeData?.avgScores||[]).map((x:any,i:number)=>({id:i,name:x.category,color:x.color,average:Number(x.avgScore||0),count:0}))} title="Средние оценки по категориям" />
                     <CategoryRadarChart data={(employeeData?.avgScores||[]).map((x:any,i:number)=>({id:i,name:x.category,color:x.color,average:Number(x.avgScore||0),count:0}))} title="Профиль компетенций" />
                   </div>
+                {/* Тепловая карта компетенций по респондентам (если есть данные) */}
+                {Array.isArray(employeeData?.responses) && employeeData.responses.length>0 && (()=>{
+                  // rows: категории; columns: респонденты; values: средний балл по категории от респондента
+                  const responders = Array.from(new Set(employeeData.responses.map((r:any)=> (r.respondent||'Неизвестно') as string)));
+                  const categories = Array.from(new Set(employeeData.responses.map((r:any)=> (r.category||'') as string))).filter(Boolean);
+                  const values: Record<string, Record<string, number>> = {};
+                  const counts: Record<string, Record<string, number>> = {};
+                  for (const cat of categories) { values[cat] = {}; counts[cat] = {}; }
+                  employeeData.responses.forEach((r:any)=>{
+                    const cat = r.category || '';
+                    const resp = r.respondent || 'Неизвестно';
+                    if (!cat) return;
+                    values[cat][resp] = (values[cat][resp]||0) + Number(r.score||0);
+                    counts[cat][resp] = (counts[cat][resp]||0) + 1;
+                  });
+                  categories.forEach(cat => {
+                    responders.forEach(resp => {
+                      if (counts[cat][resp]) {
+                        values[cat][resp] = Math.round((values[cat][resp]/counts[cat][resp]) * 100)/100;
+                      }
+                    });
+                  });
+                  return (
+                    <HeatmapGrid rows={categories} columns={responders} values={values} title="Тепловая карта компетенций (по респондентам)" />
+                  );
+                })()}
                   {/* AI рекомендации — перед блоком ответов */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex items-center justify-between mb-3">
