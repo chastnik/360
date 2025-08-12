@@ -1,5 +1,5 @@
 // Автор: Стас Чашин @chastnik
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -450,6 +450,11 @@ interface CategoryTrendSplineChartProps {
 // Мультисерийный сплайновый график динамики категорий по циклам
 export const CategoryTrendSplineChart: React.FC<CategoryTrendSplineChartProps> = ({ data, categories, title, xKey = 'label' }) => {
   const palette = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4', '#F472B6', '#84CC16', '#F97316', '#A78BFA'];
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
+
+  const toggleKey = (key: string) => setHidden(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const legendItems = categories.map((c, idx) => ({ key: c.key, color: c.color || palette[idx % palette.length] }));
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -460,8 +465,27 @@ export const CategoryTrendSplineChart: React.FC<CategoryTrendSplineChartProps> =
           <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
           <YAxis domain={[0, 5]} />
           <Tooltip formatter={(value: number) => [Number(value).toFixed(2), 'Средняя оценка']} />
-          <Legend />
-          {categories.map((c, idx) => (
+          <Legend
+            verticalAlign="top"
+            align="left"
+            content={() => (
+              <div className="flex flex-wrap gap-3 mb-2">
+                {legendItems.map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => toggleKey(item.key)}
+                    className={`flex items-center gap-2 px-2 py-1 rounded border text-xs ${hidden[item.key] ? 'opacity-50 border-gray-300 dark:border-gray-600' : 'border-transparent'}`}
+                    title={hidden[item.key] ? 'Показать' : 'Скрыть'}
+                  >
+                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: item.color }} />
+                    <span className="whitespace-nowrap">{item.key}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          />
+          {categories.filter(c => !hidden[c.key]).map((c, idx) => (
             <Line key={c.key} type="monotone" dataKey={c.key} name={c.key} stroke={c.color || palette[idx % palette.length]} strokeWidth={2} dot={{ r: 2 }} />
           ))}
         </LineChart>
