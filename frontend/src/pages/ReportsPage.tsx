@@ -700,20 +700,22 @@ export const ReportsPage: React.FC = () => {
                 {/* Тепловая карта компетенций по респондентам (если есть данные) */}
                 {Array.isArray(employeeData?.responses) && employeeData.responses.length>0 && (()=>{
                   // rows: категории; columns: респонденты; values: средний балл по категории от респондента
-                  const responders = Array.from(new Set(employeeData.responses.map((r:any)=> (r.respondent||'Неизвестно') as string)));
-                  const categories = Array.from(new Set(employeeData.responses.map((r:any)=> (r.category||'') as string))).filter(Boolean);
+                  const respondersSet = new Set<string>(employeeData.responses.map((r:any)=> String(r.respondent || 'Неизвестно')));
+                  const categoriesSet = new Set<string>(employeeData.responses.map((r:any)=> String(r.category || '')));
+                  const responders: string[] = Array.from(respondersSet);
+                  const categories: string[] = Array.from(categoriesSet).filter(Boolean);
                   const values: Record<string, Record<string, number>> = {};
                   const counts: Record<string, Record<string, number>> = {};
                   for (const cat of categories) { values[cat] = {}; counts[cat] = {}; }
                   employeeData.responses.forEach((r:any)=>{
-                    const cat = r.category || '';
-                    const resp = r.respondent || 'Неизвестно';
+                    const cat: string = String(r.category || '');
+                    const resp: string = String(r.respondent || 'Неизвестно');
                     if (!cat) return;
                     values[cat][resp] = (values[cat][resp]||0) + Number(r.score||0);
                     counts[cat][resp] = (counts[cat][resp]||0) + 1;
                   });
-                  categories.forEach(cat => {
-                    responders.forEach(resp => {
+                  categories.forEach((cat: string) => {
+                    responders.forEach((resp: string) => {
                       if (counts[cat][resp]) {
                         values[cat][resp] = Math.round((values[cat][resp]/counts[cat][resp]) * 100)/100;
                       }
