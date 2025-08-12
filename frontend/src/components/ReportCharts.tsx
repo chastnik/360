@@ -373,7 +373,7 @@ export const DistributionRankTrendChart: React.FC<DistributionRankTrendChartProp
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="label" tick={{ fontSize: 12 }} />
           <YAxis domain={[1, 5]} reversed tickCount={5} allowDecimals={false} />
-          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка ${name.slice(1)}`]} />
+          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка #${name}`]} />
           <Legend />
           <Line type="monotone" name="1" dataKey="s1" stroke={colors.s1} strokeWidth={2} dot={{ r: 3 }} />
           <Line type="monotone" name="2" dataKey="s2" stroke={colors.s2} strokeWidth={2} dot={{ r: 3 }} />
