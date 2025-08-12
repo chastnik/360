@@ -18,7 +18,9 @@ import {
   PolarRadiusAxis,
   Radar,
   LineChart,
-  Line
+  Line,
+  AreaChart,
+  Area
 } from 'recharts';
 
 interface CategoryAverage {
@@ -323,21 +325,13 @@ export const TrendChart: React.FC<TrendChartProps> = ({ data, title }) => {
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data}>
+        <AreaChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" tick={{ fontSize: 12 }} />
           <YAxis domain={[0, 5]} />
-          <Tooltip 
-            formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']}
-          />
-          <Line 
-            type="monotone" 
-            dataKey="score" 
-            stroke="#3B82F6" 
-            strokeWidth={2}
-            dot={{ r: 4 }}
-          />
-        </LineChart>
+          <Tooltip formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']} />
+          <Area type="monotone" dataKey="score" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.2} strokeWidth={2} />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
