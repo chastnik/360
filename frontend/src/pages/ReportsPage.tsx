@@ -95,6 +95,8 @@ export const ReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Состояние разворачивания блоков в динамике (по умолчанию свернуто)
+  const [trendExpanded, setTrendExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadCycles();
@@ -907,31 +909,46 @@ export const ReportsPage: React.FC = () => {
                     {/* Табличное представление по циклам до уровня ответов */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Детализация по циклам</h3>
-                      <div className="space-y-6">
-                        {items.map((it:any, idx:number)=> (
-                          <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded p-4">
-                            <div className="flex justify-between items-center mb-3">
-                              <div className="font-medium text-gray-900 dark:text-white">{it.cycleName}</div>
-                              <div className="text-primary-600 font-bold">{Number(it.overallAverage||0).toFixed(2)}</div>
-                            </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                              <CategoryBarChart data={(it.categories||[]).map((c:any,i:number)=>({id:i,name:c.category,color:c.color,average:Number(c.avgScore||0),count:0}))} title="Категории" />
-                              <CategoryRadarChart data={(it.categories||[]).map((c:any,i:number)=>({id:i,name:c.category,color:c.color,average:Number(c.avgScore||0),count:0}))} title="Профиль" />
-                            </div>
-                            {Array.isArray(it.responses) && it.responses.length>0 && (
-                              <div className="mt-4 divide-y divide-gray-200 dark:divide-gray-700">
-                                {it.responses.map((r:any,i:number)=> (
-                                  <div key={i} className="py-2">
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
-                                    <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
-                                    <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent?` • ${r.respondent}`:''}{r.respondentType?` • ${r.respondentType}`:''}</div>
-                                    {r.comment && (<div className="mt-1 text-sm text-gray-700 dark:text-gray-300">Комментарий: {r.comment}</div>)}
+                      <div className="space-y-3">
+                        {items.map((it:any, idx:number)=> {
+                          const key = String(it.cycleId || idx);
+                          const isOpen = !!trendExpanded[key];
+                          return (
+                            <div key={key} className="border border-gray-200 dark:border-gray-700 rounded">
+                              <button
+                                type="button"
+                                onClick={() => setTrendExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+                                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-t hover:bg-gray-100 dark:hover:bg-gray-600"
+                              >
+                                <span className="font-medium text-gray-900 dark:text-white">{it.cycleName}</span>
+                                <span className="flex items-center gap-3">
+                                  <span className="text-primary-600 font-bold">{Number(it.overallAverage||0).toFixed(2)}</span>
+                                  <span className="text-gray-500 dark:text-gray-300">{isOpen ? '▲' : '▼'}</span>
+                                </span>
+                              </button>
+                              {isOpen && (
+                                <div className="p-4">
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <CategoryBarChart data={(it.categories||[]).map((c:any,i:number)=>({id:i,name:c.category,color:c.color,average:Number(c.avgScore||0),count:0}))} title="Категории" />
+                                    <CategoryRadarChart data={(it.categories||[]).map((c:any,i:number)=>({id:i,name:c.category,color:c.color,average:Number(c.avgScore||0),count:0}))} title="Профиль" />
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                                  {Array.isArray(it.responses) && it.responses.length>0 && (
+                                    <div className="mt-4 divide-y divide-gray-200 dark:divide-gray-700">
+                                      {it.responses.map((r:any,i:number)=> (
+                                        <div key={i} className="py-2">
+                                          <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
+                                          <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
+                                          <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent?` • ${r.respondent}`:''}{r.respondentType?` • ${r.respondentType}`:''}</div>
+                                          {r.comment && (<div className="mt-1 text-sm text-gray-700 dark:text-gray-300">Комментарий: {r.comment}</div>)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </>
