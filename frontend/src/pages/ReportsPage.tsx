@@ -13,7 +13,8 @@ import {
   ScoreDistributionChart,
   TrendChart,
   DistributionRankTrendChart,
-  HeatmapGrid
+  HeatmapGrid,
+  CategoryTrendSplineChart
 } from '../components/ReportCharts';
 import api, { reportsAPI } from '../services/api';
 
@@ -935,6 +936,25 @@ export const ReportsPage: React.FC = () => {
                     <div className="grid grid-cols-1 gap-6">
                       <TrendChart data={trendData} title="Динамика общего среднего по циклам" />
                     </div>
+                    {/* Динамика по категориям (сплайны) */}
+                    {(() => {
+                      // Соберем унифицированный список категорий (по всем циклам)
+                      const categorySet = new Set<string>();
+                      items.forEach((it:any)=> (it.categories||[]).forEach((c:any)=> categorySet.add(String(c.category||''))));
+                      const categoryList = Array.from(categorySet).filter(Boolean);
+                      if (categoryList.length === 0) return null;
+                      // Подготовим ряды данных: для каждого цикла — средние по каждой категории, прочие = null
+                      const series = items.map((it:any) => {
+                        const row: Record<string, number | string | null> = { label: String(it.cycleName) };
+                        categoryList.forEach(cat => { row[cat] = null; });
+                        (it.categories||[]).forEach((c:any)=> { row[String(c.category||'')] = Number(c.avgScore||0); });
+                        return row as Record<string, number | string>;
+                      });
+                      const categories = categoryList.map((key, idx) => ({ key }));
+                      return (
+                        <CategoryTrendSplineChart data={series} categories={categories} title="Динамика по категориям" />
+                      );
+                    })()}
                     {/* Табличное представление по циклам до уровня ответов */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Детализация по циклам</h3>

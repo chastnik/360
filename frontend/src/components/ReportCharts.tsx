@@ -439,3 +439,33 @@ export const HeatmapGrid: React.FC<HeatmapGridProps> = ({ rows, columns, values,
     </div>
   );
 };
+
+interface CategoryTrendSplineChartProps {
+  data: Array<Record<string, number | string>>; // [{ label, CatA, CatB, ... }]
+  categories: Array<{ key: string; color?: string }>;
+  title: string;
+  xKey?: string;
+}
+
+// Мультисерийный сплайновый график динамики категорий по циклам
+export const CategoryTrendSplineChart: React.FC<CategoryTrendSplineChartProps> = ({ data, categories, title, xKey = 'label' }) => {
+  const palette = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4', '#F472B6', '#84CC16', '#F97316', '#A78BFA'];
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <ResponsiveContainer width="100%" height={360}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
+          <YAxis domain={[0, 5]} />
+          <Tooltip formatter={(value: number) => [Number(value).toFixed(2), 'Средняя оценка']} />
+          <Legend />
+          {categories.map((c, idx) => (
+            <Line key={c.key} type="monotone" dataKey={c.key} name={c.key} stroke={c.color || palette[idx % palette.length]} strokeWidth={2} dot={{ r: 2 }} />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
