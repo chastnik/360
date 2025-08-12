@@ -100,7 +100,7 @@ export const ReportsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if ((activeTab === 'users' || activeTab === 'employee') && usersAll.length === 0) {
+    if ((activeTab === 'users' || activeTab === 'employee' || activeTab === 'employeeTrend') && usersAll.length === 0) {
       (async () => {
         try {
           const res = await api.get('/users');
@@ -654,7 +654,7 @@ export const ReportsPage: React.FC = () => {
                     .map(u => (
                       <button
                         key={u.id}
-                        onClick={() => { setEmployeeUserId(u.id); }}
+                        onClick={() => { setEmployeeUserId(String(u.id)); }}
                         className={`w-full text-left px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700 ${employeeUserId===u.id?'bg-gray-100 dark:bg-gray-700':''}`}
                       >
                         <div className="text-sm text-gray-900 dark:text-white font-medium">{u.first_name} {u.last_name}</div>
@@ -840,7 +840,7 @@ export const ReportsPage: React.FC = () => {
                   try {
                     setGenerating('trend');
                     const res = await reportsAPI.getEmployeeTrend(employeeUserId, true);
-                    setEmployeeData(res);
+                    setEmployeeData(res as any);
                     setError(null);
                   } catch (e) {
                     setError('Не удалось загрузить динамику');
