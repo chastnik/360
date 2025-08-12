@@ -866,7 +866,19 @@ export const ReportsPage: React.FC = () => {
                   <>
                     <OverallScoreDisplay compact score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
                     <div className="grid grid-cols-1 gap-6">
-                      <ScoreDistributionChart title="Распределение оценок (последний цикл)" distribution={(()=>{const init:any={1:0,2:0,3:0,4:0,5:0}; return init;})()} />
+                      {(() => {
+                        const last = items[items.length - 1];
+                        const dist: any = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                        if (Array.isArray(last?.responses)) {
+                          last.responses.forEach((r: any) => {
+                            const s = Number(r?.score || 0);
+                            if (s >= 1 && s <= 5) dist[s] = (dist[s] || 0) + 1;
+                          });
+                        }
+                        return (
+                          <ScoreDistributionChart title="Распределение оценок (последний цикл)" distribution={dist} />
+                        );
+                      })()}
                     </div>
                     <div className="grid grid-cols-1 gap-6">
                       <TrendChart data={trendData} title="Динамика общего среднего по циклам" />
