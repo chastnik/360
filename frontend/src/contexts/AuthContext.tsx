@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';

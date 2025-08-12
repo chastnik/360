@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';

@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React from 'react';
 import {
   BarChart,

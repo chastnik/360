@@ -1,3 +1,4 @@
+# Автор: Стас Чашин @chastnik
 FROM node:20-alpine as build
 WORKDIR /app
 

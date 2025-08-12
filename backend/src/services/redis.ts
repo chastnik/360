@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
 import databaseService from './database';
 

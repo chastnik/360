@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.up = async function(knex) {
   // roles
   await knex.schema.createTable('roles', function(table) {

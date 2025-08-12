@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';

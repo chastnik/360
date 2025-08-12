@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.up = function(knex) {
   return knex.schema.alterTable('users', function(table) {
     table.string('reset_token').nullable();

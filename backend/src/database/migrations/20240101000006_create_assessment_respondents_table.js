@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.up = function(knex) {
   return knex.schema.createTable('assessment_respondents', function(table) {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));

@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 // Общие типы для всего приложения
 
 export interface Category {

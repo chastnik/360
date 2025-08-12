@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Layout убран - компонент оборачивается в Layout на уровне роутинга

@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 export interface User {
   id: string;
   email: string;

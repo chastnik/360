@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 // Layout убран - компонент оборачивается в Layout на уровне роутинга

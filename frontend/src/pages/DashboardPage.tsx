@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useEffect, useState } from 'react';
 import { CategoryBarChart, CategoryRadarChart, OverallScoreDisplay, TrendChart } from '../components/ReportCharts';
 import api from '../services/api';

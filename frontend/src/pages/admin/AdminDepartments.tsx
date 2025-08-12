@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { Department, User } from '../../types/common';

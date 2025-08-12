@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React from 'react';
 
 export const AdminPage: React.FC = () => {

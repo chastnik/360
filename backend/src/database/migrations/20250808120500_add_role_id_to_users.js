@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.up = async function(knex) {
   // Добавляем колонку role_id
   await knex.schema.alterTable('users', function(table) {

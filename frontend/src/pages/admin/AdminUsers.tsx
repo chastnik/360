@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
 import RoleSelect from './RoleSelect';
 import api from '../../services/api';

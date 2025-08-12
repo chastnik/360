@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.seed = function(knex) {
   return knex('categories').del()
     .then(function () {

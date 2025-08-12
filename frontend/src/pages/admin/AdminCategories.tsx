@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
 import api, { categoriesAPI, questionsAPI } from '../../services/api';
 import { Category } from '../../types/common';

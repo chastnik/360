@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import axios from 'axios';
 import { 
   ApiResponse, 

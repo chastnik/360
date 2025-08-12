@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
 import axios, { AxiosInstance } from 'axios';
 import dotenv from 'dotenv';

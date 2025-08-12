@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [

@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
 // Layout убран - компонент оборачивается в Layout на уровне роутинга
 import { useAuth } from '../contexts/AuthContext';

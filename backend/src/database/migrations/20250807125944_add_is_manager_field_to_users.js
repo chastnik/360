@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.up = function(knex) {
   return knex.schema.table('users', function(table) {
     table.boolean('is_manager').defaultTo(false).notNullable();

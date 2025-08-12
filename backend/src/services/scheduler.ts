@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
 import { schedule, ScheduledTask } from 'node-cron';
 import knex from '../database/connection';

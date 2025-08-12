@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 const bcrypt = require('bcryptjs');
 
 exports.seed = async function(knex) {

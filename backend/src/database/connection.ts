@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 import knex from 'knex';
 import { config } from 'dotenv';
 import path from 'path';

@@ -1,3 +1,4 @@
+// Автор: Стас Чашин @chastnik
 exports.seed = async function(knex) {
   // Удаляем существующие записи
   await knex('system_settings').del();
