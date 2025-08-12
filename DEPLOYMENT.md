@@ -1,6 +1,9 @@
 # 🚀 Развертывание системы 360° оценки
 
-Данная документация описывает процесс развертывания системы 360° оценки персонала в производственной среде.
+Эта страница — обзор. Доступны две схемы развертывания:
+
+- См. «DEPLOYMENT_DOCKER.md» — развертывание через Docker Compose
+- См. «DEPLOYMENT_BARE.md» — развертывание без Docker (на хосте)
 
 ## 📋 Требования
 
@@ -11,10 +14,9 @@
 - **CPU**: 2 ядра, рекомендуется 4
 
 ### Программное обеспечение
-- Docker 20.10+
-- Docker Compose 2.0+
 - Git
 - curl (для проверки здоровья)
+- Для Docker-схемы: Docker 20.10+ и Docker Compose v2
 
 ## 🔧 Установка зависимостей
 
@@ -61,7 +63,7 @@ sudo chmod +x /usr/local/bin/docker-compose
 ### 1. Клонирование репозитория
 ```bash
 git clone <repository-url>
-cd 360-assessment-system
+cd 360
 ```
 
 ### 2. Настройка переменных окружения
@@ -73,37 +75,14 @@ cp env.example .env
 nano .env
 ```
 
-### 3. Быстрый запуск
+### 3. Выберите вариант развертывания
+- Для Docker: следуйте «DEPLOYMENT_DOCKER.md»
+- Для без-Docker: следуйте «DEPLOYMENT_BARE.md»
+
+### 4. Быстрый старт (альтернатива)
+При наличии Docker можно запустить всё разом:
 ```bash
-# Сделать скрипт исполняемым
-chmod +x deploy.sh
-
-# Запуск системы
-./deploy.sh start
-```
-
-### 4. Пошаговый запуск
-```bash
-# Проверка зависимостей
-./deploy.sh build
-
-# Запуск базы данных
-docker-compose up -d database
-
-# Ожидание готовности базы
-sleep 30
-
-# Запуск backend
-docker-compose up -d backend
-
-# Ожидание готовности backend
-sleep 20
-
-# Запуск frontend
-docker-compose up -d frontend
-
-# Проверка статуса
-./deploy.sh status
+docker compose up -d --build
 ```
 
 ## ⚙️ Конфигурация
@@ -111,12 +90,17 @@ docker-compose up -d frontend
 ### Обязательные переменные
 ```env
 # База данных
+DB_HOST=localhost
+DB_PORT=5432
 DB_PASSWORD=your_secure_password_here
 DB_NAME=assessment360
 DB_USER=assessment_user
 
 # JWT секрет
 JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
+
+# URL фронтенда (для CORS и ссылок в уведомлениях)
+FRONTEND_URL=http://localhost
 
 # Mattermost
 MATTERMOST_URL=https://your-mattermost-server.com
@@ -132,6 +116,7 @@ BACKEND_PORT=5000
 
 # Redis
 REDIS_PASSWORD=your_redis_password
+REDIS_PORT=6379
 
 # SSL (для production)
 SSL_CERT_PATH=/etc/ssl/certs/your-domain.crt
@@ -191,14 +176,14 @@ REDIS_PASSWORD=$(openssl rand -base64 32)
 
 ### Проверка здоровья
 ```bash
-# Frontend
+# Frontend (если настроен nginx)
 curl -f http://localhost/health
 
 # Backend
-curl -f http://localhost:5000/api/health
+curl -f http://localhost:5000/health
 
-# Database
-docker-compose exec database pg_isready -U assessment_user -d assessment360
+# Database (в Docker)
+docker compose exec database pg_isready -U assessment_user -d assessment360 | cat
 ```
 
 ## 🔄 Управление
@@ -234,20 +219,14 @@ docker-compose exec database pg_isready -U assessment_user -d assessment360
 
 ### Создание резервных копий
 ```bash
-# Автоматическое создание резервной копии
-./deploy.sh backup
-
-# Ручное создание резервной копии
-docker-compose exec database pg_dump -U assessment_user assessment360 > backup.sql
+# Ручное создание резервной копии (Docker)
+docker compose exec database pg_dump -U assessment_user assessment360 > backup.sql
 ```
 
 ### Восстановление
 ```bash
-# Восстановление из резервной копии
-./deploy.sh restore backup_20240101_120000.sql
-
-# Ручное восстановление
-docker-compose exec -T database psql -U assessment_user -d assessment360 < backup.sql
+# Восстановление (Docker)
+docker compose exec -T database psql -U assessment_user -d assessment360 < backup.sql
 ```
 
 ### Автоматизация резервного копирования
@@ -266,26 +245,25 @@ crontab -e
 
 ### Nginx конфигурация для домена
 ```nginx
+# См. также nginx.conf в репозитории (вариант для контейнера)
 server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$server_name$request_uri;
-}
+  listen 80;
+  server_name your-domain.com;
 
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-    
-    ssl_certificate /etc/ssl/certs/your-domain.crt;
-    ssl_certificate_key /etc/ssl/private/your-domain.key;
-    
-    location / {
-        proxy_pass http://localhost:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+  root /var/www/assessment360;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
 }
 ```
 
@@ -293,16 +271,14 @@ server {
 
 ### Горизонтальное масштабирование
 ```yaml
-# docker-compose.override.yml
-version: '3.8'
+# docker-compose.override.yml (пример)
 services:
   backend:
-    deploy:
-      replicas: 3
-  
+      deploy:
+        replicas: 3
   frontend:
-    deploy:
-      replicas: 2
+      deploy:
+        replicas: 2
 ```
 
 ### Использование внешней базы данных
@@ -321,29 +297,29 @@ DB_PASSWORD=your_password
 
 #### 1. Контейнер не запускается
 ```bash
-# Проверка логов
-docker-compose logs [service]
+# Проверка логов (Docker)
+docker compose logs [service] | cat
 
-# Проверка состояния
-docker-compose ps
+# Проверка состояния (Docker)
+docker compose ps | cat
 ```
 
 #### 2. База данных недоступна
 ```bash
-# Проверка подключения
-docker-compose exec database psql -U assessment_user -d assessment360
+# Проверка подключения (Docker)
+docker compose exec database psql -U assessment_user -d assessment360 | cat
 
-# Проверка логов базы данных
-docker-compose logs database
+# Проверка логов базы данных (Docker)
+docker compose logs database | cat
 ```
 
 #### 3. Frontend не отображается
 ```bash
-# Проверка nginx конфигурации
-docker-compose exec frontend nginx -t
+# Проверка nginx конфигурации (Docker)
+docker compose exec frontend nginx -t | cat
 
-# Перезапуск nginx
-docker-compose restart frontend
+# Перезапуск nginx (Docker)
+docker compose restart frontend
 ```
 
 #### 4. Проблемы с производительностью
@@ -357,14 +333,14 @@ docker system df
 
 ### Логи
 ```bash
-# Все логи
-docker-compose logs
+# Все логи (Docker)
+docker compose logs | cat
 
-# Логи конкретного сервиса
-docker-compose logs backend -f
+# Логи конкретного сервиса (Docker)
+docker compose logs backend -f | cat
 
-# Логи за последние 100 строк
-docker-compose logs --tail=100 backend
+# Логи за последние 100 строк (Docker)
+docker compose logs --tail=100 backend | cat
 ```
 
 ## 🔧 Техническое обслуживание

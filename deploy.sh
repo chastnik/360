@@ -37,8 +37,8 @@ check_dependencies() {
         exit 1
     fi
     
-    if ! command -v docker-compose &> /dev/null; then
-        error "Docker Compose не установлен. Пожалуйста, установите Docker Compose"
+    if ! docker compose version &> /dev/null && ! command -v docker-compose &> /dev/null; then
+        error "Docker Compose не установлен. Установите Docker Compose v2 (docker compose) или v1 (docker-compose)"
         exit 1
     fi
     
@@ -75,11 +75,11 @@ build_images() {
     
     # Сборка backend
     log "Сборка backend..."
-    docker-compose build backend
+    if docker compose version &> /dev/null; then docker compose build backend; else docker-compose build backend; fi
     
     # Сборка frontend
     log "Сборка frontend..."
-    docker-compose build frontend
+    if docker compose version &> /dev/null; then docker compose build frontend; else docker-compose build frontend; fi
     
     success "Образы собраны"
 }
@@ -90,7 +90,7 @@ start_system() {
     
     # Запуск базы данных
     log "Запуск базы данных..."
-    docker-compose up -d database
+    if docker compose version &> /dev/null; then docker compose up -d database; else docker-compose up -d database; fi
     
     # Ждем готовности базы данных
     log "Ожидание готовности базы данных..."
@@ -98,11 +98,11 @@ start_system() {
     
     # Запуск Redis
     log "Запуск Redis..."
-    docker-compose up -d redis
+    if docker compose version &> /dev/null; then docker compose up -d redis; else docker-compose up -d redis; fi
     
     # Запуск backend
     log "Запуск backend..."
-    docker-compose up -d backend
+    if docker compose version &> /dev/null; then docker compose up -d backend; else docker-compose up -d backend; fi
     
     # Ждем готовности backend
     log "Ожидание готовности backend..."
@@ -110,7 +110,7 @@ start_system() {
     
     # Запуск frontend
     log "Запуск frontend..."
-    docker-compose up -d frontend
+    if docker compose version &> /dev/null; then docker compose up -d frontend; else docker-compose up -d frontend; fi
     
     success "Система запущена"
 }
@@ -118,7 +118,7 @@ start_system() {
 # Функция для остановки системы
 stop_system() {
     log "Остановка системы..."
-    docker-compose down
+    if docker compose version &> /dev/null; then docker compose down; else docker-compose down; fi
     success "Система остановлена"
 }
 
@@ -133,9 +133,9 @@ restart_system() {
 view_logs() {
     service=${1:-}
     if [ -z "$service" ]; then
-        docker-compose logs -f
+        if docker compose version &> /dev/null; then docker compose logs -f; else docker-compose logs -f; fi
     else
-        docker-compose logs -f $service
+        if docker compose version &> /dev/null; then docker compose logs -f $service; else docker-compose logs -f $service; fi
     fi
 }
 
@@ -145,20 +145,21 @@ check_status() {
     
     echo ""
     echo "=== Статус контейнеров ==="
-    docker-compose ps
+    if docker compose version &> /dev/null; then docker compose ps; else docker-compose ps; fi
     
     echo ""
     echo "=== Проверка здоровья ==="
     
     # Проверка базы данных
-    if docker-compose exec database pg_isready -U ${DB_USER:-assessment_user} -d ${DB_NAME:-assessment360} &> /dev/null; then
+    if (docker compose version &> /dev/null && docker compose exec database pg_isready -U ${DB_USER:-assessment_user} -d ${DB_NAME:-assessment360} &> /dev/null) || \
+       (command -v docker-compose &> /dev/null && docker-compose exec database pg_isready -U ${DB_USER:-assessment_user} -d ${DB_NAME:-assessment360} &> /dev/null); then
         success "База данных: работает"
     else
         error "База данных: не работает"
     fi
     
     # Проверка backend
-    if curl -f http://localhost:5000/api/health &> /dev/null; then
+    if curl -f http://localhost:5000/health &> /dev/null; then
         success "Backend: работает"
     else
         error "Backend: не работает"
@@ -204,7 +205,7 @@ backup_database() {
     log "Создание резервной копии базы данных..."
     
     backup_file="backup_$(date +%Y%m%d_%H%M%S).sql"
-    docker-compose exec database pg_dump -U ${DB_USER:-assessment_user} ${DB_NAME:-assessment360} > $backup_file
+    if docker compose version &> /dev/null; then docker compose exec database pg_dump -U ${DB_USER:-assessment_user} ${DB_NAME:-assessment360} > $backup_file; else docker-compose exec database pg_dump -U ${DB_USER:-assessment_user} ${DB_NAME:-assessment360} > $backup_file; fi
     
     success "Резервная копия создана: $backup_file"
 }
@@ -219,7 +220,7 @@ restore_database() {
     
     log "Восстановление базы данных из $backup_file..."
     
-    docker-compose exec -T database psql -U ${DB_USER:-assessment_user} -d ${DB_NAME:-assessment360} < $backup_file
+    if docker compose version &> /dev/null; then docker compose exec -T database psql -U ${DB_USER:-assessment_user} -d ${DB_NAME:-assessment360} < $backup_file; else docker-compose exec -T database psql -U ${DB_USER:-assessment_user} -d ${DB_NAME:-assessment360} < $backup_file; fi
     
     success "База данных восстановлена"
 }
@@ -229,10 +230,10 @@ cleanup() {
     log "Очистка системы..."
     
     # Останавливаем и удаляем контейнеры
-    docker-compose down -v
+    if docker compose version &> /dev/null; then docker compose down -v; else docker-compose down -v; fi
     
     # Удаляем образы
-    docker-compose down --rmi all
+    if docker compose version &> /dev/null; then docker compose down --rmi all; else docker-compose down --rmi all; fi
     
     # Удаляем volumes
     docker volume prune -f
