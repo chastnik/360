@@ -64,9 +64,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               
               {/* Информация о пользователе */}
               <div className="flex items-center">
-                <span className="text-sm text-gray-700 dark:text-gray-300 mr-3">
-                  {user?.first_name} {user?.last_name}
-                </span>
                 <button
                   onClick={() => logout()}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 text-sm font-medium"
