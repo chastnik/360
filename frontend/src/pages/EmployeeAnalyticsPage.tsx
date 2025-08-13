@@ -148,7 +148,7 @@ export const EmployeeAnalyticsPage: React.FC = () => {
       </div>
 
       {/* AI рекомендации — перед блоком ответов */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">AI рекомендации</h3>
           <button
