@@ -187,7 +187,7 @@ export const EmployeeAnalyticsPage: React.FC = () => {
           </button>
         </div>
         {aiText ? (
-          <div className="markdown-body">
+          <div className="markdown-body leading-7">
             <ReactMarkdown
               components={{
                 h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3" {...props} />,

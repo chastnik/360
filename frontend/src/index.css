@@ -107,6 +107,12 @@
   .markdown-body code { @apply bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300 px-1 py-0.5 rounded; }
   .markdown-body pre { @apply bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 p-3 rounded overflow-auto; }
 
+  /* Усиление читаемости в тёмной теме для любых вложенных элементов */
+  .dark .markdown-body, .dark .markdown-body * { color: #f3f4f6 !important; }
+  .dark .markdown-body a { color: #93c5fd !important; }
+  .dark .markdown-body strong { color: #ffffff !important; }
+  .dark .markdown-body li::marker { color: #9ca3af !important; }
+
   .btn {
     @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
   }
