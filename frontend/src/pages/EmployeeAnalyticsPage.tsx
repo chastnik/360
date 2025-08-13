@@ -258,16 +258,16 @@ export const EmployeeAnalyticsPage: React.FC = () => {
             <div key={idx} className="py-3">
               <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
               <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
-              {/* Отображаем с надёжными фолбэками по данным */}
-              {((r.type === 'text') || (!!r.text && r.type !== 'rating')) && (
-                <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">Ответ: {r.text || '—'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              )}
-              {((r.type === 'boolean') || (typeof r.bool === 'boolean' && !r.text)) && (
-                <div className="text-sm text-gray-600 dark:text-gray-300">Ответ: {typeof r.bool === 'boolean' ? (r.bool ? 'Да' : 'Нет') : '—'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              )}
-              {((r.type === 'rating') || (r.score != null && !r.text)) && (
-                <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score != null ? r.score : '—'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              )}
+              {/* Приоритет: текст -> булево -> числовая оценка -> прочее */}
+              {r.text ? (
+                <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">Ответ: {r.text}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              ) : (typeof r.bool === 'boolean' ? (
+                <div className="text-sm text-gray-600 dark:text-gray-300">Ответ: {r.bool ? 'Да' : 'Нет'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              ) : (r.score != null ? (
+                <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              ) : (
+                <div className="text-sm text-gray-600 dark:text-gray-300">Ответ: —{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              ))}
               {r.comment && (
                 <div className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">Комментарий: {r.comment}</div>
               )}
