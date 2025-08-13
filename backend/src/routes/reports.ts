@@ -168,8 +168,11 @@ router.get('/user/:userId/analytics', authenticateToken, async (req: any, res: a
       .join('categories', 'questions.category_id', 'categories.id')
       .select(
         'assessment_responses.rating_value as score',
+        'assessment_responses.text_response as text',
+        'assessment_responses.boolean_response as bool',
         'assessment_responses.comment',
         'questions.question_text',
+        'questions.question_type as question_type',
         'categories.name as category_name',
         'categories.color as category_color',
         'respondent_users.first_name as respondent_first_name',
@@ -210,7 +213,10 @@ router.get('/user/:userId/analytics', authenticateToken, async (req: any, res: a
         question: r.question_text,
         category: r.category_name,
         color: r.category_color,
-        score: Number(r.score || 0),
+        score: r.score != null ? Number(r.score) : null,
+        text: r.text ?? null,
+        bool: typeof r.bool === 'boolean' ? r.bool : null,
+        type: r.question_type,
         comment: r.comment,
         respondent: `${r.respondent_first_name || ''} ${r.respondent_last_name || ''}`.trim(),
         respondentType: r.respondent_type

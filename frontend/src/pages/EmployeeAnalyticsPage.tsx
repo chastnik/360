@@ -258,9 +258,17 @@ export const EmployeeAnalyticsPage: React.FC = () => {
             <div key={idx} className="py-3">
               <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
               <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              {r.type === 'rating' && (
+                <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score != null ? r.score : '—'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              )}
+              {r.type === 'boolean' && (
+                <div className="text-sm text-gray-600 dark:text-gray-300">Ответ: {typeof r.bool === 'boolean' ? (r.bool ? 'Да' : 'Нет') : '—'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              )}
+              {r.type === 'text' && (
+                <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">Ответ: {r.text || '—'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
+              )}
               {r.comment && (
-                <div className="mt-1 text-sm text-gray-700 dark:text-gray-300">Комментарий: {r.comment}</div>
+                <div className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">Комментарий: {r.comment}</div>
               )}
             </div>
           )) : (
