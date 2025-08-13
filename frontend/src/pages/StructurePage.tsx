@@ -24,6 +24,8 @@ const StructurePage: React.FC = () => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -65,13 +67,49 @@ const StructurePage: React.FC = () => {
     return uniq;
   }, [users]);
 
+  const parentMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    users.forEach(u => {
+      map[String(u.id)] = u.manager_id ? String(u.manager_id) : null;
+    });
+    return map;
+  }, [users]);
+
+  const expandPathTo = (userId: string) => {
+    const updates: Record<string, boolean> = {};
+    let cur: string | null = userId;
+    while (cur) {
+      updates[cur] = true;
+      cur = parentMap[cur] || null;
+    }
+    setExpanded(prev => ({ ...prev, ...updates }));
+    // Прокрутка к карточке
+    setTimeout(() => {
+      const el = document.getElementById(`user-${userId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  };
+
+  useEffect(() => {
+    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    const q = searchQuery.toLowerCase();
+    const list = users.filter(u => {
+      const hay = [u.first_name, u.last_name, u.middle_name, u.email, u.position, u.mattermost_username]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    }).slice(0, 10);
+    setSearchResults(list);
+  }, [searchQuery, users]);
+
   const toggle = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
   const Card: React.FC<{ node: TreeNode; level: number }> = ({ node, level }) => {
     const isOpen = !!expanded[node.id];
     const hasChildren = node.children && node.children.length > 0;
     return (
-      <div className="ml-4">
+      <div className="ml-4" id={`user-${node.id}`}>
         <div className="flex items-start gap-2">
           {hasChildren && (
             <button
@@ -115,6 +153,40 @@ const StructurePage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Орг. структура</h1>
+      </div>
+      {/* Поиск сотрудника */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center gap-3">
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Поиск сотрудника: ФИО, email, должность, Mattermost"
+            className="flex-1 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white border-gray-300 dark:border-gray-600"
+          />
+          <button
+            type="button"
+            onClick={() => { if (searchResults[0]) expandPathTo(String(searchResults[0].id)); }}
+            className="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded"
+            disabled={searchResults.length === 0}
+          >
+            Показать
+          </button>
+        </div>
+        {searchQuery.trim() && searchResults.length > 0 && (
+          <div className="mt-2 max-h-60 overflow-auto divide-y divide-gray-100 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded">
+            {searchResults.map(u => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => expandPathTo(String(u.id))}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <div className="text-sm text-gray-900 dark:text-white font-medium">{u.last_name} {u.first_name}{u.middle_name ? ` ${u.middle_name}` : ''}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}{u.mattermost_username ? ` • @${u.mattermost_username}` : ''}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {loading ? (
         <div className="flex justify-center items-center h-64">
