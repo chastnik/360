@@ -95,6 +95,17 @@
 }
 
 @layer components {
+  /* Markdown body defaults for readability, including dark theme */
+  .markdown-body {
+    @apply text-gray-800 dark:text-gray-100 leading-relaxed space-y-3;
+  }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3 { @apply text-gray-900 dark:text-white; }
+  .markdown-body p { @apply text-gray-800 dark:text-gray-100; }
+  .markdown-body ul, .markdown-body ol { @apply pl-6; }
+  .markdown-body a { @apply text-blue-600 dark:text-blue-400 underline; }
+  .markdown-body code { @apply bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300 px-1 py-0.5 rounded; }
+  .markdown-body pre { @apply bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 p-3 rounded overflow-auto; }
+
   .btn {
     @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
   }

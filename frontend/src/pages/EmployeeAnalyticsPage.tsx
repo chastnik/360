@@ -187,7 +187,7 @@ export const EmployeeAnalyticsPage: React.FC = () => {
           </button>
         </div>
         {aiText ? (
-          <div className="max-w-none">
+          <div className="markdown-body">
             <ReactMarkdown
               components={{
                 h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3" {...props} />,
@@ -201,7 +201,7 @@ export const EmployeeAnalyticsPage: React.FC = () => {
                 strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
                 code: ({node, inline, ...props}: any) => inline
                   ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />
-                  : <code className="block w-full p-3 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 overflow-auto" {...props} />,
+                  : <pre className="block w-full p-3 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 overflow-auto"><code {...props} /></pre>,
               }}
             >
               {aiText}
