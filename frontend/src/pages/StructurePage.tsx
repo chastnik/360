@@ -1,6 +1,7 @@
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
+import Avatar from '../components/Avatar';
 
 type User = {
   id: string;
@@ -124,12 +125,7 @@ const StructurePage: React.FC = () => {
           )}
           <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 shadow-sm min-w-[260px]">
             <div className="flex items-center gap-3 mb-2">
-              <img src={`/api/users/${node.id}/avatar`} onError={(e:any)=>{(e.currentTarget.parentElement?.querySelector('.avatar-fallback') as HTMLElement)?.classList.remove('hidden'); e.currentTarget.classList.add('hidden');}} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
-              <div className="avatar-fallback hidden">
-                <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-lg">
-                  <span>🧑‍💼</span>
-                </div>
-              </div>
+              <Avatar userId={node.id} size={40} />
               <div>
                 <div className="text-sm font-semibold text-gray-900 dark:text-white">
                   {node.last_name} {node.first_name}{node.middle_name ? ` ${node.middle_name}` : ''}

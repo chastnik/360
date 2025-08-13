@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { User, Department } from '../types/common';
+import Avatar from '../components/Avatar';
 
 export const ProfilePage: React.FC = () => {
   const { user, setUser } = useAuth();
@@ -517,7 +518,7 @@ const loadAdditionalData = useCallback(async () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Аватар</label>
                 <div className="flex items-center gap-3">
-                  <img src={`/api/users/${user.id}/avatar`} onError={(e:any)=>{e.currentTarget.style.display='none';}} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+                  <Avatar userId={user.id} size={48} />
                   <form onSubmit={handleAvatarUpload} className="flex items-center gap-2">
                     <input type="file" accept="image/*" onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} className="text-sm" />
                     <button type="submit" disabled={!avatarFile || avatarUploading} className="px-2 py-1 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded disabled:opacity-50">{avatarUploading?'Загрузка...':'Загрузить'}</button>
