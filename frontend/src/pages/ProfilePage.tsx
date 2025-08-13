@@ -517,11 +517,11 @@ const loadAdditionalData = useCallback(async () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Аватар</label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full">
                   <Avatar userId={user.id} size={48} />
-                  <form onSubmit={handleAvatarUpload} className="flex items-center gap-2">
-                    <input type="file" accept="image/*" onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} className="text-sm" />
-                    <button type="submit" disabled={!avatarFile || avatarUploading} className="px-2 py-1 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded disabled:opacity-50">{avatarUploading?'Загрузка...':'Загрузить'}</button>
+                  <form onSubmit={handleAvatarUpload} className="flex flex-wrap items-center gap-2 w-full">
+                    <input type="file" accept="image/*" onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} className="text-sm max-w-full" />
+                    <button type="submit" disabled={!avatarFile || avatarUploading} className="px-2 py-1 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded disabled:opacity-50 shrink-0">{avatarUploading?'Загрузка...':'Загрузить'}</button>
                   </form>
                 </div>
               </div>
