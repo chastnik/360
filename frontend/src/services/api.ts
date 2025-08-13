@@ -553,3 +553,14 @@ export const questionsAPI = {
 };
 
 export default api; 
+
+// Вспомогательное API для получения публичной конфигурации (в runtime)
+export async function getPublicConfig(): Promise<{ mattermostUrl: string | null }> {
+  try {
+    const res = await api.get('/mattermost/public-config');
+    const url = res.data?.data?.url || null;
+    return { mattermostUrl: url };
+  } catch {
+    return { mattermostUrl: null };
+  }
+}

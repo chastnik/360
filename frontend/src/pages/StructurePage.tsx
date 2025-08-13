@@ -1,6 +1,6 @@
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useMemo, useState } from 'react';
-import api from '../services/api';
+import api, { getPublicConfig } from '../services/api';
 import Avatar from '../components/Avatar';
 
 type User = {
@@ -29,10 +29,13 @@ const StructurePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [mmUrl, setMmUrl] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
+        const conf = await getPublicConfig();
+        setMmUrl(conf.mattermostUrl);
         const res = await api.get('/users');
         const data = res.data?.success ? res.data.data : res.data;
         const all: User[] = Array.isArray(data) ? data : [];
@@ -139,8 +142,8 @@ const StructurePage: React.FC = () => {
             </div>
             {node.mattermost_username && (
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                MM: {process.env.REACT_APP_MATTERMOST_URL ? (
-                  <a href={`${process.env.REACT_APP_MATTERMOST_URL}/direct/@${node.mattermost_username}`} target="_blank" rel="noreferrer" className="underline hover:text-gray-700 dark:hover:text-gray-200">@{node.mattermost_username}</a>
+                MM: {mmUrl ? (
+                  <a href={`${mmUrl}/direct/@${node.mattermost_username}`} target="_blank" rel="noreferrer" className="underline hover:text-gray-700 dark:hover:text-gray-200">@{node.mattermost_username}</a>
                 ) : (
                   <span>@{node.mattermost_username}</span>
                 )}

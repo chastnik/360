@@ -7,6 +7,15 @@ import mattermostService from '../services/mattermost';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
+// Публичная конфигурация (URL Mattermost) — доступна авторизованным пользователям
+router.get('/public-config', authenticateToken, async (_req: any, res): Promise<void> => {
+  try {
+    res.json({ success: true, data: { url: process.env.MATTERMOST_URL || null } });
+  } catch (error) {
+    res.json({ success: true, data: { url: null } });
+  }
+});
+
 
 /**
  * Генерация случайного пароля
