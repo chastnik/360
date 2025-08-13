@@ -108,7 +108,7 @@
   .markdown-body pre { @apply bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 p-3 rounded overflow-auto; }
 
   /* Усиление читаемости в тёмной теме для любых вложенных элементов */
-  .dark .markdown-body, .dark .markdown-body * { color: #f3f4f6 !important; }
+  .dark .markdown-body, .dark .markdown-body * { color: #f3f4f6 !important; -webkit-text-fill-color: #f3f4f6 !important; }
   .dark .markdown-body a { color: #93c5fd !important; }
   .dark .markdown-body strong { color: #ffffff !important; }
   .dark .markdown-body li::marker { color: #9ca3af !important; }
