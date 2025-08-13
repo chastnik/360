@@ -22,6 +22,7 @@ const ALL_PERMISSIONS = [
   'ui:view:admin.departments',
   'ui:view:admin.categories',
   'ui:view:admin.questions',
+  'ui:view:admin.competencies',
   'ui:view:admin.mattermost',
   'ui:view:admin.settings',
   'ui:view:admin.roles',

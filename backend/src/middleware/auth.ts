@@ -51,7 +51,12 @@ export const authenticateToken = async (
       return;
     }
 
-    req.user = decoded;
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: user.role,
+      roleId: (user as any).role_id || null
+    };
     next();
   } catch (error) {
     console.error('JWT verification error:', error);
@@ -86,3 +91,29 @@ export const requireRole = (roles: string[]) => {
 
 export const requireAdmin = requireRole(['admin']);
 export const requireManagerOrAdmin = requireRole(['manager', 'admin']); 
+
+// Проверка прав по role_permissions
+export const requirePermission = (permission: string) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, error: 'Пользователь не авторизован' });
+        return;
+      }
+      const roleId = (req.user as any).roleId;
+      if (!roleId) {
+        res.status(403).json({ success: false, error: 'У пользователя не назначена роль' });
+        return;
+      }
+      const has = await db('role_permissions').where({ role_id: roleId, permission }).first();
+      if (!has) {
+        res.status(403).json({ success: false, error: 'Недостаточно прав доступа' });
+        return;
+      }
+      next();
+    } catch (error) {
+      console.error('Permission check error:', error);
+      res.status(500).json({ success: false, error: 'Ошибка проверки прав' });
+    }
+  };
+};

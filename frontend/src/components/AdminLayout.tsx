@@ -8,50 +8,59 @@ interface AdminLayoutProps {
 }
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, permissions } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const can = (perm?: string) => !perm || permissions.includes(perm);
   const adminNavigation = [
     {
       name: 'Пользователи',
       path: '/admin/users',
-      icon: '👥'
+      icon: '👥',
+      perm: 'ui:view:admin.users'
     },
     {
       name: 'Отделы',
       path: '/admin/departments',
-      icon: '🏢'
+      icon: '🏢',
+      perm: 'ui:view:admin.departments'
     },
     {
       name: 'Категории',
       path: '/admin/categories',
-      icon: '🏷️'
+      icon: '🏷️',
+      perm: 'ui:view:admin.categories'
     },
     {
       name: 'Вопросы',
       path: '/admin/questions',
-      icon: '❓'
+      icon: '❓',
+      perm: 'ui:view:admin.questions'
     },
     {
       name: 'Mattermost',
       path: '/admin/mattermost',
-      icon: '💬'
+      icon: '💬',
+      perm: 'ui:view:admin.mattermost'
     },
     {
       name: 'Настройки',
       path: '/admin/settings',
-      icon: '⚙️'
+      icon: '⚙️',
+      perm: 'ui:view:admin.settings'
     },
     {
       name: 'Роли',
       path: '/admin/roles',
-      icon: '🛡️'
+      icon: '🛡️',
+      perm: 'ui:view:admin.roles'
     },
     {
       name: 'Компетенции',
       path: '/admin/competencies',
-      icon: '🧠'
+      icon: '🧠',
+      perm: 'ui:view:admin.competencies'
     }
   ];
 
@@ -126,7 +135,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               </Link>
             </div>
             <nav className="mt-5 px-2 space-y-1">
-              {adminNavigation.map((item) => (
+              {adminNavigation.filter(i=>can(i.perm)).map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
@@ -167,7 +176,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   </Link>
                 </div>
                 <nav className="mt-5 flex-1 px-2 space-y-1">
-                  {adminNavigation.map((item) => (
+                  {adminNavigation.filter(i=>can(i.perm)).map((item) => (
                     <Link
                       key={item.path}
                       to={item.path}

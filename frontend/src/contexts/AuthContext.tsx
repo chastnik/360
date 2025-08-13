@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   setUser: (user: User | null) => void;
   token: string | null;
+  permissions: string[];
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (userData: RegisterData) => Promise<void>;
@@ -36,6 +37,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -46,6 +48,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authAPI.getCurrentUser(authToken);
       if (response.success && response.data) {
         setUser(response.data);
+        // @ts-ignore собираем permissions из ответа, если есть поле
+        if ((response as any).permissions) setPermissions((response as any).permissions);
       } else {
         throw new Error(response.error || 'Не удалось загрузить пользователя');
       }
@@ -54,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('auth_token');
       setToken(null);
       setUser(null);
+      setPermissions([]);
     } finally {
       setIsLoading(false);
     }
@@ -78,6 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { token: authToken, user: userData } = response;
         setToken(authToken);
         setUser(userData);
+        // @ts-ignore backend возвращает permissions вместе с user
+        if ((response.user as any).permissions) setPermissions((response.user as any).permissions);
         localStorage.setItem('auth_token', authToken);
         
         console.log('Добро пожаловать!');
@@ -117,6 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     setToken(null);
+    setPermissions([]);
     localStorage.removeItem('auth_token');
     console.log('Вы вышли из системы');
     navigate('/login');
@@ -126,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     setUser,
     token,
+    permissions,
     login,
     logout,
     register,

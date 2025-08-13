@@ -2,7 +2,7 @@
 /* eslint-disable no-console */
 import { Router } from 'express';
 import db from '../database/connection';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requirePermission } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 
@@ -30,7 +30,7 @@ initializeRoleConstraint();
 
 const router = Router();
 
-router.get('/', authenticateToken, async (_req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, requirePermission('ui:view:admin.users'), async (_req: any, res: any): Promise<void> => {
   try {
     const users = await db('users')
       .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
@@ -178,7 +178,7 @@ router.put('/password', authenticateToken, async (req: any, res: any): Promise<v
 });
 
 // Создание нового пользователя (только для админов)
-router.post('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.post('/', authenticateToken, requirePermission('action:users:create'), async (req: any, res: any): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
     if (req.user.role !== 'admin') {
@@ -261,7 +261,7 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
 });
 
 // Обновление пользователя (только для админов)
-router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.put('/:id', authenticateToken, requirePermission('action:users:update'), async (req: any, res: any): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
     if (req.user.role !== 'admin') {

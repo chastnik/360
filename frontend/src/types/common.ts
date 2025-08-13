@@ -50,6 +50,8 @@ export interface User {
   last_name: string;
   middle_name?: string;
   role: 'admin' | 'hr' | 'manager' | 'user';
+  role_id?: string | null;
+  permissions?: string[];
   position?: string;
   department?: string; // Старое поле - для совместимости
   department_id?: string; // Новое поле - FK к departments

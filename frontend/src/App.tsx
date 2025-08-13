@@ -74,7 +74,7 @@ function App() {
               } />
               
               <Route path="/cycles" element={
-                <PrivateRoute>
+                <PrivateRoute requiredPermission="ui:view:cycles">
                   <Layout>
                     <CyclesPage />
                   </Layout>
@@ -82,7 +82,7 @@ function App() {
               } />
               
               <Route path="/assessments" element={
-                <PrivateRoute>
+                <PrivateRoute requiredPermission="ui:view:assessments">
                   <Layout>
                     <AssessmentsPage />
                   </Layout>
@@ -90,7 +90,7 @@ function App() {
               } />
               
               <Route path="/reports" element={
-                <PrivateRoute>
+                <PrivateRoute requiredPermission="ui:view:reports">
                   <Layout>
                     <ReportsPage />
                   </Layout>
@@ -98,7 +98,7 @@ function App() {
               } />
 
               <Route path="/structure" element={
-                <PrivateRoute>
+                <PrivateRoute requiredPermission="ui:view:dashboard">
                   <Layout>
                     <StructurePage />
                   </Layout>
@@ -106,7 +106,7 @@ function App() {
               } />
 
               <Route path="/employee/:userId" element={
-                <PrivateRoute>
+                <PrivateRoute requiredPermission="ui:view:reports">
                   <Layout>
                     <EmployeeAnalyticsPage />
                   </Layout>
@@ -125,7 +125,7 @@ function App() {
               } />
               
               <Route path="/admin/users" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.users">
                   <Layout>
                     <AdminLayout>
                       <AdminUsers />
@@ -135,7 +135,7 @@ function App() {
               } />
               
               <Route path="/admin/departments" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.departments">
                   <Layout>
                     <AdminLayout>
                       <AdminDepartments />
@@ -145,7 +145,7 @@ function App() {
               } />
               
               <Route path="/admin/categories" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.categories">
                   <Layout>
                     <AdminLayout>
                       <AdminCategories />
@@ -155,7 +155,7 @@ function App() {
               } />
               
               <Route path="/admin/questions" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.questions">
                   <Layout>
                     <AdminLayout>
                       <AdminQuestions />
@@ -165,7 +165,7 @@ function App() {
               } />
               
               <Route path="/admin/cycles" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin">
                   <Layout>
                     <AdminLayout>
                       <CyclesPage />
@@ -175,7 +175,7 @@ function App() {
               } />
               
               <Route path="/admin/reports" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin">
                   <Layout>
                     <AdminLayout>
                       <ReportsPage />
@@ -185,7 +185,7 @@ function App() {
               } />
               
               <Route path="/admin/mattermost" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.mattermost">
                   <Layout>
                     <AdminLayout>
                       <AdminMattermost />
@@ -195,7 +195,7 @@ function App() {
               } />
               
               <Route path="/admin/settings" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.settings">
                   <Layout>
                     <AdminLayout>
                       <AdminSettings />
@@ -205,7 +205,7 @@ function App() {
               } />
 
               <Route path="/admin/roles" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.roles">
                   <Layout>
                     <AdminLayout>
                       <AdminRoles />
@@ -215,7 +215,7 @@ function App() {
               } />
 
               <Route path="/admin/competencies" element={
-                <PrivateRoute requiredRole="admin">
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.competencies">
                   <Layout>
                     <AdminLayout>
                       <AdminCompetencies />

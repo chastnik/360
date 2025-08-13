@@ -2,7 +2,7 @@
 /* eslint-disable no-console */
 import { Router } from 'express';
 import knex from '../database/connection';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
@@ -106,7 +106,7 @@ export default router;
 
 
 // Компетенции (CRUD)
-router.get('/competencies', authenticateToken, requireAdmin, async (_req: any, res: any): Promise<void> => {
+router.get('/competencies', authenticateToken, requirePermission('ui:view:admin.competencies'), async (_req: any, res: any): Promise<void> => {
   try {
     const rows = await knex('competencies').where('is_active', true).orderBy('name');
     res.json({ success: true, data: rows });
@@ -115,7 +115,7 @@ router.get('/competencies', authenticateToken, requireAdmin, async (_req: any, r
   }
 });
 
-router.post('/competencies', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.post('/competencies', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: any, res: any): Promise<void> => {
   try {
     const { name, description } = req.body;
     if (!name || String(name).trim() === '') { res.status(400).json({ error: 'Название обязательно' }); return; }
@@ -126,7 +126,7 @@ router.post('/competencies', authenticateToken, requireAdmin, async (req: any, r
   }
 });
 
-router.put('/competencies/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.put('/competencies/:id', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: any, res: any): Promise<void> => {
   try {
     const { id } = req.params;
     const { name, description, is_active } = req.body;
@@ -143,7 +143,7 @@ router.put('/competencies/:id', authenticateToken, requireAdmin, async (req: any
   }
 });
 
-router.delete('/competencies/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.delete('/competencies/:id', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: any, res: any): Promise<void> => {
   try {
     const { id } = req.params;
     await knex('competencies').where('id', id).update({ is_active: false, updated_at: knex.fn.now() });

@@ -92,12 +92,15 @@ router.post('/login', async (req, res): Promise<void> => {
       { 
         userId: user.id, 
         email: user.email, 
-        role: user.role 
+        role: user.role,
+        roleId: user.role_id || null
       },
       process.env.JWT_SECRET!,
       { expiresIn: '24h' }
     );
 
+    // Отдаём ещё permissions для фронта
+    const permissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
     res.json({
       success: true,
       token,
@@ -106,7 +109,9 @@ router.post('/login', async (req, res): Promise<void> => {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        role: user.role
+        role: user.role,
+        role_id: user.role_id || null,
+        permissions
       }
     });
 
@@ -202,6 +207,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res): Promise<void
       return;
     }
 
+    const mePermissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
     res.json({
       success: true,
       user: {
@@ -210,7 +216,8 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res): Promise<void
         first_name: user.first_name,
         last_name: user.last_name,
         role: user.role
-      }
+      },
+      permissions: mePermissions
     });
 
   } catch (error) {

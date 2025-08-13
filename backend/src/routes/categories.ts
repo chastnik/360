@@ -2,12 +2,12 @@
 /* eslint-disable no-console */
 import { Router } from 'express';
 import knex from '../database/connection';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
 // Получить все категории
-router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, requirePermission('ui:view:admin.categories'), async (req: any, res: any): Promise<void> => {
   try {
     // Для админов возвращаем все категории (включая неактивные)
     // Для обычных пользователей - только активные

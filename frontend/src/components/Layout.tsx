@@ -8,15 +8,16 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, permissions } = useAuth();
   const location = useLocation();
 
+  const can = (perm?: string) => !perm || permissions.includes(perm);
   const navigation = [
     { name: 'Дашборд', href: '/dashboard', icon: '📊' },
-    { name: 'Циклы', href: '/cycles', icon: '🔄' },
-    { name: 'Оценки', href: '/assessments', icon: '📝' },
-    { name: 'Отчеты', href: '/reports', icon: '📈' },
-    { name: 'Структура', href: '/structure', icon: '🏢' },
+    { name: 'Циклы', href: '/cycles', icon: '🔄', perm: 'ui:view:cycles' },
+    { name: 'Оценки', href: '/assessments', icon: '📝', perm: 'ui:view:assessments' },
+    { name: 'Отчеты', href: '/reports', icon: '📈', perm: 'ui:view:reports' },
+    { name: 'Структура', href: '/structure', icon: '🏢', perm: 'ui:view:dashboard' },
     { name: 'Профиль', href: '/profile', icon: '👤' }
   ];
 
@@ -35,7 +36,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               </div>
               <div className="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8">
-                {navigation.map((item) => (
+                {navigation.filter(i=>can(i.perm)).map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
@@ -53,7 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
               {/* Ссылка на админку для администраторов */}
-              {user?.role === 'admin' && (
+              {user?.role === 'admin' && permissions.includes('ui:view:admin') && (
                 <Link
                   to="/admin"
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium"
