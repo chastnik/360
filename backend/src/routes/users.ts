@@ -483,3 +483,30 @@ router.get('/:id/avatar', authenticateToken, async (req: any, res: any): Promise
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
+
+// Загрузка аватара произвольного пользователя (для администраторов)
+router.post('/:id/avatar', authenticateToken, upload.single('avatar'), async (req: any, res: any): Promise<void> => {
+  try {
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Недостаточно прав доступа' });
+      return;
+    }
+    const targetUserId = req.params.id;
+    if (!req.file) {
+      res.status(400).json({ error: 'Файл не загружен' });
+      return;
+    }
+    const mime = req.file.mimetype || 'application/octet-stream';
+    await db('users')
+      .where('id', targetUserId)
+      .update({
+        avatar_data: req.file.buffer,
+        avatar_mime: mime,
+        avatar_updated_at: new Date()
+      });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Ошибка загрузки аватара админом:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});

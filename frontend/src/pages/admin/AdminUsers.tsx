@@ -29,6 +29,8 @@ const AdminUsers: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<UserFormData>({
@@ -126,6 +128,22 @@ const AdminUsers: React.FC = () => {
       
       if (response.data.success) {
         setSuccessMessage('Пользователь обновлен');
+        // Если выбран файл аватара — загрузим
+        if (avatarFile) {
+          try {
+            setAvatarUploading(true);
+            const form = new FormData();
+            form.append('avatar', avatarFile);
+            await api.post(`/users/${selectedUser.id}/avatar`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setSuccessMessage('Пользователь и аватар обновлены');
+            setAvatarFile(null);
+          } catch (err) {
+            console.error('Ошибка загрузки аватара админом', err);
+            setError('Пользователь обновлен, но не удалось загрузить аватар');
+          } finally {
+            setAvatarUploading(false);
+          }
+        }
         setShowEditForm(false);
         setSelectedUser(null);
         loadUsers();
@@ -515,6 +533,15 @@ const AdminUsers: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <img src={`/api/users/${selectedUser.id}/avatar`} onError={(e:any)=>{e.currentTarget.style.display='none';}} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
                   <span className="text-xs text-gray-500 dark:text-gray-400">Текущий аватар</span>
+                </div>
+              )}
+              {selectedUser && (
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Загрузить новый аватар</label>
+                  <input type="file" accept="image/*" onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} className="text-sm" />
+                  {avatarFile && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Выбран файл: {avatarFile.name}</div>
+                  )}
                 </div>
               )}
               
