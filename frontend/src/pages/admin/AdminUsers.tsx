@@ -16,6 +16,7 @@ interface UserFormData {
   department_id: string; // новое поле - ID отдела
   manager_id: string;
   mattermost_username: string;
+  avatar_url: string;
   is_manager: boolean;
 }
 
@@ -42,6 +43,7 @@ const AdminUsers: React.FC = () => {
     department_id: '',
     manager_id: '',
     mattermost_username: '',
+    avatar_url: '',
     is_manager: false
   });
 
@@ -96,6 +98,7 @@ const AdminUsers: React.FC = () => {
           department_id: '',
           manager_id: '',
           mattermost_username: '',
+        avatar_url: '',
           is_manager: false
         });
         loadUsers();
@@ -175,6 +178,7 @@ const AdminUsers: React.FC = () => {
       department_id: user.department_id || '',
       manager_id: user.manager_id || '',
       mattermost_username: user.mattermost_username || '',
+      avatar_url: (user as any).avatar_url || '',
       is_manager: user.is_manager || false
     });
     setShowEditForm(true);
@@ -505,6 +509,14 @@ const AdminUsers: React.FC = () => {
                   placeholder="@username"
                 />
               </div>
+
+              {/* Предпросмотр аватара */}
+              {selectedUser && (
+                <div className="flex items-center gap-3">
+                  <img src={`/api/users/${selectedUser.id}/avatar`} onError={(e:any)=>{e.currentTarget.style.display='none';}} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Текущий аватар</span>
+                </div>
+              )}
               
               <div>
                 <label className="flex items-center space-x-2">

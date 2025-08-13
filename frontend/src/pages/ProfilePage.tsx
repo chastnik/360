@@ -24,6 +24,8 @@ export const ProfilePage: React.FC = () => {
     position: user?.position || '',
     department: user?.department || ''
   });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Данные формы смены пароля
   const [passwordData, setPasswordData] = useState({
@@ -165,6 +167,25 @@ const loadAdditionalData = useCallback(async () => {
       department: user?.department || ''
     });
     setError(null);
+  };
+
+  const handleAvatarUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!avatarFile) return;
+    try {
+      setAvatarUploading(true);
+      const form = new FormData();
+      form.append('avatar', avatarFile);
+      await api.post('/users/profile/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setSuccess('Аватар обновлён');
+      setAvatarFile(null);
+      await loadAdditionalData();
+    } catch (err) {
+      console.error('Upload error', err);
+      setError('Не удалось загрузить аватар');
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const handlePasswordCancel = () => {
@@ -493,6 +514,16 @@ const loadAdditionalData = useCallback(async () => {
             </h2>
             
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Аватар</label>
+                <div className="flex items-center gap-3">
+                  <img src={`/api/users/${user.id}/avatar`} onError={(e:any)=>{e.currentTarget.style.display='none';}} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+                  <form onSubmit={handleAvatarUpload} className="flex items-center gap-2">
+                    <input type="file" accept="image/*" onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} className="text-sm" />
+                    <button type="submit" disabled={!avatarFile || avatarUploading} className="px-2 py-1 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded disabled:opacity-50">{avatarUploading?'Загрузка...':'Загрузить'}</button>
+                  </form>
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Роль

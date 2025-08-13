@@ -4,6 +4,9 @@ import { Router } from 'express';
 import db from '../database/connection';
 import { authenticateToken } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 // Инициализация: обновляем ограничение роли для поддержки 'hr'
 const initializeRoleConstraint = async () => {
@@ -30,7 +33,7 @@ const router = Router();
 router.get('/', authenticateToken, async (_req: any, res: any): Promise<void> => {
   try {
     const users = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url')
       .where('is_active', true)
       .orderBy('last_name', 'first_name');
     
@@ -50,7 +53,7 @@ router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
     const { id } = req.params;
     
     const user = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url')
       .where('id', id)
       .first();
     
@@ -72,7 +75,7 @@ router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
 // Обновление профиля пользователя
 router.put('/profile', authenticateToken, async (req: any, res: any): Promise<void> => {
   try {
-    const { first_name, last_name, email, position, department, department_id } = req.body;
+    const { first_name, last_name, email, position, department, department_id, avatar_url } = req.body;
     const userId = req.user.userId;
 
     // Проверяем, не занят ли email другим пользователем
@@ -98,12 +101,13 @@ router.put('/profile', authenticateToken, async (req: any, res: any): Promise<vo
         position,
         old_department: department,
         department_id: department_id && department_id.trim() !== '' ? department_id : null,
+        avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
         updated_at: new Date()
       });
 
     // Получаем обновленные данные пользователя
     const updatedUser = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at', 'avatar_url')
       .where('id', userId)
       .first();
 
@@ -194,6 +198,7 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
       department_id, // новое поле - ID отдела
       manager_id,
       mattermost_username,
+      avatar_url,
       password = 'defaultPassword123' // временный пароль
     } = req.body;
 
@@ -235,6 +240,7 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
         old_department: department, // старое поле для совместимости
         department_id: department_id && department_id.trim() !== '' ? department_id : null,
         manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
+        avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
         mattermost_username,
         password_hash: hashedPassword,
         is_active: true,
@@ -275,6 +281,7 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
       department_id, // новое поле - ID отдела
       manager_id,
       mattermost_username,
+      avatar_url,
       is_manager
     } = req.body;
 
@@ -322,13 +329,14 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
         department_id: department_id && department_id.trim() !== '' ? department_id : null,
         manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
         mattermost_username,
+        avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
         is_manager: is_manager === true || is_manager === 'true',
         updated_at: new Date()
       });
 
     // Получаем обновленные данные
     const updatedUser = await db('users')
-      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at'])
+      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'])
       .where('id', userId)
       .first();
 
@@ -431,3 +439,47 @@ router.patch('/:id/deactivate', authenticateToken, async (req: any, res: any): P
 });
 
 export default router; 
+
+// Загрузка аватара текущего пользователя
+router.post('/profile/avatar', authenticateToken, upload.single('avatar'), async (req: any, res: any): Promise<void> => {
+  try {
+    const userId = req.user.userId;
+    if (!req.file) {
+      res.status(400).json({ error: 'Файл не загружен' });
+      return;
+    }
+    const mime = req.file.mimetype || 'application/octet-stream';
+    await db('users')
+      .where('id', userId)
+      .update({
+        avatar_data: req.file.buffer,
+        avatar_mime: mime,
+        avatar_updated_at: new Date()
+      });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Ошибка загрузки аватара:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// Получение аватара по ID пользователя
+router.get('/:id/avatar', authenticateToken, async (req: any, res: any): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = await db('users')
+      .select('avatar_data', 'avatar_mime', 'avatar_updated_at')
+      .where('id', id)
+      .first();
+    if (!user || !user.avatar_data) {
+      res.status(404).json({ error: 'Аватар не найден' });
+      return;
+    }
+    res.setHeader('Content-Type', user.avatar_mime || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(user.avatar_data);
+  } catch (error) {
+    console.error('Ошибка получения аватара:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});

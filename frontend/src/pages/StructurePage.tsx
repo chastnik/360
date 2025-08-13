@@ -13,6 +13,7 @@ type User = {
   department?: string;
   manager_id?: string | null;
   mattermost_username?: string;
+  avatar_url?: string;
   role?: string;
   is_manager?: boolean;
 };
@@ -122,10 +123,21 @@ const StructurePage: React.FC = () => {
             </button>
           )}
           <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 shadow-sm min-w-[260px]">
-            <div className="text-sm font-semibold text-gray-900 dark:text-white">
-              {node.last_name} {node.first_name}{node.middle_name ? ` ${node.middle_name}` : ''}
+            <div className="flex items-center gap-3 mb-2">
+              {node.avatar_url ? (
+                <img src={node.avatar_url} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-lg">
+                  <span>🧑‍💼</span>
+                </div>
+              )}
+              <div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {node.last_name} {node.first_name}{node.middle_name ? ` ${node.middle_name}` : ''}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{node.position || '—'}</div>
+              </div>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{node.position || '—'}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400">{node.email}</div>
             {node.mattermost_username && (
               <div className="text-xs text-gray-500 dark:text-gray-400">MM: @{node.mattermost_username}</div>

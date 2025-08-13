@@ -55,6 +55,7 @@ export interface User {
   department_id?: string; // Новое поле - FK к departments
   manager_id?: string;
   mattermost_username?: string;
+  avatar_url?: string;
   is_manager: boolean;
   is_active: boolean;
   created_at: string;
