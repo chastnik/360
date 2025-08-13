@@ -15,6 +15,7 @@ type User = {
   manager_id?: string | null;
   mattermost_username?: string;
   avatar_url?: string;
+  avatar_updated_at?: string;
   role?: string;
   is_manager?: boolean;
 };
@@ -125,7 +126,7 @@ const StructurePage: React.FC = () => {
           )}
           <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 shadow-sm min-w-[260px]">
             <div className="flex items-center gap-3 mb-2">
-              <Avatar userId={node.id} size={40} />
+              <Avatar userId={node.id} size={40} version={node.avatar_updated_at || ''} />
               <div>
                 <div className="text-sm font-semibold text-gray-900 dark:text-white">
                   {node.last_name} {node.first_name}{node.middle_name ? ` ${node.middle_name}` : ''}

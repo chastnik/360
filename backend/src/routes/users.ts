@@ -33,7 +33,7 @@ const router = Router();
 router.get('/', authenticateToken, async (_req: any, res: any): Promise<void> => {
   try {
     const users = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
       .where('is_active', true)
       .orderBy('last_name', 'first_name');
     
