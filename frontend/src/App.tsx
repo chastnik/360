@@ -115,81 +115,101 @@ function App() {
               {/* Административные маршруты */}
               <Route path="/admin" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminDashboard />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminDashboard />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/users" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminUsers />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminUsers />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/departments" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminDepartments />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminDepartments />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/categories" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminCategories />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminCategories />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/questions" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminQuestions />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminQuestions />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/cycles" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <CyclesPage />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <CyclesPage />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/reports" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <ReportsPage />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <ReportsPage />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/mattermost" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminMattermost />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminMattermost />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/admin/settings" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminSettings />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminSettings />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
 
               <Route path="/admin/roles" element={
                 <PrivateRoute requiredRole="admin">
-                  <AdminLayout>
-                    <AdminRoles />
-                  </AdminLayout>
+                  <Layout>
+                    <AdminLayout>
+                      <AdminRoles />
+                    </AdminLayout>
+                  </Layout>
                 </PrivateRoute>
               } />
               
