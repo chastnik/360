@@ -187,18 +187,18 @@ export const EmployeeAnalyticsPage: React.FC = () => {
           </button>
         </div>
         {aiText ? (
-          <div className="markdown-body leading-7">
+          <div className="markdown-body leading-7" style={{ color: '#F3F4F6' }}>
             <ReactMarkdown
               components={{
-                h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3" {...props} />,
-                h2: ({node, ...props}) => <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2" {...props} />,
-                h3: ({node, ...props}) => <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2" {...props} />,
-                p: ({node, ...props}) => <p className="text-gray-800 dark:text-gray-100 mb-3 whitespace-pre-line" {...props} />,
-                ul: ({node, ...props}) => <ul className="list-disc pl-6 text-gray-800 dark:text-gray-100 mb-3" {...props} />,
-                ol: ({node, ...props}) => <ol className="list-decimal pl-6 text-gray-800 dark:text-gray-100 mb-3" {...props} />,
-                li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                a: ({node, ...props}) => <a className="text-blue-600 dark:text-blue-400 underline" target="_blank" rel="noreferrer" {...props} />,
-                strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
+                h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-3" style={{ color: '#FFFFFF' }} {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-xl font-semibold mb-2" style={{ color: '#FFFFFF' }} {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-lg font-semibold mb-2" style={{ color: '#FFFFFF' }} {...props} />,
+                p: ({node, ...props}) => <p className="mb-3 whitespace-pre-line" style={{ color: '#F3F4F6' }} {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3" style={{ color: '#F3F4F6' }} {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3" style={{ color: '#F3F4F6' }} {...props} />,
+                li: ({node, ...props}) => <li className="mb-1" style={{ color: '#F3F4F6' }} {...props} />,
+                a: ({node, ...props}) => <a className="underline" style={{ color: '#93C5FD' }} target="_blank" rel="noreferrer" {...props} />,
+                strong: ({node, ...props}) => <strong style={{ color: '#FFFFFF' }} {...props} />,
                 code: ({node, inline, ...props}: any) => inline
                   ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />
                   : <pre className="block w-full p-3 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 overflow-auto"><code {...props} /></pre>,
