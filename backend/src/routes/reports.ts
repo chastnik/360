@@ -133,22 +133,53 @@ router.get('/user/:userId/analytics', authenticateToken, async (req: any, res: a
     const { userId } = req.params;
     const { cycleId } = req.query as { cycleId?: string };
 
-    // Находим участника (participant) для пользователя: по cycleId или последний по дате
-    let participantQuery = knex('assessment_participants')
-      .where('assessment_participants.user_id', userId)
-      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
-      .select(
-        'assessment_participants.id as participant_id',
-        'assessment_participants.cycle_id',
-        'assessment_cycles.name as cycle_name',
-        'assessment_cycles.start_date as cycle_start',
-        'assessment_cycles.end_date as cycle_end'
-      )
-      .orderBy('assessment_participants.created_at', 'desc');
+    // Находим участника (participant) для пользователя: по cycleId или предпочитаем последний завершённый цикл
+    let participant: any = null;
+    if (cycleId) {
+      participant = await knex('assessment_participants')
+        .where('assessment_participants.user_id', userId)
+        .andWhere('assessment_participants.cycle_id', cycleId)
+        .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+        .select(
+          'assessment_participants.id as participant_id',
+          'assessment_participants.cycle_id',
+          'assessment_cycles.name as cycle_name',
+          'assessment_cycles.start_date as cycle_start',
+          'assessment_cycles.end_date as cycle_end'
+        )
+        .first();
+    } else {
+      // Пытаемся найти последний завершённый цикл
+      participant = await knex('assessment_participants')
+        .where('assessment_participants.user_id', userId)
+        .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+        .where('assessment_cycles.status', 'completed')
+        .select(
+          'assessment_participants.id as participant_id',
+          'assessment_participants.cycle_id',
+          'assessment_cycles.name as cycle_name',
+          'assessment_cycles.start_date as cycle_start',
+          'assessment_cycles.end_date as cycle_end'
+        )
+        .orderBy([{ column: 'assessment_cycles.end_date', order: 'desc' }, { column: 'assessment_participants.created_at', order: 'desc' }])
+        .first();
 
-    if (cycleId) participantQuery = participantQuery.where('assessment_participants.cycle_id', cycleId);
-
-    const participant = await participantQuery.first();
+      // Если завершённых нет — берём самый свежий любой
+      if (!participant) {
+        participant = await knex('assessment_participants')
+          .where('assessment_participants.user_id', userId)
+          .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+          .select(
+            'assessment_participants.id as participant_id',
+            'assessment_participants.cycle_id',
+            'assessment_cycles.name as cycle_name',
+            'assessment_cycles.start_date as cycle_start',
+            'assessment_cycles.end_date as cycle_end'
+          )
+          .orderBy('assessment_participants.created_at', 'desc')
+          .first();
+      }
+    }
     if (!participant) {
       res.json({
         overallAverage: 0,
