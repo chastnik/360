@@ -134,9 +134,13 @@ const StructurePage: React.FC = () => {
                 <div className="text-xs text-gray-500 dark:text-gray-400">{node.position || '—'}</div>
               </div>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{node.email}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              <a href={`mailto:${node.email}`} className="underline hover:text-gray-700 dark:hover:text-gray-200">{node.email}</a>
+            </div>
             {node.mattermost_username && (
-              <div className="text-xs text-gray-500 dark:text-gray-400">MM: @{node.mattermost_username}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                MM: <a href={`${process.env.REACT_APP_MATTERMOST_URL || ''}/direct/@${node.mattermost_username}`} target="_blank" rel="noreferrer" className="underline hover:text-gray-700 dark:hover:text-gray-200">@{node.mattermost_username}</a>
+              </div>
             )}
             {node.department && (
               <div className="text-xs text-gray-500 dark:text-gray-400">Отдел: {node.department}</div>
