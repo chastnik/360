@@ -187,8 +187,25 @@ export const EmployeeAnalyticsPage: React.FC = () => {
           </button>
         </div>
         {aiText ? (
-          <div className="prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown>{aiText}</ReactMarkdown>
+          <div className="max-w-none">
+            <ReactMarkdown
+              components={{
+                h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2" {...props} />,
+                p: ({node, ...props}) => <p className="text-gray-800 dark:text-gray-100 mb-3 whitespace-pre-line" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-6 text-gray-800 dark:text-gray-100 mb-3" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-6 text-gray-800 dark:text-gray-100 mb-3" {...props} />,
+                li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                a: ({node, ...props}) => <a className="text-blue-600 dark:text-blue-400 underline" target="_blank" rel="noreferrer" {...props} />,
+                strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
+                code: ({node, inline, ...props}: any) => inline
+                  ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />
+                  : <code className="block w-full p-3 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 overflow-auto" {...props} />,
+              }}
+            >
+              {aiText}
+            </ReactMarkdown>
           </div>
         ) : (
           <div className="text-gray-500 dark:text-gray-400 text-sm">Рекомендации ещё не сформированы.</div>
