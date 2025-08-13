@@ -2,11 +2,15 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
+type ThemeMode = 'auto' | 'light' | 'dark';
 
 interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
-  setTheme: (theme: Theme) => void;
+  theme: Theme; // применённая тема
+  themeMode: ThemeMode; // режим: auto/light/dark
+  isDark: boolean;
+  toggleTheme: () => void; // быстрый переключатель (light<->dark)
+  setTheme: (theme: Theme) => void; // напрямую применить тему
+  setThemeMode: (mode: ThemeMode) => void; // установить режим
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -24,59 +28,66 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem('themeMode') as ThemeMode | null;
+    return saved === 'light' || saved === 'dark' || saved === 'auto' ? saved : 'auto';
+  });
   const [theme, setThemeState] = useState<Theme>(() => {
-    // Проверяем сохраненную тему в localStorage
-    const savedTheme = localStorage.getItem('theme') as Theme;
-    if (savedTheme) {
-      return savedTheme;
-    }
-    
-    // Проверяем системную тему
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    
-    return 'light';
+    const savedTheme = localStorage.getItem('theme') as Theme | null;
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return prefersDark ? 'dark' : 'light';
   });
 
+  // Применяем тему к документу и сохраняем
   useEffect(() => {
-    // Применяем тему к документу
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    
-    // Сохраняем тему в localStorage
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Реагируем на изменения системной темы в режиме auto
   useEffect(() => {
-    // Слушаем изменения системной темы
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      const savedTheme = localStorage.getItem('theme');
-      if (!savedTheme) {
-        setThemeState(e.matches ? 'dark' : 'light');
-      }
+      if (themeMode === 'auto') setThemeState(e.matches ? 'dark' : 'light');
     };
-
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  }, [themeMode]);
+
+  // Сохраняем режим и рассчитываем применяемую тему
+  useEffect(() => {
+    localStorage.setItem('themeMode', themeMode);
+    if (themeMode === 'auto') {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setThemeState(prefersDark ? 'dark' : 'light');
+    } else {
+      setThemeState(themeMode);
+    }
+  }, [themeMode]);
 
   const toggleTheme = () => {
-    setThemeState(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    // Быстрое переключение светлая/тёмная, фиксируя явный режим
+    setThemeModeState(prev => {
+      const next = theme === 'light' ? 'dark' : 'light';
+      localStorage.setItem('themeMode', next);
+      return next;
+    });
   };
 
   const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
+    setThemeModeState(newTheme);
   };
+  const setThemeMode = (mode: ThemeMode) => setThemeModeState(mode);
 
   const value = {
     theme,
+    themeMode,
+    isDark: theme === 'dark',
     toggleTheme,
     setTheme,
+    setThemeMode,
   };
 
   return (

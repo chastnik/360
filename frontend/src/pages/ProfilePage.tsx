@@ -4,9 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { User, Department } from '../types/common';
 import Avatar from '../components/Avatar';
+import { useTheme } from '../contexts/ThemeContext';
 
 export const ProfilePage: React.FC = () => {
   const { user, setUser } = useAuth();
+  const { themeMode, setThemeMode, isDark } = useTheme();
   const [editing, setEditing] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -524,6 +526,23 @@ const loadAdditionalData = useCallback(async () => {
                     <button type="submit" disabled={!avatarFile || avatarUploading} className="px-2 py-1 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded disabled:opacity-50 shrink-0">{avatarUploading?'Загрузка...':'Загрузить'}</button>
                   </form>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Тема интерфейса
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={themeMode}
+                    onChange={(e)=>setThemeMode(e.target.value as any)}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="auto">Авто (по системе)</option>
+                    <option value="light">Светлая</option>
+                    <option value="dark">Тёмная</option>
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Тема применяется ко всем страницам и графикам.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

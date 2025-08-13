@@ -22,6 +22,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface CategoryAverage {
   id: number;
@@ -44,22 +45,24 @@ interface CategoryBarChartProps {
 }
 
 export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({ data, title }) => {
+  const { isDark } = useTheme();
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
           <XAxis 
             dataKey="name" 
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }}
             angle={-45}
             textAnchor="end"
             height={60}
           />
-          <YAxis domain={[0, 5]} />
+          <YAxis domain={[0, 5]} tick={{ fill: isDark ? '#d1d5db' : '#374151' }} />
           <Tooltip 
             formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']}
+            contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }}
             labelFormatter={(label) => `Категория: ${label}`}
           />
           <Bar dataKey="average" fill="#3B82F6" />
@@ -75,6 +78,7 @@ interface RadarChartProps {
 }
 
 export const CategoryRadarChart: React.FC<RadarChartProps> = ({ data, title }) => {
+  const { isDark } = useTheme();
   const radarData = data.map(item => ({
     category: item.name,
     score: item.average,
@@ -86,9 +90,9 @@ export const CategoryRadarChart: React.FC<RadarChartProps> = ({ data, title }) =
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <RadarChart data={radarData}>
-          <PolarGrid />
-          <PolarAngleAxis dataKey="category" tick={{ fontSize: 12 }} />
-          <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
+          <PolarGrid stroke={isDark ? '#374151' : '#e5e7eb'} />
+          <PolarAngleAxis dataKey="category" tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }} />
+          <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10, fill: isDark ? '#d1d5db' : '#374151' }} />
           <Radar
             name="Оценка"
             dataKey="score"
@@ -96,7 +100,7 @@ export const CategoryRadarChart: React.FC<RadarChartProps> = ({ data, title }) =
             fill="#3B82F6"
             fillOpacity={0.3}
           />
-          <Tooltip formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']} />
+          <Tooltip formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']} contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }} />
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -115,6 +119,7 @@ interface ScoreDistributionProps {
 }
 
 export const ScoreDistributionChart: React.FC<ScoreDistributionProps> = ({ distribution, title }) => {
+  const { isDark } = useTheme();
   const data = [
     { name: 'Очень плохо (1)', value: distribution[1], color: '#EF4444' },
     { name: 'Плохо (2)', value: distribution[2], color: '#F59E0B' },
@@ -163,8 +168,8 @@ export const ScoreDistributionChart: React.FC<ScoreDistributionProps> = ({ distr
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Pie>
-          <Tooltip />
-          <Legend />
+          <Tooltip contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }} />
+          <Legend wrapperStyle={{ color: isDark ? '#d1d5db' : '#374151' }} />
         </PieChart>
       </ResponsiveContainer>
     </div>
@@ -182,6 +187,7 @@ interface ComparisonChartProps {
 }
 
 export const ComparisonChart: React.FC<ComparisonChartProps> = ({ data, title }) => {
+  const { isDark } = useTheme();
   // Получаем все уникальные категории
   const categories = data[0]?.categoryAverages || [];
   
@@ -202,19 +208,20 @@ export const ComparisonChart: React.FC<ComparisonChartProps> = ({ data, title })
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={400}>
         <BarChart data={comparisonData}>
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
           <XAxis 
             dataKey="category" 
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }}
             angle={-45}
             textAnchor="end"
             height={80}
           />
-          <YAxis domain={[0, 5]} />
+          <YAxis domain={[0, 5]} tick={{ fill: isDark ? '#d1d5db' : '#374151' }} />
           <Tooltip 
             formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']}
+            contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ color: isDark ? '#d1d5db' : '#374151' }} />
           {data.map((participant, index) => (
             <Bar 
               key={participant.participantId}
@@ -238,6 +245,7 @@ interface OverlayRadarProps {
 }
 
 export const OverlayRadarChart: React.FC<OverlayRadarProps> = ({ data, title }) => {
+  const { isDark } = useTheme();
   // Собираем все категории как в ComparisonChart
   const categories = data[0]?.categoryAverages || [];
   const radarData = categories.map(category => {
@@ -256,14 +264,14 @@ export const OverlayRadarChart: React.FC<OverlayRadarProps> = ({ data, title }) 
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={400}>
         <RadarChart data={radarData}>
-          <PolarGrid />
-          <PolarAngleAxis dataKey="category" tick={{ fontSize: 12 }} />
-          <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
+          <PolarGrid stroke={isDark ? '#374151' : '#e5e7eb'} />
+          <PolarAngleAxis dataKey="category" tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }} />
+          <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10, fill: isDark ? '#d1d5db' : '#374151' }} />
           {data.map((p, idx) => (
             <Radar key={p.participantId} name={p.participantName} dataKey={p.participantName} stroke={colors[idx % colors.length]} fill={colors[idx % colors.length]} fillOpacity={0.15} />
           ))}
-          <Tooltip />
-          <Legend />
+          <Tooltip contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }} />
+          <Legend wrapperStyle={{ color: isDark ? '#d1d5db' : '#374151' }} />
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -321,15 +329,16 @@ interface TrendChartProps {
 }
 
 export const TrendChart: React.FC<TrendChartProps> = ({ data, title }) => {
+  const { isDark } = useTheme();
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-          <YAxis domain={[0, 5]} />
-          <Tooltip formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
+          <XAxis dataKey="date" tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }} />
+          <YAxis domain={[0, 5]} tick={{ fill: isDark ? '#d1d5db' : '#374151' }} />
+          <Tooltip formatter={(value: number) => [value.toFixed(2), 'Средняя оценка']} contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }} />
           <Area type="monotone" dataKey="score" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.2} strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
@@ -351,6 +360,7 @@ interface DistributionRankTrendChartProps {
 
 // Линейная диаграмма рангов распределения оценок (1..5) по периодам (циклами)
 export const DistributionRankTrendChart: React.FC<DistributionRankTrendChartProps> = ({ data, title }) => {
+  const { isDark } = useTheme();
   const colors = {
     s1: '#EF4444',
     s2: '#F59E0B',
@@ -364,11 +374,11 @@ export const DistributionRankTrendChart: React.FC<DistributionRankTrendChartProp
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-          <YAxis domain={[1, 5]} reversed tickCount={5} allowDecimals={false} />
-          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка ${name}`]} />
-          <Legend />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
+          <XAxis dataKey="label" tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }} />
+          <YAxis domain={[1, 5]} reversed tickCount={5} allowDecimals={false} tick={{ fill: isDark ? '#d1d5db' : '#374151' }} />
+          <Tooltip formatter={(value: number, name: string) => [`${value} место`, `Оценка ${name}`]} contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }} />
+          <Legend wrapperStyle={{ color: isDark ? '#d1d5db' : '#374151' }} />
           <Line type="monotone" name="1" dataKey="s1" stroke={colors.s1} strokeWidth={2} dot={{ r: 3 }} />
           <Line type="monotone" name="2" dataKey="s2" stroke={colors.s2} strokeWidth={2} dot={{ r: 3 }} />
           <Line type="monotone" name="3" dataKey="s3" stroke={colors.s3} strokeWidth={2} dot={{ r: 3 }} />
@@ -451,6 +461,7 @@ interface CategoryTrendSplineChartProps {
 export const CategoryTrendSplineChart: React.FC<CategoryTrendSplineChartProps> = ({ data, categories, title, xKey = 'label' }) => {
   const palette = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4', '#F472B6', '#84CC16', '#F97316', '#A78BFA'];
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  const { isDark } = useTheme();
 
   const toggleKey = (key: string) => setHidden(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -461,10 +472,10 @@ export const CategoryTrendSplineChart: React.FC<CategoryTrendSplineChartProps> =
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={360}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
-          <YAxis domain={[0, 5]} />
-          <Tooltip formatter={(value: number) => [Number(value).toFixed(2), 'Средняя оценка']} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
+          <XAxis dataKey={xKey} tick={{ fontSize: 12, fill: isDark ? '#d1d5db' : '#374151' }} />
+          <YAxis domain={[0, 5]} tick={{ fill: isDark ? '#d1d5db' : '#374151' }} />
+          <Tooltip formatter={(value: number) => [Number(value).toFixed(2), 'Средняя оценка']} contentStyle={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }} />
           <Legend
             verticalAlign="top"
             align="left"
