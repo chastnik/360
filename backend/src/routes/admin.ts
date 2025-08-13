@@ -105,3 +105,51 @@ router.get('/recent-activity', authenticateToken, requireAdmin, async (_req: any
 export default router;
 
 
+// Компетенции (CRUD)
+router.get('/competencies', authenticateToken, requireAdmin, async (_req: any, res: any): Promise<void> => {
+  try {
+    const rows = await knex('competencies').where('is_active', true).orderBy('name');
+    res.json({ success: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ error: 'Не удалось получить компетенции' });
+  }
+});
+
+router.post('/competencies', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+  try {
+    const { name, description } = req.body;
+    if (!name || String(name).trim() === '') { res.status(400).json({ error: 'Название обязательно' }); return; }
+    const [row] = await knex('competencies').insert({ name: String(name).trim(), description: description || null }).returning('*');
+    res.status(201).json({ success: true, data: row });
+  } catch (e) {
+    res.status(500).json({ error: 'Не удалось создать компетенцию' });
+  }
+});
+
+router.put('/competencies/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { name, description, is_active } = req.body;
+    await knex('competencies').where('id', id).update({
+      name: name && String(name).trim() !== '' ? String(name).trim() : undefined,
+      description: description !== undefined ? description : undefined,
+      is_active: typeof is_active === 'boolean' ? is_active : undefined,
+      updated_at: knex.fn.now()
+    });
+    const row = await knex('competencies').where('id', id).first();
+    res.json({ success: true, data: row });
+  } catch (e) {
+    res.status(500).json({ error: 'Не удалось обновить компетенцию' });
+  }
+});
+
+router.delete('/competencies/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await knex('competencies').where('id', id).update({ is_active: false, updated_at: knex.fn.now() });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Не удалось удалить компетенцию' });
+  }
+});
+
