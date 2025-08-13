@@ -152,9 +152,6 @@ const StructurePage: React.FC = () => {
             {node.department && (
               <div className="text-xs text-gray-500 dark:text-gray-400">Отдел: {node.department}</div>
             )}
-            {node.role && (
-              <div className="text-xs text-gray-500 dark:text-gray-400">Роль: {node.role}</div>
-            )}
           </div>
         </div>
         {hasChildren && isOpen && (
