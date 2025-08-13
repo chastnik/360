@@ -20,6 +20,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { SurveyPage } from './pages/SurveyPage';
 import { ReportViewPage } from './pages/ReportViewPage';
 import EmployeeAnalyticsPage from './pages/EmployeeAnalyticsPage';
+import StructurePage from './pages/StructurePage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -91,6 +92,14 @@ function App() {
                 <PrivateRoute>
                   <Layout>
                     <ReportsPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/structure" element={
+                <PrivateRoute>
+                  <Layout>
+                    <StructurePage />
                   </Layout>
                 </PrivateRoute>
               } />

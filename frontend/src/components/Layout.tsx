@@ -16,6 +16,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Циклы', href: '/cycles', icon: '🔄' },
     { name: 'Оценки', href: '/assessments', icon: '📝' },
     { name: 'Отчеты', href: '/reports', icon: '📈' },
+    { name: 'Структура', href: '/structure', icon: '🏢' },
     { name: 'Профиль', href: '/profile', icon: '👤' }
   ];
 
