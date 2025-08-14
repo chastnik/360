@@ -819,7 +819,17 @@ export const ReportsPage: React.FC = () => {
                         <div key={idx} className="py-3">
                           <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
                           <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
-                          <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent?` • ${r.respondent}`:''}{r.respondentType?` • ${r.respondentType}`:''}</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                            {(() => {
+                              const text = typeof r?.text === 'string' && r.text.trim() !== '' ? r.text : (typeof r?.text_response === 'string' && r.text_response.trim() !== '' ? r.text_response : '');
+                              const boolVal = typeof r?.bool === 'boolean' ? r.bool : (typeof r?.boolean_response === 'boolean' ? r.boolean_response : undefined);
+                              const scoreVal = r?.score != null ? r.score : (r?.rating_value != null ? r.rating_value : null);
+                              const tail = `${r.respondent?` • ${r.respondent}`:''}${r.respondentType?` • ${r.respondentType}`:''}`;
+                              if (text) return `Ответ: ${text}${tail}`;
+                              if (typeof boolVal === 'boolean') return `Ответ: ${boolVal ? 'Да' : 'Нет'}${tail}`;
+                              return `Оценка: ${scoreVal ?? '—'}${tail}`;
+                            })()}
+                          </div>
                           {r.comment && (<div className="mt-1 text-sm text-gray-700 dark:text-gray-300">Комментарий: {r.comment}</div>)}
                         </div>
                       )) : (
@@ -987,7 +997,17 @@ export const ReportsPage: React.FC = () => {
                                         <div key={i} className="py-2">
                                           <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
                                           <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
-                                          <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent?` • ${r.respondent}`:''}{r.respondentType?` • ${r.respondentType}`:''}</div>
+                                          <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                                            {(() => {
+                                              const text = typeof r?.text === 'string' && r.text.trim() !== '' ? r.text : (typeof r?.text_response === 'string' && r.text_response.trim() !== '' ? r.text_response : '');
+                                              const boolVal = typeof r?.bool === 'boolean' ? r.bool : (typeof r?.boolean_response === 'boolean' ? r.boolean_response : undefined);
+                                              const scoreVal = r?.score != null ? r.score : (r?.rating_value != null ? r.rating_value : null);
+                                              const tail = `${r.respondent?` • ${r.respondent}`:''}${r.respondentType?` • ${r.respondentType}`:''}`;
+                                              if (text) return `Ответ: ${text}${tail}`;
+                                              if (typeof boolVal === 'boolean') return `Ответ: ${boolVal ? 'Да' : 'Нет'}${tail}`;
+                                              return `Оценка: ${scoreVal ?? '—'}${tail}`;
+                                            })()}
+                                          </div>
                                           {r.comment && (<div className="mt-1 text-sm text-gray-700 dark:text-gray-300">Комментарий: {r.comment}</div>)}
                                         </div>
                                       ))}
