@@ -105,6 +105,35 @@ export const EmployeeAnalyticsPage: React.FC = () => {
     return items;
   }, [data, categoryFilter, scoreFilter, respondentQuery, questionQuery, sortKey, sortDir]);
 
+  const renderResponse = (r: any) => {
+    if (r && typeof r.text === 'string' && r.text.trim() !== '') {
+      return (
+        <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+          Ответ: {r.text}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
+        </div>
+      );
+    }
+    if (typeof r?.bool === 'boolean') {
+      return (
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          Ответ: {r.bool ? 'Да' : 'Нет'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
+        </div>
+      );
+    }
+    if (r?.score != null) {
+      return (
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          Оценка: {r.score}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
+        </div>
+      );
+    }
+    return (
+      <div className="text-sm text-gray-600 dark:text-gray-300">
+        Ответ: —{r?.respondent ? ` • ${r.respondent}` : ''}{r?.respondentType ? ` • ${r.respondentType}` : ''}
+      </div>
+    );
+  };
+
   
 
   if (loading) {
@@ -258,16 +287,7 @@ export const EmployeeAnalyticsPage: React.FC = () => {
             <div key={idx} className="py-3">
               <div className="text-sm text-gray-500 dark:text-gray-400">Категория: {r.category}</div>
               <div className="font-medium text-gray-900 dark:text-white">{r.question}</div>
-              {/* Приоритет: текст -> булево -> числовая оценка -> прочее */}
-              {r.text ? (
-                <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">Ответ: {r.text}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              ) : (typeof r.bool === 'boolean' ? (
-                <div className="text-sm text-gray-600 dark:text-gray-300">Ответ: {r.bool ? 'Да' : 'Нет'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              ) : (r.score != null ? (
-                <div className="text-sm text-gray-600 dark:text-gray-300">Оценка: {r.score}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              ) : (
-                <div className="text-sm text-gray-600 dark:text-gray-300">Ответ: —{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}</div>
-              ))}
+              {renderResponse(r)}
               {r.comment && (
                 <div className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">Комментарий: {r.comment}</div>
               )}
