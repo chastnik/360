@@ -88,7 +88,12 @@ export const authAPI = {
       const response = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return response.data;
+      const d = response.data;
+      // Бэкенд отдает { success: true, user: {...}, permissions: [...] }
+      if (d && typeof d === 'object' && (d.user || d.data)) {
+        return { success: true, data: (d.user || d.data) } as any;
+      }
+      return d;
     } catch (error: any) {
       return {
         success: false,
