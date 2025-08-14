@@ -106,24 +106,31 @@ export const EmployeeAnalyticsPage: React.FC = () => {
   }, [data, categoryFilter, scoreFilter, respondentQuery, questionQuery, sortKey, sortDir]);
 
   const renderResponse = (r: any) => {
-    if (r && typeof r.text === 'string' && r.text.trim() !== '') {
+    const text = (typeof r?.text === 'string' && r.text.trim() !== '')
+      ? r.text
+      : (typeof r?.text_response === 'string' && r.text_response.trim() !== '' ? r.text_response : '');
+    const boolVal = (typeof r?.bool === 'boolean') ? r.bool
+      : (typeof r?.boolean_response === 'boolean' ? r.boolean_response : undefined);
+    const scoreVal = (r?.score != null ? r.score : (r?.rating_value != null ? r.rating_value : null));
+
+    if (text) {
       return (
         <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
-          Ответ: {r.text}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
+          Ответ: {text}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
         </div>
       );
     }
-    if (typeof r?.bool === 'boolean') {
+    if (typeof boolVal === 'boolean') {
       return (
         <div className="text-sm text-gray-600 dark:text-gray-300">
-          Ответ: {r.bool ? 'Да' : 'Нет'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
+          Ответ: {boolVal ? 'Да' : 'Нет'}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
         </div>
       );
     }
-    if (r?.score != null) {
+    if (scoreVal != null) {
       return (
         <div className="text-sm text-gray-600 dark:text-gray-300">
-          Оценка: {r.score}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
+          Оценка: {scoreVal}{r.respondent ? ` • ${r.respondent}` : ''}{r.respondentType ? ` • ${r.respondentType}` : ''}
         </div>
       );
     }
