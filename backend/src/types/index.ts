@@ -116,6 +116,7 @@ export interface AuthTokenPayload {
   userId: string;
   email: string;
   role: string;
+  roleId?: string | null;
 }
 
 export interface ApiResponse<T = any> {

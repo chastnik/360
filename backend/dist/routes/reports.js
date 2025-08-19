@@ -99,14 +99,32 @@ router.get('/user/:userId/analytics', auth_1.authenticateToken, async (req, res)
     try {
         const { userId } = req.params;
         const { cycleId } = req.query;
-        let participantQuery = (0, connection_1.default)('assessment_participants')
-            .where('assessment_participants.user_id', userId)
-            .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
-            .select('assessment_participants.id as participant_id', 'assessment_participants.cycle_id', 'assessment_cycles.name as cycle_name', 'assessment_cycles.start_date as cycle_start', 'assessment_cycles.end_date as cycle_end')
-            .orderBy('assessment_participants.created_at', 'desc');
-        if (cycleId)
-            participantQuery = participantQuery.where('assessment_participants.cycle_id', cycleId);
-        const participant = await participantQuery.first();
+        let participant = null;
+        if (cycleId) {
+            participant = await (0, connection_1.default)('assessment_participants')
+                .where('assessment_participants.user_id', userId)
+                .andWhere('assessment_participants.cycle_id', cycleId)
+                .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+                .select('assessment_participants.id as participant_id', 'assessment_participants.cycle_id', 'assessment_cycles.name as cycle_name', 'assessment_cycles.start_date as cycle_start', 'assessment_cycles.end_date as cycle_end')
+                .first();
+        }
+        else {
+            participant = await (0, connection_1.default)('assessment_participants')
+                .where('assessment_participants.user_id', userId)
+                .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+                .where('assessment_cycles.status', 'completed')
+                .select('assessment_participants.id as participant_id', 'assessment_participants.cycle_id', 'assessment_cycles.name as cycle_name', 'assessment_cycles.start_date as cycle_start', 'assessment_cycles.end_date as cycle_end')
+                .orderBy([{ column: 'assessment_cycles.end_date', order: 'desc' }, { column: 'assessment_participants.created_at', order: 'desc' }])
+                .first();
+            if (!participant) {
+                participant = await (0, connection_1.default)('assessment_participants')
+                    .where('assessment_participants.user_id', userId)
+                    .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+                    .select('assessment_participants.id as participant_id', 'assessment_participants.cycle_id', 'assessment_cycles.name as cycle_name', 'assessment_cycles.start_date as cycle_start', 'assessment_cycles.end_date as cycle_end')
+                    .orderBy('assessment_participants.created_at', 'desc')
+                    .first();
+            }
+        }
         if (!participant) {
             res.json({
                 overallAverage: 0,
@@ -122,7 +140,7 @@ router.get('/user/:userId/analytics', auth_1.authenticateToken, async (req, res)
             .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
             .join('questions', 'assessment_responses.question_id', 'questions.id')
             .join('categories', 'questions.category_id', 'categories.id')
-            .select('assessment_responses.rating_value as score', 'assessment_responses.comment', 'questions.question_text', 'categories.name as category_name', 'categories.color as category_color', 'respondent_users.first_name as respondent_first_name', 'respondent_users.last_name as respondent_last_name', 'assessment_respondents.respondent_type')
+            .select('assessment_responses.rating_value as score', 'assessment_responses.text_response as text', 'assessment_responses.boolean_response as bool', 'assessment_responses.comment', 'questions.question_text', 'questions.question_type as question_type', 'categories.name as category_name', 'categories.color as category_color', 'respondent_users.first_name as respondent_first_name', 'respondent_users.last_name as respondent_last_name', 'assessment_respondents.respondent_type')
             .where('assessment_respondents.participant_id', participant.participant_id);
         const avgScores = await (0, connection_1.default)('assessment_responses')
             .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
@@ -152,7 +170,10 @@ router.get('/user/:userId/analytics', auth_1.authenticateToken, async (req, res)
                 question: r.question_text,
                 category: r.category_name,
                 color: r.category_color,
-                score: Number(r.score || 0),
+                score: r.score != null ? Number(r.score) : null,
+                text: r.text ?? null,
+                bool: typeof r.bool === 'boolean' ? r.bool : null,
+                type: r.question_type,
                 comment: r.comment,
                 respondent: `${r.respondent_first_name || ''} ${r.respondent_last_name || ''}`.trim(),
                 respondentType: r.respondent_type
@@ -161,6 +182,87 @@ router.get('/user/:userId/analytics', auth_1.authenticateToken, async (req, res)
     }
     catch (error) {
         console.error('Ошибка аналитики сотрудника:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
+router.get('/user/:userId/trend', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { includeResponses } = req.query;
+        const participants = await (0, connection_1.default)('assessment_participants')
+            .where('assessment_participants.user_id', userId)
+            .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+            .select('assessment_participants.id as participant_id', 'assessment_cycles.id as cycle_id', 'assessment_cycles.name as cycle_name', 'assessment_cycles.start_date as cycle_start', 'assessment_cycles.end_date as cycle_end')
+            .orderBy('assessment_cycles.start_date', 'asc');
+        if (!participants || participants.length === 0) {
+            res.json({ userId, items: [] });
+            return;
+        }
+        const participantIds = participants.map((p) => p.participant_id);
+        const overallRows = await (0, connection_1.default)('assessment_responses')
+            .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+            .select('assessment_respondents.participant_id')
+            .avg('assessment_responses.rating_value as avg_score')
+            .whereIn('assessment_respondents.participant_id', participantIds)
+            .groupBy('assessment_respondents.participant_id');
+        const overallByParticipant = {};
+        for (const row of overallRows) {
+            overallByParticipant[String(row.participant_id)] = Math.round(Number(row.avg_score || 0) * 100) / 100;
+        }
+        const byCategoryRows = await (0, connection_1.default)('assessment_responses')
+            .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+            .join('questions', 'assessment_responses.question_id', 'questions.id')
+            .join('categories', 'questions.category_id', 'categories.id')
+            .select('assessment_respondents.participant_id', 'categories.id as category_id', 'categories.name as category_name', 'categories.color as category_color')
+            .avg('assessment_responses.rating_value as avg_score')
+            .whereIn('assessment_respondents.participant_id', participantIds)
+            .groupBy('assessment_respondents.participant_id', 'categories.id', 'categories.name', 'categories.color')
+            .orderBy('categories.name');
+        const categoriesByParticipant = {};
+        for (const row of byCategoryRows) {
+            const pid = String(row.participant_id);
+            (categoriesByParticipant[pid] = categoriesByParticipant[pid] || []).push({
+                category: row.category_name,
+                color: row.category_color,
+                avgScore: Math.round(Number(row.avg_score || 0) * 100) / 100
+            });
+        }
+        let responsesByParticipant = {};
+        if (String(includeResponses).toLowerCase() === 'true') {
+            const responseRows = await (0, connection_1.default)('assessment_responses')
+                .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+                .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
+                .join('questions', 'assessment_responses.question_id', 'questions.id')
+                .join('categories', 'questions.category_id', 'categories.id')
+                .select('assessment_respondents.participant_id', 'categories.name as category', 'categories.color as color', 'questions.question_text as question', 'assessment_responses.rating_value as score', 'assessment_responses.comment as comment', 'respondent_users.first_name as respondent_first_name', 'respondent_users.last_name as respondent_last_name', 'assessment_respondents.respondent_type as respondent_type')
+                .whereIn('assessment_respondents.participant_id', participantIds)
+                .orderBy('categories.name');
+            for (const r of responseRows) {
+                const pid = String(r.participant_id);
+                (responsesByParticipant[pid] = responsesByParticipant[pid] || []).push({
+                    category: r.category,
+                    color: r.color,
+                    question: r.question,
+                    score: Number(r.score || 0),
+                    comment: r.comment,
+                    respondent: `${r.respondent_first_name || ''} ${r.respondent_last_name || ''}`.trim(),
+                    respondentType: r.respondent_type,
+                });
+            }
+        }
+        const items = participants.map((p) => ({
+            cycleId: p.cycle_id,
+            cycleName: p.cycle_name,
+            start_date: p.cycle_start,
+            end_date: p.cycle_end,
+            overallAverage: overallByParticipant[String(p.participant_id)] || 0,
+            categories: categoriesByParticipant[String(p.participant_id)] || [],
+            responses: responsesByParticipant[String(p.participant_id)] || []
+        }));
+        res.json({ userId, items });
+    }
+    catch (error) {
+        console.error('Ошибка тренда сотрудника:', error);
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });

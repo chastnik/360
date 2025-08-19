@@ -7,7 +7,7 @@ const express_1 = require("express");
 const connection_1 = __importDefault(require("../database/connection"));
 const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
-router.get('/', auth_1.authenticateToken, async (req, res) => {
+router.get('/', auth_1.authenticateToken, (0, auth_1.requirePermission)('ui:view:admin.categories'), async (req, res) => {
     try {
         const isAdmin = req.user.role === 'admin';
         let query = (0, connection_1.default)('categories')

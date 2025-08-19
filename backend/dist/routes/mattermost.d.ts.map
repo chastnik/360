@@ -1,1 +1,1 @@
-{"version":3,"file":"mattermost.d.ts","sourceRoot":"","sources":["../../src/routes/mattermost.ts"],"names":[],"mappings":"AAOA,QAAA,MAAM,MAAM,4CAAW,CAAC;AA2nBxB,eAAe,MAAM,CAAC"}
+{"version":3,"file":"mattermost.d.ts","sourceRoot":"","sources":["../../src/routes/mattermost.ts"],"names":[],"mappings":"AAQA,QAAA,MAAM,MAAM,4CAAW,CAAC;AAooBxB,eAAe,MAAM,CAAC"}

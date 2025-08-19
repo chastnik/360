@@ -23,6 +23,8 @@ const reports_1 = __importDefault(require("./routes/reports"));
 const mattermost_1 = __importDefault(require("./routes/mattermost"));
 const settings_1 = __importDefault(require("./routes/settings"));
 const departments_1 = __importDefault(require("./routes/departments"));
+const roles_1 = __importDefault(require("./routes/roles"));
+const admin_1 = __importDefault(require("./routes/admin"));
 (0, dotenv_1.config)({ path: path_1.default.resolve(__dirname, '../../.env') });
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +52,8 @@ app.use('/api/reports', reports_1.default);
 app.use('/api/mattermost', mattermost_1.default);
 app.use('/api/settings', settings_1.default);
 app.use('/api/departments', departments_1.default);
+app.use('/api/roles', roles_1.default);
+app.use('/api/admin', admin_1.default);
 app.get('/health', (_req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });

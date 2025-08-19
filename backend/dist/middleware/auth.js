@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.requireManagerOrAdmin = exports.requireAdmin = exports.requireRole = exports.authenticateToken = void 0;
+exports.requirePermission = exports.requireManagerOrAdmin = exports.requireAdmin = exports.requireRole = exports.authenticateToken = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const connection_1 = __importDefault(require("../database/connection"));
 const authenticateToken = async (req, res, next) => {
@@ -36,7 +36,12 @@ const authenticateToken = async (req, res, next) => {
             });
             return;
         }
-        req.user = decoded;
+        req.user = {
+            userId: decoded.userId,
+            email: decoded.email,
+            role: user.role,
+            roleId: user.role_id || null
+        };
         next();
     }
     catch (error) {
@@ -70,4 +75,30 @@ const requireRole = (roles) => {
 exports.requireRole = requireRole;
 exports.requireAdmin = (0, exports.requireRole)(['admin']);
 exports.requireManagerOrAdmin = (0, exports.requireRole)(['manager', 'admin']);
+const requirePermission = (permission) => {
+    return async (req, res, next) => {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, error: 'Пользователь не авторизован' });
+                return;
+            }
+            const roleId = req.user.roleId;
+            if (!roleId) {
+                res.status(403).json({ success: false, error: 'У пользователя не назначена роль' });
+                return;
+            }
+            const has = await (0, connection_1.default)('role_permissions').where({ role_id: roleId, permission }).first();
+            if (!has) {
+                res.status(403).json({ success: false, error: 'Недостаточно прав доступа' });
+                return;
+            }
+            next();
+        }
+        catch (error) {
+            console.error('Permission check error:', error);
+            res.status(500).json({ success: false, error: 'Ошибка проверки прав' });
+        }
+    };
+};
+exports.requirePermission = requirePermission;
 //# sourceMappingURL=auth.js.map

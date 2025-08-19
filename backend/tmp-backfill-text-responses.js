@@ -99,6 +99,7 @@ function randomText() {
 
     let respondentsProcessed = 0;
     let responsesInserted = 0;
+    let responsesUpdated = 0;
 
     for (const c of cycles) {
       const participants = await knex('assessment_participants')
@@ -119,7 +120,15 @@ function randomText() {
         const exists = await knex('assessment_responses')
           .where({ respondent_id: r.id, question_id: questionId })
           .first('id');
-        if (exists) continue;
+        if (exists) {
+          if (argv.overwrite) {
+            await knex('assessment_responses')
+              .where({ id: exists.id })
+              .update({ text_response: randomText() });
+            responsesUpdated++;
+          }
+          continue;
+        }
 
         await knex('assessment_responses')
           .insert({
@@ -138,7 +147,9 @@ function randomText() {
       questionText: argv.questionText || null,
       cyclesProcessed: cycles.length,
       respondentsProcessed,
-      responsesInserted
+      responsesInserted,
+      responsesUpdated,
+      overwrite: !!argv.overwrite
     }));
   } catch (e) {
     console.error('ERROR:', e.message || e);

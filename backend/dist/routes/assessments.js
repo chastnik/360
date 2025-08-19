@@ -33,6 +33,28 @@ router.get('/', auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Внутренняя ошибка сервера' });
     }
 });
+router.get('/available', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ error: 'Пользователь не авторизован' });
+            return;
+        }
+        const rows = await (0, connection_1.default)('assessment_respondents')
+            .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
+            .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+            .join('users', 'assessment_participants.user_id', 'users.id')
+            .where('assessment_respondents.respondent_user_id', userId)
+            .where('assessment_cycles.status', 'active')
+            .select('assessment_respondents.id as id', 'assessment_participants.id as participant_id', connection_1.default.raw("concat(users.first_name, ' ', users.last_name) as participant_name"), 'assessment_cycles.name as cycle_name', 'assessment_cycles.description as cycle_description', 'assessment_cycles.end_date as end_date', 'assessment_respondents.status as status', 'assessment_respondents.completed_at as completed_at')
+            .orderBy('assessment_cycles.start_date', 'desc');
+        res.json({ success: true, data: rows });
+    }
+    catch (error) {
+        console.error('Ошибка получения доступных оценок:', error);
+        res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    }
+});
 router.post('/:respondentId/start', auth_1.authenticateToken, async (req, res) => {
     try {
         const userId = req.user?.userId;

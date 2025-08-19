@@ -9,6 +9,14 @@ const auth_1 = require("../middleware/auth");
 const mattermost_1 = __importDefault(require("../services/mattermost"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const router = (0, express_1.Router)();
+router.get('/public-config', auth_1.authenticateToken, async (_req, res) => {
+    try {
+        res.json({ success: true, data: { url: process.env.MATTERMOST_URL || null } });
+    }
+    catch (error) {
+        res.json({ success: true, data: { url: null } });
+    }
+});
 function generatePassword(length = 12) {
     const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
     let password = '';

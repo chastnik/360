@@ -289,12 +289,12 @@ router.get('/user/:userId/trend', authenticateToken, async (req: any, res: any):
     const overallRows = await knex('assessment_responses')
       .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
       .select('assessment_respondents.participant_id')
-      .avg<{ participant_id: string; avg_score: string }>('assessment_responses.rating_value as avg_score')
+      .avg('assessment_responses.rating_value as avg_score')
       .whereIn('assessment_respondents.participant_id', participantIds)
-      .groupBy('assessment_respondents.participant_id');
+      .groupBy('assessment_respondents.participant_id') as unknown as Array<{ participant_id: string; avg_score: string }>;
 
     const overallByParticipant: Record<string, number> = {};
-    for (const row of overallRows as any[]) {
+    for (const row of overallRows) {
       overallByParticipant[String(row.participant_id)] = Math.round(Number(row.avg_score || 0) * 100) / 100;
     }
 
