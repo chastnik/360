@@ -23,6 +23,10 @@ import EmployeeAnalyticsPage from './pages/EmployeeAnalyticsPage';
 import StructurePage from './pages/StructurePage';
 import LearningPage from './pages/LearningPage';
 import CoursesPage from './pages/learning/CoursesPage';
+import SchedulePage from './pages/learning/SchedulePage';
+import GrowthPlansPage from './pages/learning/GrowthPlansPage';
+import TestingPage from './pages/learning/TestingPage';
+import CompetenceMatrixPage from './pages/learning/CompetenceMatrixPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -127,6 +131,38 @@ function App() {
                 <PrivateRoute requiredPermission="ui:view:learning">
                   <Layout>
                     <CoursesPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning/schedule" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <SchedulePage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning/growth-plans" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <GrowthPlansPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning/testing" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <TestingPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning/competence-matrix" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <CompetenceMatrixPage />
                   </Layout>
                 </PrivateRoute>
               } />
