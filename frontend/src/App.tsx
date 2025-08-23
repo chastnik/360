@@ -21,6 +21,8 @@ import { SurveyPage } from './pages/SurveyPage';
 import { ReportViewPage } from './pages/ReportViewPage';
 import EmployeeAnalyticsPage from './pages/EmployeeAnalyticsPage';
 import StructurePage from './pages/StructurePage';
+import LearningPage from './pages/LearningPage';
+import CoursesPage from './pages/learning/CoursesPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -109,6 +111,22 @@ function App() {
                 <PrivateRoute requiredPermission="ui:view:reports">
                   <Layout>
                     <EmployeeAnalyticsPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <LearningPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning/courses" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <CoursesPage />
                   </Layout>
                 </PrivateRoute>
               } />

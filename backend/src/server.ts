@@ -23,6 +23,7 @@ import settingsRoutes from './routes/settings';
 import departmentRoutes from './routes/departments';
 import roleRoutes from './routes/roles';
 import adminRoutes from './routes/admin';
+import learningRoutes from './routes/learning';
 
 // Загружаем переменные окружения из корневого .env файла
 config({ path: path.resolve(__dirname, '../../.env') });
@@ -61,6 +62,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/learning', learningRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
