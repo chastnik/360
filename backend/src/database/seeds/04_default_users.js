@@ -21,7 +21,7 @@ exports.seed = async function(knex) {
       middle_name: 'Управление',
       role: 'admin',
       position: 'Системный администратор',
-      department: 'IT',
+      // department_id можно связать позже после наполнения departments
       is_active: true
     },
     {
@@ -33,7 +33,7 @@ exports.seed = async function(knex) {
       middle_name: 'HR',
       role: 'manager',
       position: 'HR менеджер',
-      department: 'Управление персоналом',
+      // department_id можно связать позже после наполнения departments
       is_active: true
     },
     {
@@ -45,7 +45,7 @@ exports.seed = async function(knex) {
       middle_name: 'Обычный',
       role: 'user',
       position: 'Сотрудник',
-      department: 'Разработка',
+      // department_id можно связать позже после наполнения departments
       manager_id: '550e8400-e29b-41d4-a716-446655440101', // Менеджер
       is_active: true
     }

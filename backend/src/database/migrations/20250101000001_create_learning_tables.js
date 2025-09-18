@@ -2,7 +2,20 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.up = function(knex) {
+exports.up = async function(knex) {
+  // Убедимся, что таблица competencies существует (нужна для внешнего ключа)
+  const hasCompetencies = await knex.schema.hasTable('competencies');
+  if (!hasCompetencies) {
+    await knex.schema.createTable('competencies', (table) => {
+      table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
+      table.string('name').notNullable();
+      table.text('description');
+      table.boolean('is_active').notNullable().defaultTo(true);
+      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('updated_at').defaultTo(knex.fn.now());
+    });
+  }
+
   return knex.schema
     // Таблица курсов
     .createTable('training_courses', function(table) {
@@ -12,7 +25,8 @@ exports.up = function(knex) {
       table.integer('hours').unsigned().notNullable().comment('Объем курса в часах');
       table.boolean('is_active').defaultTo(true);
       table.enum('target_level', ['junior', 'middle', 'senior']).notNullable();
-      table.integer('system_id').unsigned().references('id').inTable('systems').onDelete('SET NULL');
+      // Делаем system_id nullable без внешнего ключа, т.к. таблица systems не гарантированно существует
+      table.integer('system_id').unsigned().nullable();
       table.timestamps(true, true);
     })
     
@@ -37,7 +51,8 @@ exports.up = function(knex) {
     // Таблица планов индивидуального роста
     .createTable('growth_plans', function(table) {
       table.increments('id').primary();
-      table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+      // users.id имеет тип UUID, поэтому ключ также UUID
+      table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
       table.date('start_date').notNullable();
       table.integer('study_load_percent').unsigned().notNullable().comment('Процент времени на учебу (0-100)');
       table.date('end_date').comment('Дата завершения обучения (рассчитывается)');
@@ -69,8 +84,9 @@ exports.up = function(knex) {
     // Таблица матрицы компетенций
     .createTable('competence_matrix', function(table) {
       table.increments('id').primary();
-      table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
-      table.integer('competency_id').unsigned().notNullable().references('id').inTable('competencies').onDelete('CASCADE');
+      // users.id и competencies.id имеют тип UUID
+      table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
+      table.uuid('competency_id').notNullable().references('id').inTable('competencies').onDelete('CASCADE');
       table.enum('level', ['novice', 'beginner', 'competent', 'proficient', 'expert']).notNullable();
       table.integer('score').unsigned().comment('Балл от 0 до 100');
       table.date('assessment_date').notNullable();

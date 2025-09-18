@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api';
+import api from '../../services/api';
 
 interface TestResult {
   id: number;
@@ -16,6 +16,25 @@ interface Course {
   hours: number;
   target_level: string;
   description: string;
+  prerequisites?: Course[];
+  corequisites?: Course[];
+}
+
+interface CourseSelection {
+  courseId: number;
+  status: 'planned' | 'completed' | 'in_progress' | 'skipped';
+  isRequired: boolean;
+  addedAutomatically: boolean;
+}
+
+interface User {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  middle_name?: string;
+  position?: string;
+  department?: string;
 }
 
 interface GrowthPlan {
@@ -31,11 +50,23 @@ interface GrowthPlan {
 const GrowthPlansPage: React.FC = () => {
   const [plans, setPlans] = useState<GrowthPlan[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<GrowthPlan | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  
+  // Form states for create plan modal
+  const [formData, setFormData] = useState({
+    user_id: '',
+    start_date: '',
+    study_load_percent: 20,
+    courses: [] as number[]
+  });
+  const [courseSelections, setCourseSelections] = useState<Map<number, CourseSelection>>(new Map());
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -43,14 +74,24 @@ const GrowthPlansPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [plansResponse, coursesResponse] = await Promise.all([
+      const [plansResponse, coursesResponse, usersResponse] = await Promise.all([
         api.get('/learning/growth-plans'),
-        api.get('/learning/courses')
+        api.get('/learning/courses'),
+        api.get('/learning/users')
       ]);
-      setPlans(plansResponse.data);
-      setCourses(coursesResponse.data);
+      
+      // Обрабатываем ответы API - данные приходят напрямую в response.data
+      const plansData = Array.isArray(plansResponse.data) ? plansResponse.data : [];
+      const coursesData = Array.isArray(coursesResponse.data) ? coursesResponse.data : [];
+      const usersData = Array.isArray(usersResponse.data) ? usersResponse.data : [];
+      
+      setPlans(plansData);
+      setCourses(coursesData);
+      setUsers(usersData);
+      
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Ошибка загрузки данных:', error);
+      console.error('Детали ошибки:', (error as any).response?.data || (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -94,13 +135,154 @@ const GrowthPlansPage: React.FC = () => {
     }
   };
 
-  const handleCreatePlan = async (formData: any) => {
+  const validateForm = () => {
+    const errors: {[key: string]: string} = {};
+    
+    if (!formData.user_id) {
+      errors.user_id = 'Выберите пользователя';
+    }
+    
+    if (!formData.start_date) {
+      errors.start_date = 'Дата начала обязательна';
+    }
+    
+    if (formData.study_load_percent < 1 || formData.study_load_percent > 100) {
+      errors.study_load_percent = 'Нагрузка должна быть от 1% до 100%';
+    }
+    
+    if (formData.courses.length === 0) {
+      errors.courses = 'Выберите хотя бы один курс';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreatePlan = async () => {
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
     try {
-      await api.post('/learning/growth-plans', formData);
+      // Преобразуем Map в объект для отправки на сервер
+      const courseSelectionsObj = Object.fromEntries(courseSelections.entries());
+      
+      const planData = {
+        ...formData,
+        courseSelections: courseSelectionsObj
+      };
+      
+      await api.post('/learning/growth-plans', planData);
       setShowCreateModal(false);
+      setFormData({
+        user_id: '',
+        start_date: '',
+        study_load_percent: 20,
+        courses: []
+      });
+      setCourseSelections(new Map());
+      setFormErrors({});
       fetchData();
     } catch (error) {
       console.error('Error creating plan:', error);
+      setFormErrors({ general: 'Ошибка при создании плана. Попробуйте снова.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Функция для добавления связанных курсов
+  const addRelatedCourses = (courseId: number, selections: Map<number, CourseSelection>) => {
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return selections;
+
+    // Добавляем prerequisites
+    course.prerequisites?.forEach(prereq => {
+      if (!selections.has(prereq.id)) {
+        selections.set(prereq.id, {
+          courseId: prereq.id,
+          status: 'planned',
+          isRequired: false,
+          addedAutomatically: true
+        });
+        // Рекурсивно добавляем prerequisites для prerequisites
+        addRelatedCourses(prereq.id, selections);
+      }
+    });
+
+    // Добавляем corequisites
+    course.corequisites?.forEach(coreq => {
+      if (!selections.has(coreq.id)) {
+        selections.set(coreq.id, {
+          courseId: coreq.id,
+          status: 'planned',
+          isRequired: false,
+          addedAutomatically: true
+        });
+        // Рекурсивно добавляем связанные курсы для corequisites
+        addRelatedCourses(coreq.id, selections);
+      }
+    });
+
+    return selections;
+  };
+
+  const handleCourseToggle = (courseId: number) => {
+    const newSelections = new Map(courseSelections);
+    
+    if (newSelections.has(courseId)) {
+      // Убираем курс
+      newSelections.delete(courseId);
+      
+      // Убираем автоматически добавленные связанные курсы, если они не нужны
+      const remainingCourses = Array.from(newSelections.keys());
+      const toRemove: number[] = [];
+      
+      newSelections.forEach((selection, id) => {
+        if (selection.addedAutomatically) {
+          const course = courses.find(c => c.id === id);
+          const isNeededAsPrereq = remainingCourses.some(remainingId => {
+            const remainingCourse = courses.find(c => c.id === remainingId);
+            return remainingCourse?.prerequisites?.some(p => p.id === id) || 
+                   remainingCourse?.corequisites?.some(c => c.id === id);
+          });
+          
+          if (!isNeededAsPrereq) {
+            toRemove.push(id);
+          }
+        }
+      });
+      
+      toRemove.forEach(id => newSelections.delete(id));
+    } else {
+      // Добавляем курс как обязательный
+      newSelections.set(courseId, {
+        courseId,
+        status: 'planned',
+        isRequired: true,
+        addedAutomatically: false
+      });
+      
+      // Добавляем связанные курсы
+      addRelatedCourses(courseId, newSelections);
+    }
+    
+    setCourseSelections(newSelections);
+    
+    // Обновляем formData для совместимости
+    setFormData(prev => ({
+      ...prev,
+      courses: Array.from(newSelections.keys())
+    }));
+  };
+
+  const updateCourseStatus = (courseId: number, status: 'planned' | 'completed' | 'in_progress' | 'skipped') => {
+    const newSelections = new Map(courseSelections);
+    const selection = newSelections.get(courseId);
+    if (selection) {
+      newSelections.set(courseId, { ...selection, status });
+      setCourseSelections(newSelections);
     }
   };
 
@@ -338,20 +520,232 @@ const GrowthPlansPage: React.FC = () => {
       {/* Create Plan Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Создать план роста
             </h2>
-            {/* TODO: Add form */}
+            
+            {formErrors.general && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {formErrors.general}
+              </div>
+            )}
+            
+            
+            <form className="space-y-6">
+              {/* Выбор пользователя */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Пользователь
+                </label>
+                <select
+                  value={formData.user_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                    formErrors.user_id ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">
+                    {users.length === 0 ? 'Загрузка пользователей...' : 'Выберите пользователя'}
+                  </option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.last_name} {user.first_name} {user.middle_name} 
+                      {user.position && ` - ${user.position}`}
+                      {user.department && ` (${user.department})`}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.user_id && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.user_id}</p>
+                )}
+              </div>
+
+              {/* Дата начала */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Дата начала обучения
+                </label>
+                <input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
+                    formErrors.start_date ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {formErrors.start_date && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.start_date}</p>
+                )}
+              </div>
+
+              {/* Нагрузка обучения */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Нагрузка обучения (% от рабочего времени)
+                </label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={formData.study_load_percent}
+                    onChange={(e) => setFormData(prev => ({ ...prev, study_load_percent: parseInt(e.target.value) }))}
+                    className="flex-1"
+                  />
+                  <span className="text-lg font-medium text-gray-900 dark:text-white min-w-[60px]">
+                    {formData.study_load_percent}%
+                  </span>
+                </div>
+                {formErrors.study_load_percent && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.study_load_percent}</p>
+                )}
+              </div>
+
+              {/* Выбор курсов */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Выберите курсы для изучения
+                </label>
+                <div className="max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md">
+                  {courses.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      Загрузка курсов...
+                    </div>
+                  ) : (
+                    courses.map((course) => {
+                      const selection = courseSelections.get(course.id);
+                      const isSelected = !!selection;
+                      const isAutoAdded = selection?.addedAutomatically || false;
+                      
+                      return (
+                        <div
+                          key={course.id}
+                          className={`flex items-start p-3 border-b border-gray-200 dark:border-gray-600 last:border-b-0 ${
+                            isAutoAdded ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            id={`course-${course.id}`}
+                            checked={isSelected}
+                            onChange={() => handleCourseToggle(course.id)}
+                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <div className="ml-3 flex-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <label htmlFor={`course-${course.id}`} className="font-medium text-gray-900 dark:text-white cursor-pointer">
+                                    {course.name}
+                                  </label>
+                                  {isAutoAdded && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                                      Автоматически
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                  {course.description}
+                                </div>
+                                
+                                {/* Показываем prerequisites и corequisites */}
+                                {(course.prerequisites?.length || course.corequisites?.length) && (
+                                  <div className="mt-2 text-xs text-gray-500">
+                                    {course.prerequisites && course.prerequisites.length > 0 && (
+                                      <div>
+                                        <span className="font-medium">Требует:</span> {course.prerequisites.map(p => p.name).join(', ')}
+                                      </div>
+                                    )}
+                                    {course.corequisites && course.corequisites.length > 0 && (
+                                      <div>
+                                        <span className="font-medium">Вместе с:</span> {course.corequisites.map(c => c.name).join(', ')}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Статус курса */}
+                                {isSelected && (
+                                  <div className="mt-2">
+                                    <select
+                                      value={selection?.status || 'planned'}
+                                      onChange={(e) => updateCourseStatus(course.id, e.target.value as any)}
+                                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    >
+                                      <option value="planned">Запланирован</option>
+                                      <option value="completed">Уже пройден</option>
+                                      <option value="in_progress">В процессе</option>
+                                      <option value="skipped">Пропустить</option>
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right ml-4">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {course.hours}ч
+                                </div>
+                                <div className="text-xs text-gray-400 flex items-center">
+                                  {getLevelIcon(course.target_level)} {course.target_level}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                {formErrors.courses && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.courses}</p>
+                )}
+                
+                {/* Информация о выбранных курсах */}
+                {courseSelections.size > 0 && (
+                  <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">Выбрано курсов:</span> {courseSelections.size}
+                      {Array.from(courseSelections.values()).filter(s => s.addedAutomatically).length > 0 && (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          {' '}(включая {Array.from(courseSelections.values()).filter(s => s.addedAutomatically).length} автоматически добавленных)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </form>
+            
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setFormData({
+                    user_id: '',
+                    start_date: '',
+                    study_load_percent: 20,
+                    courses: []
+                  });
+                  setFormErrors({});
+                }}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-50"
               >
                 Отмена
               </button>
-              <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                Создать
+              <button
+                onClick={handleCreatePlan}
+                disabled={isSubmitting}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50 flex items-center"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Создание...
+                  </>
+                ) : (
+                  'Создать'
+                )}
               </button>
             </div>
           </div>

@@ -1,8 +1,31 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth';
-import { knex } from '../database/connection';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
+import knex from '../database/connection';
 
 const router = express.Router();
+
+// Получить пользователей для создания планов роста
+router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    // Только админы и HR могут видеть всех пользователей, остальные только себя
+    let users;
+    if (req.user?.role === 'admin' || req.user?.role === 'hr') {
+      users = await knex('users')
+        .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department')
+        .where('is_active', true)
+        .orderBy('last_name', 'first_name');
+    } else {
+      users = await knex('users')
+        .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department')
+        .where({ id: req.user?.id, is_active: true });
+    }
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users for growth plans:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Получить все курсы
 router.get('/courses', authenticateToken, async (req, res) => {
@@ -11,6 +34,24 @@ router.get('/courses', authenticateToken, async (req, res) => {
       .select('*')
       .where('is_active', true)
       .orderBy('name');
+    
+    // Добавляем информацию о связях для каждого курса
+    for (const course of courses) {
+      // Получаем prerequisites (курсы, которые нужно пройти до этого)
+      const prerequisites = await knex('course_prerequisites as cp')
+        .join('training_courses as tc', 'cp.prerequisite_id', 'tc.id')
+        .select('tc.id', 'tc.name', 'tc.target_level')
+        .where('cp.course_id', course.id);
+      
+      // Получаем corequisites (курсы, которые нужно проходить параллельно)
+      const corequisites = await knex('course_corequisites as cc')
+        .join('training_courses as tc', 'cc.corequisite_id', 'tc.id')
+        .select('tc.id', 'tc.name', 'tc.target_level')
+        .where('cc.course_id', course.id);
+      
+      course.prerequisites = prerequisites;
+      course.corequisites = corequisites;
+    }
     
     res.json(courses);
   } catch (error) {
@@ -57,7 +98,7 @@ router.get('/courses/:id', authenticateToken, async (req, res) => {
 });
 
 // Создать новый курс
-router.post('/courses', authenticateToken, async (req, res) => {
+router.post('/courses', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { name, description, hours, target_level, system_id, prerequisites, corequisites } = req.body;
     
@@ -103,7 +144,7 @@ router.post('/courses', authenticateToken, async (req, res) => {
 });
 
 // Обновить курс
-router.put('/courses/:id', authenticateToken, async (req, res) => {
+router.put('/courses/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { name, description, hours, target_level, system_id, is_active, prerequisites, corequisites } = req.body;
@@ -157,7 +198,7 @@ router.put('/courses/:id', authenticateToken, async (req, res) => {
 });
 
 // Удалить курс
-router.delete('/courses/:id', authenticateToken, async (req, res) => {
+router.delete('/courses/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     
@@ -181,15 +222,19 @@ router.delete('/courses/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Получить планы роста пользователя
-router.get('/growth-plans', authenticateToken, async (req, res) => {
+// Получить планы роста
+router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.id;
+    // Админы и HR видят все планы, обычные пользователи только свои
+    let plansQuery = knex('growth_plans as gp')
+      .join('users as u', 'gp.user_id', 'u.id')
+      .select('gp.*', 'u.first_name', 'u.last_name', 'u.email');
     
-    const plans = await knex('growth_plans as gp')
-      .select('gp.*')
-      .where('gp.user_id', userId)
-      .orderBy('gp.created_at', 'desc');
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      plansQuery = plansQuery.where('gp.user_id', req.user?.id);
+    }
+    
+    const plans = await plansQuery.orderBy('gp.created_at', 'desc');
     
     // Получаем курсы для каждого плана
     for (const plan of plans) {
@@ -217,25 +262,44 @@ router.get('/growth-plans', authenticateToken, async (req, res) => {
 });
 
 // Создать план роста
-router.post('/growth-plans', authenticateToken, async (req, res) => {
+router.post('/growth-plans', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { start_date, study_load_percent, courses } = req.body;
-    const userId = req.user?.id;
+    const { user_id, start_date, study_load_percent, courses, courseSelections } = req.body;
+    
+    // Проверяем права доступа - только админы и HR могут создавать планы для других пользователей
+    const targetUserId = user_id || req.user?.id;
+    if (user_id && user_id !== req.user?.id && req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const [plan] = await knex('growth_plans')
       .insert({
-        user_id: userId,
+        user_id: targetUserId,
         start_date,
         study_load_percent,
         status: 'active'
       })
       .returning('*');
     
-    // Добавляем курсы к плану
-    if (courses && courses.length > 0) {
+    // Добавляем курсы к плану с расширенной информацией
+    if (courseSelections && Object.keys(courseSelections).length > 0) {
+      const courseData = Object.entries(courseSelections).map(([courseId, selection]: [string, any]) => ({
+        growth_plan_id: plan.id,
+        course_id: parseInt(courseId),
+        status: selection.status || 'planned',
+        is_required: selection.isRequired !== false,
+        added_automatically: selection.addedAutomatically || false,
+        completion_date: selection.status === 'completed' ? new Date() : null
+      }));
+      await knex('growth_plan_courses').insert(courseData);
+    } else if (courses && courses.length > 0) {
+      // Fallback для старого формата
       const courseData = courses.map((courseId: number) => ({
         growth_plan_id: plan.id,
-        course_id: courseId
+        course_id: courseId,
+        status: 'planned',
+        is_required: true,
+        added_automatically: false
       }));
       await knex('growth_plan_courses').insert(courseData);
     }
@@ -248,7 +312,7 @@ router.post('/growth-plans', authenticateToken, async (req, res) => {
 });
 
 // Обновить план роста
-router.put('/growth-plans/:id', authenticateToken, async (req, res) => {
+router.put('/growth-plans/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { start_date, study_load_percent, status, courses } = req.body;
@@ -290,7 +354,7 @@ router.put('/growth-plans/:id', authenticateToken, async (req, res) => {
 });
 
 // Добавить результат тестирования
-router.post('/test-results', authenticateToken, async (req, res) => {
+router.post('/test-results', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { growth_plan_id, course_id, status, test_date, notes } = req.body;
     const userId = req.user?.id;
@@ -322,7 +386,7 @@ router.post('/test-results', authenticateToken, async (req, res) => {
 });
 
 // Получить матрицу компетенций пользователя
-router.get('/competence-matrix', authenticateToken, async (req, res) => {
+router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.id;
     
@@ -340,7 +404,7 @@ router.get('/competence-matrix', authenticateToken, async (req, res) => {
 });
 
 // Обновить матрицу компетенций
-router.post('/competence-matrix', authenticateToken, async (req, res) => {
+router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { competency_id, level, score, assessment_date, notes } = req.body;
     const userId = req.user?.id;
@@ -371,7 +435,7 @@ router.post('/competence-matrix', authenticateToken, async (req, res) => {
 });
 
 // Получить график обучения (все планы роста)
-router.get('/training-schedule', authenticateToken, async (req, res) => {
+router.get('/training-schedule', authenticateToken, async (req: AuthRequest, res) => {
   try {
     // Проверяем права доступа
     if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {

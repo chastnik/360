@@ -48,8 +48,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authAPI.getCurrentUser(authToken);
       if (response.success && response.data) {
         setUser(response.data);
-        // @ts-ignore собираем permissions из ответа, если есть поле
-        if ((response as any).permissions) setPermissions((response as any).permissions);
+        // Извлекаем permissions из корневого уровня ответа
+        if ((response as any).permissions) {
+          setPermissions((response as any).permissions);
+        } else {
+          setPermissions([]);
+        }
       } else {
         throw new Error(response.error || 'Не удалось загрузить пользователя');
       }
@@ -83,8 +87,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { token: authToken, user: userData } = response;
         setToken(authToken);
         setUser(userData);
-        // @ts-ignore backend возвращает permissions вместе с user
-        if ((response.user as any).permissions) setPermissions((response.user as any).permissions);
+        // Извлекаем permissions из корневого уровня ответа при логине
+        if ((response as any).permissions) {
+          setPermissions((response as any).permissions);
+        } else if ((response.user as any).permissions) {
+          setPermissions((response.user as any).permissions);
+        } else {
+          setPermissions([]);
+        }
         localStorage.setItem('auth_token', authToken);
         
         console.log('Добро пожаловать!');
