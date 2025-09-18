@@ -359,10 +359,15 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
     const { growth_plan_id, course_id, status, test_date, notes } = req.body;
     const userId = req.user?.id;
     
-    // Проверяем, что план принадлежит пользователю
-    const plan = await knex('growth_plans')
-      .where({ id: growth_plan_id, user_id: userId })
-      .first();
+    // Проверяем, что план существует и пользователь имеет к нему доступ
+    let planQuery = knex('growth_plans').where('id', growth_plan_id);
+    
+    // Обычные пользователи могут добавлять результаты только к своим планам
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      planQuery = planQuery.where('user_id', userId);
+    }
+    
+    const plan = await planQuery.first();
     
     if (!plan) {
       return res.status(404).json({ error: 'Growth plan not found' });

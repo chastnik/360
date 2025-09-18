@@ -39,12 +39,17 @@ interface User {
 
 interface GrowthPlan {
   id: number;
+  user_id: number;
   start_date: string;
   study_load_percent: number;
   end_date?: string;
   status: 'active' | 'completed';
   courses: Course[];
   test_results: TestResult[];
+  // Информация о пользователе
+  first_name?: string;
+  last_name?: string;
+  email?: string;
 }
 
 const GrowthPlansPage: React.FC = () => {
@@ -67,6 +72,15 @@ const GrowthPlansPage: React.FC = () => {
   const [courseSelections, setCourseSelections] = useState<Map<number, CourseSelection>>(new Map());
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Form states for test result modal
+  const [testFormData, setTestFormData] = useState({
+    test_date: new Date().toISOString().split('T')[0],
+    status: 'passed' as 'passed' | 'failed',
+    notes: ''
+  });
+  const [testFormErrors, setTestFormErrors] = useState<{[key: string]: string}>({});
+  const [isSubmittingTest, setIsSubmittingTest] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -286,6 +300,39 @@ const GrowthPlansPage: React.FC = () => {
     }
   };
 
+  const handleTestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingTest(true);
+    setTestFormErrors({});
+
+    try {
+      await api.post('/learning/test-results', {
+        growth_plan_id: selectedPlan?.id,
+        course_id: selectedCourse?.id,
+        status: testFormData.status,
+        test_date: testFormData.test_date,
+        notes: testFormData.notes || null
+      });
+      
+      setShowTestModal(false);
+      setSelectedPlan(null);
+      setSelectedCourse(null);
+      setTestFormData({
+        test_date: new Date().toISOString().split('T')[0],
+        status: 'passed',
+        notes: ''
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Error adding test result:', error);
+      setTestFormErrors({
+        general: 'Произошла ошибка при сохранении результата теста'
+      });
+    } finally {
+      setIsSubmittingTest(false);
+    }
+  };
+
   const handleAddTestResult = async (formData: any) => {
     try {
       await api.post('/learning/test-results', {
@@ -318,7 +365,7 @@ const GrowthPlansPage: React.FC = () => {
             📈 Планы индивидуального роста
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Управление вашими персональными планами развития
+            Управление персональными планами развития
           </p>
         </div>
         <button
@@ -344,6 +391,11 @@ const GrowthPlansPage: React.FC = () => {
                 <p className="text-gray-600 dark:text-gray-400">
                   Создан {new Date(plan.start_date).toLocaleDateString('ru-RU')}
                 </p>
+                {plan.first_name && plan.last_name && (
+                  <p className="text-blue-600 dark:text-blue-400 font-medium">
+                    👤 {plan.last_name} {plan.first_name}
+                  </p>
+                )}
               </div>
               <div className="flex items-center space-x-3">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(plan.status)}`}>
@@ -763,23 +815,114 @@ const GrowthPlansPage: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400">
                 Курс: <strong>{selectedCourse.name}</strong>
               </p>
+              {selectedPlan.first_name && selectedPlan.last_name && (
+                <p className="text-blue-600 dark:text-blue-400">
+                  Участник: <strong>{selectedPlan.last_name} {selectedPlan.first_name}</strong>
+                </p>
+              )}
             </div>
-            {/* TODO: Add form */}
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowTestModal(false);
-                  setSelectedPlan(null);
-                  setSelectedCourse(null);
-                }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-              >
-                Отмена
-              </button>
-              <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                Сохранить
-              </button>
-            </div>
+            
+            {testFormErrors.general && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {testFormErrors.general}
+              </div>
+            )}
+
+            <form onSubmit={handleTestSubmit}>
+              {/* Дата тестирования */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Дата тестирования
+                </label>
+                <input
+                  type="date"
+                  value={testFormData.test_date}
+                  onChange={(e) => setTestFormData({...testFormData, test_date: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  required
+                />
+              </div>
+
+              {/* Результат теста */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Результат теста
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="status"
+                      value="passed"
+                      checked={testFormData.status === 'passed'}
+                      onChange={(e) => setTestFormData({...testFormData, status: e.target.value as 'passed' | 'failed'})}
+                      className="mr-2 text-blue-500"
+                    />
+                    <span className="text-green-600 dark:text-green-400">✅ Пройден</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="status"
+                      value="failed"
+                      checked={testFormData.status === 'failed'}
+                      onChange={(e) => setTestFormData({...testFormData, status: e.target.value as 'passed' | 'failed'})}
+                      className="mr-2 text-blue-500"
+                    />
+                    <span className="text-red-600 dark:text-red-400">❌ Не пройден</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Заметки */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Заметки (опционально)
+                </label>
+                <textarea
+                  value={testFormData.notes}
+                  onChange={(e) => setTestFormData({...testFormData, notes: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Дополнительная информация о тестировании..."
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTestModal(false);
+                    setSelectedPlan(null);
+                    setSelectedCourse(null);
+                    setTestFormData({
+                      test_date: new Date().toISOString().split('T')[0],
+                      status: 'passed',
+                      notes: ''
+                    });
+                    setTestFormErrors({});
+                  }}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  disabled={isSubmittingTest}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                  disabled={isSubmittingTest}
+                >
+                  {isSubmittingTest ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                      Сохранение...
+                    </>
+                  ) : (
+                    'Сохранить'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
