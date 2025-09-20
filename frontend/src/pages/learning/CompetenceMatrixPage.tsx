@@ -3,19 +3,20 @@ import api from '../../services/api';
 
 interface CompetenceMatrix {
   id: number;
-  competency_id: number;
+  competency_id: string; // UUID в базе данных
   competency_name: string;
   competency_description: string;
-  level: 'novice' | 'beginner' | 'competent' | 'proficient' | 'expert';
+  level: 'junior' | 'middle' | 'senior';
   score: number;
   assessment_date: string;
   notes?: string;
 }
 
 interface Competency {
-  id: number;
+  id: string; // UUID в базе данных
   name: string;
   description: string;
+  is_active?: boolean;
 }
 
 const CompetenceMatrixPage: React.FC = () => {
@@ -24,6 +25,19 @@ const CompetenceMatrixPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [selectedCompetency, setSelectedCompetency] = useState<Competency | null>(null);
+  
+  // Form states for assessment modal
+  const [assessmentFormData, setAssessmentFormData] = useState({
+    competency_id: '',
+    user_id: '',
+    level: 'middle' as 'junior' | 'middle' | 'senior',
+    score: 50,
+    assessment_date: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
+  const [users, setUsers] = useState<any[]>([]);
+  const [assessmentFormErrors, setAssessmentFormErrors] = useState<{[key: string]: string}>({});
+  const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -31,12 +45,30 @@ const CompetenceMatrixPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [matrixResponse, competenciesResponse] = await Promise.all([
-        api.get('/learning/competence-matrix'),
-        api.get('/competencies')
+      const [matrixResponse, competenciesResponse, usersResponse] = await Promise.all([
+        api.get('/learning/competence-matrix').catch(err => {
+          console.error('Matrix API error:', err);
+          return { data: [] };
+        }),
+        api.get('/learning/competencies').catch(err => {
+          console.error('Competencies API error:', err);
+          return { data: [] };
+        }),
+        api.get('/learning/users').catch(err => {
+          console.error('Users API error:', err);
+          return { data: [] };
+        })
       ]);
-      setMatrix(matrixResponse.data);
-      setCompetencies(competenciesResponse.data);
+      
+      setMatrix(Array.isArray(matrixResponse.data) ? matrixResponse.data : []);
+      
+      // Обрабатываем ответ от learning API (возвращает данные напрямую)
+      const competenciesData = competenciesResponse.data;
+      setCompetencies(Array.isArray(competenciesData) ? competenciesData : []);
+      
+      // Устанавливаем пользователей
+      setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
+      
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -46,22 +78,18 @@ const CompetenceMatrixPage: React.FC = () => {
 
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'novice': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      case 'beginner': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
-      case 'competent': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
-      case 'proficient': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
-      case 'expert': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'junior': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'middle': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'senior': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
     }
   };
 
   const getLevelIcon = (level: string) => {
     switch (level) {
-      case 'novice': return '🌱';
-      case 'beginner': return '🌿';
-      case 'competent': return '🌳';
-      case 'proficient': return '🏆';
-      case 'expert': return '👑';
+      case 'junior': return '🌱';
+      case 'middle': return '🌿';
+      case 'senior': return '🌳';
       default: return '❓';
     }
   };
@@ -80,16 +108,56 @@ const CompetenceMatrixPage: React.FC = () => {
     return 'bg-red-500';
   };
 
+  const getSuggestedLevelByScore = (score: number): 'junior' | 'middle' | 'senior' => {
+    if (score >= 75) return 'senior';
+    if (score >= 50) return 'middle';
+    return 'junior';
+  };
+
   const getStatistics = () => {
     const total = matrix.length;
-    const expert = matrix.filter(m => m.level === 'expert').length;
-    const proficient = matrix.filter(m => m.level === 'proficient').length;
-    const competent = matrix.filter(m => m.level === 'competent').length;
-    const beginner = matrix.filter(m => m.level === 'beginner').length;
-    const novice = matrix.filter(m => m.level === 'novice').length;
+    const junior = matrix.filter(m => m.level === 'junior').length;
+    const middle = matrix.filter(m => m.level === 'middle').length;
+    const senior = matrix.filter(m => m.level === 'senior').length;
     const avgScore = total > 0 ? Math.round(matrix.reduce((sum, m) => sum + m.score, 0) / total) : 0;
 
-    return { total, expert, proficient, competent, beginner, novice, avgScore };
+    return { total, junior, middle, senior, avgScore };
+  };
+
+  const handleAssessmentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingAssessment(true);
+    setAssessmentFormErrors({});
+
+    try {
+      await api.post('/learning/competence-matrix', {
+        competency_id: assessmentFormData.competency_id || selectedCompetency?.id,
+        user_id: assessmentFormData.user_id,
+        level: assessmentFormData.level,
+        score: assessmentFormData.score,
+        assessment_date: assessmentFormData.assessment_date,
+        notes: assessmentFormData.notes || null
+      });
+      
+      setShowAssessmentModal(false);
+      setSelectedCompetency(null);
+      setAssessmentFormData({
+        competency_id: '',
+        user_id: '',
+        level: 'middle',
+        score: 50,
+        assessment_date: new Date().toISOString().split('T')[0],
+        notes: ''
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Error adding assessment:', error);
+      setAssessmentFormErrors({
+        general: 'Произошла ошибка при сохранении оценки'
+      });
+    } finally {
+      setIsSubmittingAssessment(false);
+    }
   };
 
   const handleAddAssessment = async (formData: any) => {
@@ -124,7 +192,7 @@ const CompetenceMatrixPage: React.FC = () => {
             🧠 Матрица компетенций
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Оценка ваших профессиональных компетенций
+            Оценка профессиональных компетенций
           </p>
         </div>
         <button
@@ -158,19 +226,19 @@ const CompetenceMatrixPage: React.FC = () => {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <div className="flex items-center">
-            <div className="text-3xl mr-4">👑</div>
+            <div className="text-3xl mr-4">🌳</div>
             <div>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.expert + stats.proficient}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Высокий уровень</div>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.senior}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Senior</div>
             </div>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <div className="flex items-center">
-            <div className="text-3xl mr-4">🎯</div>
+            <div className="text-3xl mr-4">🌿</div>
             <div>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.competent}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Компетентный</div>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.middle}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Middle</div>
             </div>
           </div>
         </div>
@@ -307,7 +375,7 @@ const CompetenceMatrixPage: React.FC = () => {
       {/* Add Assessment Modal */}
       {showAssessmentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Оценка компетенции
             </h2>
@@ -321,21 +389,199 @@ const CompetenceMatrixPage: React.FC = () => {
                 </p>
               </div>
             )}
-            {/* TODO: Add form */}
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAssessmentModal(false);
-                  setSelectedCompetency(null);
-                }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-              >
-                Отмена
-              </button>
-              <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
-                Сохранить
-              </button>
-            </div>
+
+            {assessmentFormErrors.general && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {assessmentFormErrors.general}
+              </div>
+            )}
+
+            <form onSubmit={handleAssessmentSubmit}>
+              {/* Выбор компетенции */}
+              {!selectedCompetency && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Компетенция
+                  </label>
+                  <select
+                    value={assessmentFormData.competency_id}
+                    onChange={(e) => setAssessmentFormData({...assessmentFormData, competency_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    required
+                    disabled={competencies.length === 0}
+                  >
+                    <option value="">
+                      {competencies.length === 0 ? 'Загрузка компетенций...' : 'Выберите компетенцию'}
+                    </option>
+                    {competencies.map((competency) => (
+                      <option key={competency.id} value={competency.id}>
+                        {competency.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Выбор пользователя */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Оцениваемый пользователь
+                </label>
+                <select
+                  value={assessmentFormData.user_id}
+                  onChange={(e) => setAssessmentFormData({...assessmentFormData, user_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  required
+                  disabled={users.length === 0}
+                >
+                  <option value="">
+                    {users.length === 0 ? 'Загрузка пользователей...' : 'Выберите пользователя'}
+                  </option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.last_name} {user.first_name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Уровень компетенции */}
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Уровень компетенции
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const suggestedLevel = getSuggestedLevelByScore(assessmentFormData.score);
+                      setAssessmentFormData({...assessmentFormData, level: suggestedLevel});
+                    }}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                  >
+                    🤖 Определить по баллу
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { value: 'junior', label: 'Junior', icon: '🌱', description: 'Начальный уровень' },
+                    { value: 'middle', label: 'Middle', icon: '🌿', description: 'Средний уровень' },
+                    { value: 'senior', label: 'Senior', icon: '🌳', description: 'Старший уровень' }
+                  ].map((level) => (
+                    <label key={level.value} className="flex items-center p-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="level"
+                        value={level.value}
+                        checked={assessmentFormData.level === level.value}
+                        onChange={(e) => setAssessmentFormData({...assessmentFormData, level: e.target.value as any})}
+                        className="mr-3 text-blue-500"
+                      />
+                      <span className="text-lg mr-2">{level.icon}</span>
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">{level.label}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{level.description}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Балл */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Балл (0-100)
+                </label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={assessmentFormData.score}
+                    onChange={(e) => setAssessmentFormData({...assessmentFormData, score: parseInt(e.target.value)})}
+                    className="flex-1"
+                  />
+                  <div className="w-16 text-center">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={assessmentFormData.score}
+                      onChange={(e) => setAssessmentFormData({...assessmentFormData, score: parseInt(e.target.value) || 0})}
+                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-center dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Текущий балл: <span className={`font-medium ${getScoreColor(assessmentFormData.score)}`}>{assessmentFormData.score}</span>
+                </div>
+              </div>
+
+              {/* Дата оценки */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Дата оценки
+                </label>
+                <input
+                  type="date"
+                  value={assessmentFormData.assessment_date}
+                  onChange={(e) => setAssessmentFormData({...assessmentFormData, assessment_date: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  required
+                />
+              </div>
+
+              {/* Заметки */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Заметки (опционально)
+                </label>
+                <textarea
+                  value={assessmentFormData.notes}
+                  onChange={(e) => setAssessmentFormData({...assessmentFormData, notes: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Дополнительные комментарии к оценке..."
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAssessmentModal(false);
+                    setSelectedCompetency(null);
+                    setAssessmentFormData({
+                      competency_id: '',
+                      user_id: '',
+                      level: 'middle',
+                      score: 50,
+                      assessment_date: new Date().toISOString().split('T')[0],
+                      notes: ''
+                    });
+                    setAssessmentFormErrors({});
+                  }}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  disabled={isSubmittingAssessment}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                  disabled={isSubmittingAssessment}
+                >
+                  {isSubmittingAssessment ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                      Сохранение...
+                    </>
+                  ) : (
+                    'Сохранить'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

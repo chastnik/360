@@ -27,6 +27,26 @@ router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// Получить компетенции для learning модуля
+router.get('/competencies', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    // Только админы и HR могут работать с компетенциями
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const competencies = await knex('competencies')
+      .select('*')
+      .where('is_active', true)
+      .orderBy('name');
+    
+    res.json(competencies);
+  } catch (error) {
+    console.error('Error fetching competencies:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Получить все курсы
 router.get('/courses', authenticateToken, async (req, res) => {
   try {
@@ -411,17 +431,19 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
 // Обновить матрицу компетенций
 router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { competency_id, level, score, assessment_date, notes } = req.body;
-    const userId = req.user?.id;
+    const { competency_id, user_id, level, score, assessment_date, notes } = req.body;
     
     // Проверяем права доступа
     if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
       return res.status(403).json({ error: 'Access denied' });
     }
     
+    // Используем переданный user_id или текущего пользователя
+    const targetUserId = user_id || req.user?.id;
+    
     const [matrix] = await knex('competence_matrix')
       .insert({
-        user_id: userId,
+        user_id: targetUserId,
         competency_id,
         level,
         score,

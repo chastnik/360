@@ -109,6 +109,81 @@ install_dependencies() {
     print_success "Все зависимости установлены"
 }
 
+# Проверка статуса PostgreSQL
+check_postgres_status() {
+    print_info "Проверка статуса PostgreSQL..."
+    
+    # Проверяем, запущен ли PostgreSQL
+    if pgrep -x "postgres" > /dev/null; then
+        print_success "PostgreSQL запущен"
+        return 0
+    else
+        print_warning "PostgreSQL не запущен"
+        return 1
+    fi
+}
+
+# Запуск PostgreSQL
+start_postgres() {
+    print_info "Запуск PostgreSQL..."
+    
+    # Пытаемся запустить PostgreSQL через service
+    if command -v service &> /dev/null; then
+        if service postgresql start 2>/dev/null; then
+            print_success "PostgreSQL запущен через service"
+            # Ждем немного, чтобы PostgreSQL полностью запустился
+            sleep 3
+            return 0
+        fi
+    fi
+    
+    # Пытаемся запустить через systemctl (если доступен)
+    if command -v systemctl &> /dev/null; then
+        if systemctl start postgresql 2>/dev/null; then
+            print_success "PostgreSQL запущен через systemctl"
+            sleep 3
+            return 0
+        fi
+    fi
+    
+    # Пытаемся запустить напрямую
+    if command -v pg_ctl &> /dev/null; then
+        # Ищем директорию данных PostgreSQL
+        for data_dir in /var/lib/postgresql/*/main /usr/local/var/postgres; do
+            if [ -d "$data_dir" ]; then
+                if pg_ctl start -D "$data_dir" -l /tmp/postgres.log 2>/dev/null; then
+                    print_success "PostgreSQL запущен через pg_ctl"
+                    sleep 3
+                    return 0
+                fi
+            fi
+        done
+    fi
+    
+    print_error "Не удалось запустить PostgreSQL автоматически"
+    print_info "Попробуйте запустить PostgreSQL вручную:"
+    print_info "  sudo service postgresql start"
+    print_info "  или"
+    print_info "  sudo systemctl start postgresql"
+    return 1
+}
+
+# Проверка и запуск PostgreSQL
+ensure_postgres_running() {
+    if ! check_postgres_status; then
+        if ! start_postgres; then
+            print_error "Не удалось запустить PostgreSQL"
+            exit 1
+        fi
+        
+        # Повторная проверка после запуска
+        if ! check_postgres_status; then
+            print_error "PostgreSQL не запустился"
+            exit 1
+        fi
+    fi
+}
+
 # Проверка базы данных
 check_database() {
     print_info "Проверка подключения к базе данных..."
@@ -247,6 +322,7 @@ show_help() {
     echo "  -s, --seed          Только выполнение сидов"
     echo "  -b, --build         Только сборка проектов"
     echo "  -c, --check         Только проверка окружения"
+    echo "  --postgres          Только проверка и запуск PostgreSQL"
     echo
     echo "Примеры:"
     echo "  $0 --dev            # Запуск в режиме разработки"
@@ -266,6 +342,7 @@ main() {
     SEED_ONLY=false
     BUILD_ONLY=false
     CHECK_ONLY=false
+    POSTGRES_ONLY=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -301,6 +378,10 @@ main() {
                 CHECK_ONLY=true
                 shift
                 ;;
+            --postgres)
+                POSTGRES_ONLY=true
+                shift
+                ;;
             *)
                 print_error "Неизвестная опция: $1"
                 show_help
@@ -319,6 +400,12 @@ main() {
         exit 0
     fi
     
+    if [ "$POSTGRES_ONLY" = true ]; then
+        ensure_postgres_running
+        print_success "Проверка PostgreSQL завершена"
+        exit 0
+    fi
+    
     # Установка зависимостей
     install_dependencies
     
@@ -326,6 +413,9 @@ main() {
         print_success "Установка зависимостей завершена"
         exit 0
     fi
+    
+    # Проверка и запуск PostgreSQL
+    ensure_postgres_running
     
     # Проверка базы данных
     check_database
