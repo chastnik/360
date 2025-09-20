@@ -33,7 +33,7 @@ const router = Router();
 router.get('/', authenticateToken, requirePermission('ui:view:admin.users'), async (_req: any, res: any): Promise<void> => {
   try {
     const users = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
       .where('is_active', true)
       .orderBy('last_name', 'first_name');
     
@@ -227,27 +227,46 @@ router.post('/', authenticateToken, requirePermission('action:users:create'), as
       }
     }
 
+    // Подготавливаем данные для создания пользователя
+    const userData: any = {
+      email,
+      first_name,
+      last_name,
+      middle_name,
+      position,
+      old_department: department, // старое поле для совместимости
+      department_id: department_id && department_id.trim() !== '' ? department_id : null,
+      manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
+      avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
+      mattermost_username,
+      password_hash: hashedPassword,
+      is_active: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    // Обрабатываем роль - приоритет у новой системы (role_id)
+    if (role_id && role_id.trim() !== '') {
+      // Используем новую систему ролей
+      userData.role_id = role_id;
+      
+      // Получаем информацию о роли из справочника для заполнения старого поля
+      const roleInfo = await db('roles').where('id', role_id).first();
+      if (roleInfo) {
+        userData.role = roleInfo.key; // заполняем старое поле для совместимости
+      } else {
+        userData.role = 'user'; // fallback
+      }
+    } else {
+      // Fallback на старую систему ролей
+      userData.role = role || 'user';
+      userData.role_id = null;
+    }
+
     // Создаем пользователя
     const [newUser] = await db('users')
-      .insert({
-        email,
-        first_name,
-        last_name,
-        middle_name,
-        role: role || 'user',
-        role_id: role_id && role_id.trim() !== '' ? role_id : null,
-        position,
-        old_department: department, // старое поле для совместимости
-        department_id: department_id && department_id.trim() !== '' ? department_id : null,
-        manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
-        avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
-        mattermost_username,
-        password_hash: hashedPassword,
-        is_active: true,
-        created_at: new Date(),
-        updated_at: new Date()
-      })
-      .returning(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_active', 'created_at', 'updated_at']);
+      .insert(userData)
+      .returning(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_active', 'created_at', 'updated_at']);
 
     res.status(201).json({
       success: true,
@@ -314,29 +333,46 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
       }
     }
 
+    // Подготавливаем данные для обновления
+    const updateData: any = {
+      email,
+      first_name,
+      last_name,
+      middle_name,
+      position,
+      old_department: department, // старое поле для совместимости
+      department_id: department_id && department_id.trim() !== '' ? department_id : null,
+      manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
+      mattermost_username,
+      avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
+      is_manager: is_manager === true || is_manager === 'true',
+      updated_at: new Date()
+    };
+
+    // Обрабатываем роль - приоритет у новой системы (role_id)
+    if (req.body.role_id && String(req.body.role_id).trim() !== '') {
+      // Используем новую систему ролей
+      updateData.role_id = req.body.role_id;
+      
+      // Получаем информацию о роли из справочника для обновления старого поля
+      const roleInfo = await db('roles').where('id', req.body.role_id).first();
+      if (roleInfo) {
+        updateData.role = roleInfo.key; // обновляем старое поле для совместимости
+      }
+    } else if (role) {
+      // Fallback на старую систему ролей
+      updateData.role = role;
+      updateData.role_id = null;
+    }
+
     // Обновляем данные пользователя
     await db('users')
       .where('id', userId)
-      .update({
-        email,
-        first_name,
-        last_name,
-        middle_name,
-        role,
-        role_id: req.body.role_id && String(req.body.role_id).trim() !== '' ? req.body.role_id : null,
-        position,
-        old_department: department, // старое поле для совместимости
-        department_id: department_id && department_id.trim() !== '' ? department_id : null,
-        manager_id: manager_id && manager_id.trim() !== '' ? manager_id : null,
-        mattermost_username,
-        avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
-        is_manager: is_manager === true || is_manager === 'true',
-        updated_at: new Date()
-      });
+      .update(updateData);
 
     // Получаем обновленные данные
     const updatedUser = await db('users')
-      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'])
+      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'])
       .where('id', userId)
       .first();
 

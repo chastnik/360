@@ -30,7 +30,7 @@ const router = (0, express_1.Router)();
 router.get('/', auth_1.authenticateToken, (0, auth_1.requirePermission)('ui:view:admin.users'), async (_req, res) => {
     try {
         const users = await (0, connection_1.default)('users')
-            .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
+            .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
             .where('is_active', true)
             .orderBy('last_name', 'first_name');
         res.json({
@@ -171,14 +171,11 @@ router.post('/', auth_1.authenticateToken, (0, auth_1.requirePermission)('action
                 return;
             }
         }
-        const [newUser] = await (0, connection_1.default)('users')
-            .insert({
+        const userData = {
             email,
             first_name,
             last_name,
             middle_name,
-            role: role || 'user',
-            role_id: role_id && role_id.trim() !== '' ? role_id : null,
             position,
             old_department: department,
             department_id: department_id && department_id.trim() !== '' ? department_id : null,
@@ -189,8 +186,24 @@ router.post('/', auth_1.authenticateToken, (0, auth_1.requirePermission)('action
             is_active: true,
             created_at: new Date(),
             updated_at: new Date()
-        })
-            .returning(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_active', 'created_at', 'updated_at']);
+        };
+        if (role_id && role_id.trim() !== '') {
+            userData.role_id = role_id;
+            const roleInfo = await (0, connection_1.default)('roles').where('id', role_id).first();
+            if (roleInfo) {
+                userData.role = roleInfo.key;
+            }
+            else {
+                userData.role = 'user';
+            }
+        }
+        else {
+            userData.role = role || 'user';
+            userData.role_id = null;
+        }
+        const [newUser] = await (0, connection_1.default)('users')
+            .insert(userData)
+            .returning(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'is_active', 'created_at', 'updated_at']);
         res.status(201).json({
             success: true,
             user: newUser,
@@ -232,15 +245,11 @@ router.put('/:id', auth_1.authenticateToken, (0, auth_1.requirePermission)('acti
                 return;
             }
         }
-        await (0, connection_1.default)('users')
-            .where('id', userId)
-            .update({
+        const updateData = {
             email,
             first_name,
             last_name,
             middle_name,
-            role,
-            role_id: req.body.role_id && String(req.body.role_id).trim() !== '' ? req.body.role_id : null,
             position,
             old_department: department,
             department_id: department_id && department_id.trim() !== '' ? department_id : null,
@@ -249,9 +258,23 @@ router.put('/:id', auth_1.authenticateToken, (0, auth_1.requirePermission)('acti
             avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
             is_manager: is_manager === true || is_manager === 'true',
             updated_at: new Date()
-        });
+        };
+        if (req.body.role_id && String(req.body.role_id).trim() !== '') {
+            updateData.role_id = req.body.role_id;
+            const roleInfo = await (0, connection_1.default)('roles').where('id', req.body.role_id).first();
+            if (roleInfo) {
+                updateData.role = roleInfo.key;
+            }
+        }
+        else if (role) {
+            updateData.role = role;
+            updateData.role_id = null;
+        }
+        await (0, connection_1.default)('users')
+            .where('id', userId)
+            .update(updateData);
         const updatedUser = await (0, connection_1.default)('users')
-            .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'])
+            .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'])
             .where('id', userId)
             .first();
         res.json({

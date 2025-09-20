@@ -215,7 +215,8 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res): Promise<void
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        role: user.role
+        role: user.role,
+        role_id: user.role_id
       },
       permissions: mePermissions
     });
