@@ -26,6 +26,7 @@
 - `-b, --build` - Только сборка проектов
 - `-c, --check` - Только проверка окружения
 - `--postgres` - Только проверка и запуск PostgreSQL
+- `--redis` - Только проверка и запуск Redis
 
 #### Примеры:
 ```bash
@@ -46,6 +47,9 @@
 
 # Проверка и запуск PostgreSQL
 ./start.sh --postgres
+
+# Проверка и запуск Redis
+./start.sh --redis
 ```
 
 ### 2. `dev.sh` - Быстрый запуск для разработки
@@ -112,9 +116,10 @@
 2. **Файл .env** - проверка наличия конфигурации
 3. **Зависимости** - проверка и установка node_modules
 4. **PostgreSQL** - автоматическая проверка и запуск сервера БД
-5. **База данных** - проверка подключения к PostgreSQL
-6. **Миграции** - выполнение миграций БД
-7. **Сиды** - заполнение начальными данными
+5. **Redis** - автоматическая проверка и запуск сервера кеширования
+6. **База данных** - проверка подключения к PostgreSQL
+7. **Миграции** - выполнение миграций БД
+8. **Сиды** - заполнение начальными данными
 
 ### Автоматическая проверка PostgreSQL
 
@@ -148,6 +153,40 @@ Starting PostgreSQL 15 database server: main.
 [SUCCESS] PostgreSQL запущен через service
 [INFO] Проверка статуса PostgreSQL...
 [SUCCESS] PostgreSQL запущен
+```
+
+### Автоматическая проверка Redis
+
+Скрипт `start.sh` автоматически проверяет статус Redis и запускает его при необходимости.
+
+**Что делает скрипт:**
+- Проверяет, запущен ли Redis
+- Если не запущен, пытается запустить через:
+  - `service redis-server start`
+  - `systemctl start redis` или `systemctl start redis-server`
+  - `redis-server --daemonize yes` (напрямую)
+- Ждет 2 секунды для полного запуска
+- Повторно проверяет статус после запуска
+
+**Использование:**
+```bash
+# Проверить и запустить только Redis
+./start.sh --redis
+
+# Redis проверяется автоматически при любом запуске
+./start.sh --dev
+./start.sh --production
+```
+
+**Выходные данные:**
+```
+[INFO] Проверка статуса Redis...
+[WARNING] Redis не запущен
+[INFO] Запуск Redis...
+Starting redis-server: redis-server.
+[SUCCESS] Redis запущен через service
+[INFO] Проверка статуса Redis...
+[SUCCESS] Redis запущен
 ```
 
 ## Устранение проблем
@@ -232,6 +271,19 @@ GRANT ALL PRIVILEGES ON DATABASE assessment360 TO assessment_user;
 sudo service postgresql start
 ```
 
+### Ошибка "ECONNREFUSED 127.0.0.1:6379"
+
+Эта ошибка означает, что Redis не запущен или недоступен.
+
+**Решение:**
+```bash
+# Автоматический запуск через скрипт
+./start.sh --redis
+
+# Или вручную
+sudo service redis-server start
+```
+
 ### Ошибка "Port already in use"
 ```bash
 # Найти процесс на порту
@@ -302,6 +354,7 @@ export PATH="$PATH:/path/to/your/360/project"
 alias 360-dev='cd /path/to/your/360/project && ./dev.sh'
 alias 360-prod='cd /path/to/your/360/project && ./start.sh --production'
 alias 360-postgres='cd /path/to/your/360/project && ./start.sh --postgres'
+alias 360-redis='cd /path/to/your/360/project && ./start.sh --redis'
 alias 360-check='cd /path/to/your/360/project && ./start.sh --check'
 ```
 
@@ -353,6 +406,9 @@ nodemon start.sh --dev
 # Если PostgreSQL не запустился автоматически
 ./start.sh --postgres
 
+# Если Redis не запустился автоматически
+./start.sh --redis
+
 # Проверка состояния системы
 ./start.sh --check
 
@@ -366,6 +422,7 @@ nodemon start.sh --dev
 # Пошаговая диагностика
 ./start.sh --check          # Проверка окружения
 ./start.sh --postgres       # Проверка PostgreSQL
+./start.sh --redis          # Проверка Redis
 ./start.sh --migrate        # Проверка миграций
 ./start.sh --dev            # Запуск в режиме разработки
 ```
@@ -375,6 +432,7 @@ nodemon start.sh --dev
 ```bash
 # В скрипте деплоя
 ./start.sh --postgres       # Убедиться что БД запущена
+./start.sh --redis          # Убедиться что Redis запущен
 ./start.sh --migrate        # Выполнить миграции
 ./start.sh --build          # Собрать проект
 ./start.sh --production     # Запустить в продакшн режиме
@@ -387,6 +445,7 @@ nodemon start.sh --dev
 1. Проверьте логи системы
 2. Убедитесь в корректности настроек в `.env`
 3. Проверьте подключение к базе данных с помощью `./start.sh --postgres`
-4. Перезапустите систему с флагом `--check`
+4. Проверьте подключение к Redis с помощью `./start.sh --redis`
+5. Перезапустите систему с флагом `--check`
 
 Для получения помощи обратитесь к документации проекта или создайте issue в репозитории. 

@@ -184,6 +184,76 @@ ensure_postgres_running() {
     fi
 }
 
+# Проверка статуса Redis
+check_redis_status() {
+    print_info "Проверка статуса Redis..."
+    
+    # Проверяем, запущен ли Redis
+    if pgrep -x "redis-server" > /dev/null; then
+        print_success "Redis запущен"
+        return 0
+    else
+        print_warning "Redis не запущен"
+        return 1
+    fi
+}
+
+# Запуск Redis
+start_redis() {
+    print_info "Запуск Redis..."
+    
+    # Пытаемся запустить Redis через service
+    if command -v service &> /dev/null; then
+        if service redis-server start 2>/dev/null; then
+            print_success "Redis запущен через service"
+            # Ждем немного, чтобы Redis полностью запустился
+            sleep 2
+            return 0
+        fi
+    fi
+    
+    # Пытаемся запустить через systemctl (если доступен)
+    if command -v systemctl &> /dev/null; then
+        if systemctl start redis 2>/dev/null || systemctl start redis-server 2>/dev/null; then
+            print_success "Redis запущен через systemctl"
+            sleep 2
+            return 0
+        fi
+    fi
+    
+    # Пытаемся запустить напрямую
+    if command -v redis-server &> /dev/null; then
+        if redis-server --daemonize yes 2>/dev/null; then
+            print_success "Redis запущен напрямую"
+            sleep 2
+            return 0
+        fi
+    fi
+    
+    print_error "Не удалось запустить Redis автоматически"
+    print_info "Попробуйте запустить Redis вручную:"
+    print_info "  sudo service redis-server start"
+    print_info "  или"
+    print_info "  sudo systemctl start redis"
+    return 1
+}
+
+# Проверка и запуск Redis
+ensure_redis_running() {
+    if ! check_redis_status; then
+        if ! start_redis; then
+            print_error "Не удалось запустить Redis"
+            exit 1
+        fi
+        
+        # Повторная проверка после запуска
+        if ! check_redis_status; then
+            print_error "Redis не запустился"
+            exit 1
+        fi
+    fi
+}
+
 # Проверка базы данных
 check_database() {
     print_info "Проверка подключения к базе данных..."
@@ -323,6 +393,7 @@ show_help() {
     echo "  -b, --build         Только сборка проектов"
     echo "  -c, --check         Только проверка окружения"
     echo "  --postgres          Только проверка и запуск PostgreSQL"
+    echo "  --redis             Только проверка и запуск Redis"
     echo
     echo "Примеры:"
     echo "  $0 --dev            # Запуск в режиме разработки"
@@ -343,6 +414,7 @@ main() {
     BUILD_ONLY=false
     CHECK_ONLY=false
     POSTGRES_ONLY=false
+    REDIS_ONLY=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -382,6 +454,10 @@ main() {
                 POSTGRES_ONLY=true
                 shift
                 ;;
+            --redis)
+                REDIS_ONLY=true
+                shift
+                ;;
             *)
                 print_error "Неизвестная опция: $1"
                 show_help
@@ -406,6 +482,12 @@ main() {
         exit 0
     fi
     
+    if [ "$REDIS_ONLY" = true ]; then
+        ensure_redis_running
+        print_success "Проверка Redis завершена"
+        exit 0
+    fi
+    
     # Установка зависимостей
     install_dependencies
     
@@ -416,6 +498,9 @@ main() {
     
     # Проверка и запуск PostgreSQL
     ensure_postgres_running
+    
+    # Проверка и запуск Redis
+    ensure_redis_running
     
     # Проверка базы данных
     check_database
