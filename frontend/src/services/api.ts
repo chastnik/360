@@ -9,7 +9,7 @@ import {
   AssessmentCycle 
 } from '../types/common';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Создаем экземпляр axios с базовой конфигурацией
 const api = axios.create({

@@ -21,6 +21,7 @@ import { SurveyPage } from './pages/SurveyPage';
 import { ReportViewPage } from './pages/ReportViewPage';
 import EmployeeAnalyticsPage from './pages/EmployeeAnalyticsPage';
 import StructurePage from './pages/StructurePage';
+import EmployeesPage from './pages/EmployeesPage';
 import LearningPage from './pages/LearningPage';
 import CoursesPage from './pages/learning/CoursesPage';
 import SchedulePage from './pages/learning/SchedulePage';
@@ -107,6 +108,14 @@ function App() {
                 <PrivateRoute requiredPermission="ui:view:dashboard">
                   <Layout>
                     <StructurePage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/employees/*" element={
+                <PrivateRoute requiredPermission="ui:view:dashboard">
+                  <Layout>
+                    <EmployeesPage />
                   </Layout>
                 </PrivateRoute>
               } />
