@@ -64,10 +64,14 @@ router.post('/login', async (req, res): Promise<void> => {
 
     const { email, password }: LoginRequest = req.body;
 
-    // Найти пользователя
-    const user = await db('users')
-      .where({ email: email.toLowerCase(), is_active: true })
-      .first();
+    // Найти пользователя (используем прямой SQL для избежания проблем с .first())
+    const result = await db.raw(`
+      SELECT * FROM users 
+      WHERE email = ? AND is_active = true
+      LIMIT 1
+    `, [email.toLowerCase()]);
+    
+    const user = result.rows[0];
 
     if (!user) {
       res.status(401).json({
@@ -101,6 +105,16 @@ router.post('/login', async (req, res): Promise<void> => {
 
     // Отдаём ещё permissions для фронта
     const permissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
+    
+    // Debug log
+    console.log('LOGIN DEBUG - user object:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      role_id: user.role_id,
+      permissions_count: permissions.length
+    });
+    
     res.json({
       success: true,
       token,
@@ -210,7 +224,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res): Promise<void
     const mePermissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
     res.json({
       success: true,
-      user: {
+      data: {
         id: user.id,
         email: user.email,
         first_name: user.first_name,
@@ -428,6 +442,119 @@ router.post('/reset-password', async (req, res): Promise<void> => {
     res.status(500).json({
       success: false,
       error: 'Внутренняя ошибка сервера'
+    });
+  }
+});
+
+// Тестовый эндпоинт для отладки базы данных
+router.get('/test-db', async (req, res) => {
+  try {
+    const user = await db('users')
+      .where({ email: 'admin@company.com', is_active: true })
+      .first();
+    
+    // Тестируем тот же код, что и в логине
+    const permissions = await db('role_permissions').where('role_id', user?.role_id).pluck('permission');
+    
+    res.json({
+      success: true,
+      debug: {
+        user_exists: !!user,
+        user_data: user ? {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          role_id: user.role_id,
+          first_name: user.first_name,
+          last_name: user.last_name
+        } : null,
+        permissions_count: permissions.length,
+        user_raw: user,
+        db_config: process.env.DATABASE_URL ? 'DATABASE_URL' : 'env vars'
+      }
+    });
+  } catch (error: any) {
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Тестовый логин для отладки
+router.post('/test-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Найти пользователя (точно такой же код как в логине)
+    const user = await db('users')
+      .where({ email: email.toLowerCase(), is_active: true })
+      .first();
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Пользователь не найден'
+      });
+    }
+
+    // Проверить пароль
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Неверный пароль'
+      });
+    }
+
+    // Получить права
+    const permissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
+
+    res.json({
+      success: true,
+      test_user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role,
+        role_id: user.role_id || null,
+        permissions
+      }
+    });
+
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Тестовый эндпоинт с прямым SQL
+router.get('/test-sql', async (req, res) => {
+  try {
+    // Прямой SQL запрос
+    const result = await db.raw(`
+      SELECT id, email, role, role_id, first_name, last_name, is_active
+      FROM users 
+      WHERE email = ? AND is_active = true
+    `, ['admin@company.com']);
+    
+    const user = result.rows[0];
+    
+    res.json({
+      success: true,
+      debug: {
+        sql_result: result.rows,
+        user_data: user,
+        user_fields: user ? Object.keys(user) : null
+      }
+    });
+  } catch (error: any) {
+    res.json({
+      success: false,
+      error: error.message
     });
   }
 });

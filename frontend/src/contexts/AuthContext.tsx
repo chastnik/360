@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUser = useCallback(async (authToken: string) => {
     try {
       const response = await authAPI.getCurrentUser(authToken);
-      if (response.success && response.data) {
+      if (response.success && response.data && response.data.id) {
         setUser(response.data);
         // Извлекаем permissions из корневого уровня ответа
         if ((response as any).permissions) {
@@ -63,10 +63,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(null);
       setUser(null);
       setPermissions([]);
+      // При ошибке загрузки пользователя перенаправляем на логин
+      navigate('/login', { replace: true });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('auth_token');

@@ -59,12 +59,19 @@ const VacationModal: React.FC<VacationModalProps> = ({
 
   const canEdit = user?.role === 'admin' || user?.role === 'hr';
 
+  // Функция для преобразования даты в формат YYYY-MM-DD
+  const formatDateForInput = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
+
   useEffect(() => {
     if (vacation) {
       setFormData({
         user_id: vacation.user_id,
-        start_date: vacation.start_date,
-        end_date: vacation.end_date,
+        start_date: formatDateForInput(vacation.start_date),
+        end_date: formatDateForInput(vacation.end_date),
         type: vacation.type,
         comment: vacation.comment || '',
         status: vacation.status

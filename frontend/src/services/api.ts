@@ -91,7 +91,13 @@ export const authAPI = {
       const d = response.data;
       // Бэкенд отдает { success: true, user: {...}, permissions: [...] }
       if (d && typeof d === 'object' && (d.user || d.data)) {
-        return { success: true, data: (d.user || d.data) } as any;
+        // Сохраняем permissions в ответе
+        const result = { 
+          success: true, 
+          data: (d.user || d.data),
+          permissions: d.permissions || []
+        };
+        return result as any;
       }
       return d;
     } catch (error: any) {

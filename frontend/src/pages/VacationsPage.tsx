@@ -404,16 +404,16 @@ const VacationsPage: React.FC = () => {
         )}
         {!loading && (
         <div className="overflow-x-auto">
-          <div className="min-w-full">
+          <div className="min-w-max">
             {/* Заголовки месяцев */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
-              <div className="w-48 flex-shrink-0 p-3 bg-gray-50 dark:bg-gray-700 font-medium text-gray-900 dark:text-white">
+            <div className="flex border-b-2 border-gray-300 dark:border-gray-600">
+              <div className="w-48 flex-shrink-0 p-3 bg-gray-50 dark:bg-gray-700 font-medium text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700">
                 Сотрудник
               </div>
               {months.map(month => (
                 <div
                   key={month.number}
-                  className="flex-1 min-w-32 p-3 bg-gray-50 dark:bg-gray-700 font-medium text-gray-900 dark:text-white text-center border-l border-gray-200 dark:border-gray-700"
+                  className="w-32 flex-shrink-0 p-3 bg-gray-50 dark:bg-gray-700 font-medium text-gray-900 dark:text-white text-center border-l border-gray-200 dark:border-gray-700"
                 >
                   {month.name}
                 </div>
@@ -456,9 +456,9 @@ const VacationsPage: React.FC = () => {
               const userVacations = filteredVacations.filter(v => v.user_id === user.id);
               
               return (
-                <div key={user.id} className="flex border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <div key={user.id} className="flex border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 min-h-[60px]">
                   {/* Имя сотрудника */}
-                  <div className="w-48 flex-shrink-0 p-3">
+                  <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 dark:border-gray-700">
                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                       {user.last_name} {user.first_name}
                     </div>
@@ -471,7 +471,7 @@ const VacationsPage: React.FC = () => {
                   {months.map(month => (
                     <div
                       key={month.number}
-                      className="flex-1 min-w-32 p-2 border-l border-gray-200 dark:border-gray-700 relative"
+                      className="w-32 flex-shrink-0 p-2 border-l border-gray-200 dark:border-gray-700 relative min-h-[60px]"
                     >
                       {/* Отпуска в этом месяце */}
                       {userVacations.map(vacation => {

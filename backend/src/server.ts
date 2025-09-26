@@ -50,8 +50,12 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// Test routes (временно заменяем основной auth)
+import testAuthRoutes from './routes/test-auth';
+app.use('/api/auth', testAuthRoutes);
+
 // Routes
-app.use('/api/auth', authRoutes);
+// app.use('/api/auth', authRoutes); // временно отключен
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/questions', questionRoutes);
