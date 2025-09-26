@@ -61,7 +61,7 @@ router.post('/login', async (req, res) => {
       permissions
     };
 
-    res.json({
+    return res.json({
       success: true,
       token,
       user: userData
@@ -69,7 +69,7 @@ router.post('/login', async (req, res) => {
 
   } catch (error: any) {
     console.error('Ошибка в логине:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -121,7 +121,7 @@ router.post('/login-new', async (req, res) => {
     // Получить права
     const permissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
 
-    res.json({
+    return res.json({
       success: true,
       token,
       user: {
@@ -137,7 +137,7 @@ router.post('/login-new', async (req, res) => {
 
   } catch (error: any) {
     console.error('Ошибка в новом логине:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -145,7 +145,7 @@ router.post('/login-new', async (req, res) => {
 });
 
 // Глубокий тест для отладки
-router.get('/debug-user', async (req, res) => {
+router.get('/debug-user', async (_req, res) => {
   try {
     const result = await db.raw(`
       SELECT * FROM users 
@@ -193,7 +193,7 @@ router.get('/debug-user', async (req, res) => {
 });
 
 // Тест статичных данных
-router.get('/test-static', (req, res) => {
+router.get('/test-static', (_req, res) => {
   const testUser = {
     id: "550e8400-e29b-41d4-a716-446655440100",
     email: "admin@company.com", 
@@ -216,7 +216,7 @@ router.get('/test-static', (req, res) => {
 });
 
 // Тест данных из базы
-router.get('/test-db-data', async (req, res) => {
+router.get('/test-db-data', async (_req, res) => {
   try {
     const result = await db.raw(`
       SELECT * FROM users 
@@ -313,14 +313,14 @@ router.post('/login-exact-copy', async (req, res) => {
       role_id: user.role_id
     };
 
-    res.json({
+    return res.json({
       success: true,
       user: userMethod1,
       token: 'test-token'
     });
 
   } catch (error: any) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -355,14 +355,14 @@ router.post('/login-no-password', async (req, res) => {
       role_id: user.role_id
     };
 
-    res.json({
+    return res.json({
       success: true,
       user: userMethod1,
       token: 'test-token'
     });
 
   } catch (error: any) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -396,7 +396,7 @@ router.get('/login-get/:email', async (req, res) => {
       role_id: user.role_id
     };
 
-    res.json({
+    return res.json({
       success: true,
       user_data: userMethod1, // Изменили название поля
       user: userMethod1,      // Оставили для сравнения
@@ -404,7 +404,7 @@ router.get('/login-get/:email', async (req, res) => {
     });
 
   } catch (error: any) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -460,7 +460,7 @@ router.get('/me', async (req, res) => {
     console.log('DEBUG ME: user from DB:', user ? {id: user.id, email: user.email, role: user.role} : 'NO USER');
     console.log('DEBUG ME: userData created:', userData);
 
-    res.json({
+    return res.json({
       success: true,
       data: userData,
       user: userData, // Фронтенд также ожидает поле user
@@ -469,7 +469,7 @@ router.get('/me', async (req, res) => {
 
   } catch (error: any) {
     console.error('Ошибка в /me:', error);
-    res.status(401).json({
+    return res.status(401).json({
       success: false,
       error: 'Недействительный токен'
     });
