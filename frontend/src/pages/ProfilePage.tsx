@@ -1,4 +1,3 @@
-// © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
 import React, { useState, useEffect, useCallback } from 'react';
@@ -10,7 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 export const ProfilePage: React.FC = () => {
   const { user, setUser } = useAuth();
-  const { themeMode, setThemeMode, isDark } = useTheme();
+  const { themeMode, setThemeMode } = useTheme();
   const [editing, setEditing] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [loading, setLoading] = useState(false);

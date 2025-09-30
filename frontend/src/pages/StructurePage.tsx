@@ -1,4 +1,3 @@
-// © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useMemo, useState } from 'react';
@@ -42,7 +41,7 @@ const StructurePage: React.FC = () => {
         const data = res.data?.success ? res.data.data : res.data;
         const all: User[] = Array.isArray(data) ? data : [];
         // Фильтр: берем только тех, у кого указан руководитель, или кто является руководителем хотя бы одного
-        const hasManager = new Set(all.filter(u => u.manager_id).map(u => String(u.id)));
+        // const hasManager = new Set(all.filter(u => u.manager_id).map(u => String(u.id)));
         const isManager = new Set(all.filter(u => all.some(x => x.manager_id === u.id)).map(u => String(u.id)));
         const filtered = all.filter(u => u.manager_id || isManager.has(String(u.id)));
         setUsers(filtered);

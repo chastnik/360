@@ -1,4 +1,3 @@
-// © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
 import React, { useState, useEffect, useCallback } from 'react';

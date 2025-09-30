@@ -1,4 +1,3 @@
-// © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
 import React, { useState } from 'react';
@@ -10,7 +9,7 @@ interface AdminLayoutProps {
 }
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const { user, logout, permissions } = useAuth();
+  const { user, permissions } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -93,15 +92,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   }
 
-  const mainNavigation = [
-    { name: 'Дашборд', href: '/dashboard', icon: '📊' },
-    { name: 'Циклы', href: '/cycles', icon: '🔄' },
-    { name: 'Оценки', href: '/assessments', icon: '📝' },
-    { name: 'Отчеты', href: '/reports', icon: '📈' },
-    { name: 'Профиль', href: '/profile', icon: '👤' }
-  ];
-
-  const isMainActive = (href: string) => location.pathname === href;
+  // основная навигация управляется на уровне Layout/Router
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">

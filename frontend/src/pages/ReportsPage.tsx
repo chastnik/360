@@ -1,4 +1,3 @@
-// © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
 import React, { useState, useEffect, useMemo } from 'react';
@@ -20,16 +19,7 @@ import {
 } from '../components/ReportCharts';
 import api, { reportsAPI } from '../services/api';
 
-interface Report {
-  id: number;
-  cycle_id: number;
-  user_id: number;
-  cycle_name: string;
-  participant_name: string;
-  data: string;
-  created_at: string;
-  updated_at: string;
-}
+// Removed unused Report interface
 
 interface Cycle {
   id: string;
@@ -97,7 +87,7 @@ export const ReportsPage: React.FC = () => {
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [comparisonData, setComparisonData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState<string | null>(null);
+  const [, setGenerating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Состояние разворачивания блоков в динамике (по умолчанию свернуто)
   const [trendExpanded, setTrendExpanded] = useState<Record<string, boolean>>({});
@@ -310,18 +300,7 @@ export const ReportsPage: React.FC = () => {
     }
   };
 
-  const generateReport = async (participantId: string) => {
-    try {
-      setGenerating(participantId);
-      await api.post(`/reports/generate/${participantId}`);
-      setError(null);
-    } catch (error: any) {
-      console.error('Ошибка при генерации отчета:', error);
-      setError('Не удалось создать отчет');
-    } finally {
-      setGenerating(null);
-    }
-  };
+  // Генерация отчета отключена (по требованиям)
 
   const handleCycleChange = (cycleId: string) => {
     setSelectedCycle(cycleId);
@@ -331,44 +310,11 @@ export const ReportsPage: React.FC = () => {
     loadCycleAnalytics(cycleId);
   };
 
-  const handleParticipantSelect = (participantId: string) => {
-    setSelectedParticipants(prev => 
-      prev.includes(participantId) 
-        ? prev.filter(id => id !== participantId)
-        : [...prev, participantId]
-    );
-  };
+  // removed unused handleParticipantSelect
 
-  const loadComparison = async () => {
-    if (!selectedCycle || selectedParticipants.length < 2) return;
+  // removed unused loadComparison
 
-    try {
-      const response = await api.get(`/reports/compare/${selectedCycle}`, {
-        params: { participants: selectedParticipants }
-      });
-      const payload = response.data;
-      const mapped = Array.isArray(payload?.participants) ? payload.participants.map((p: any, idx: number) => ({
-        participantId: String(p.participant?.id || p.participantId || idx),
-        participantName: p.participant?.name || p.participantName || p.participant?.email || `Участник ${idx+1}`,
-        overallAverage: Number(p.overallScore || 0),
-        categoryAverages: Array.isArray(p.categoryScores)
-          ? p.categoryScores.map((c: any, cidx: number) => ({
-              id: cidx,
-              name: c.category,
-              color: c.color,
-              average: Number(c.avgScore || 0),
-              count: 0,
-            }))
-          : [],
-      })) : [];
-      setComparisonData(mapped);
-    } catch (error) {
-      console.error('Ошибка при загрузке сравнения:', error);
-      setError('Не удалось загрузить сравнение');
-    }
-  };
-
-  const canManageReports = user?.role === 'admin' || user?.role === 'manager';
+  // const canManageReports = user?.role === 'admin' || user?.role === 'manager';
 
   if (loading) {
     return (
@@ -768,8 +714,25 @@ export const ReportsPage: React.FC = () => {
                       </button>
                     </div>
                     {employeeAiText ? (
-                      <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <ReactMarkdown>{employeeAiText}</ReactMarkdown>
+                      <div className="markdown-body leading-7 text-gray-800 dark:text-gray-100">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white" {...props} />,
+                            h2: ({node, ...props}) => <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white" {...props} />,
+                            h3: ({node, ...props}) => <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white" {...props} />,
+                            p: ({node, ...props}) => <p className="mb-3 whitespace-pre-line text-gray-800 dark:text-gray-100" {...props} />,
+                            ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
+                            li: ({node, ...props}) => <li className="mb-1 text-gray-800 dark:text-gray-100" {...props} />,
+                            a: ({node, ...props}) => <a className="underline text-blue-600 dark:text-blue-400" target="_blank" rel="noreferrer" {...props} />,
+                            strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
+                            code: ({node, inline, ...props}: any) => inline
+                              ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />
+                              : <pre className="block w-full p-3 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 overflow-auto"><code {...props} /></pre>,
+                          }}
+                        >
+                          {employeeAiText}
+                        </ReactMarkdown>
                       </div>
                     ) : (
                       <div className="text-gray-500 dark:text-gray-400 text-sm">Рекомендации ещё не сформированы.</div>
