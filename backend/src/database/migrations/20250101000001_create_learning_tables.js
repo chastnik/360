@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 /**
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }

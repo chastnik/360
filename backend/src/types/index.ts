@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 export interface User {
   id: string;

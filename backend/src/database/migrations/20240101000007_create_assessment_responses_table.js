@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 exports.up = function(knex) {
   return knex.schema.createTable('assessment_responses', function(table) {

@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';

@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import knex from 'knex';
 import { config } from 'dotenv';

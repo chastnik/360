@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import { Router } from 'express';
 import { authenticateToken, AuthRequest } from '../middleware/auth';

@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import React, { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';

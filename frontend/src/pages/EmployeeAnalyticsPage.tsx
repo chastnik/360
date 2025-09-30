@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';

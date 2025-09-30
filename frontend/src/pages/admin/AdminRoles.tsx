@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useState } from 'react';
 import { rolesAPI } from '../../services/api';

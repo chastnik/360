@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 

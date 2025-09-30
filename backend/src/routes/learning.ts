@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 import express from 'express';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import knex from '../database/connection';

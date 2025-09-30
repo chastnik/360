@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 exports.up = async function(knex) {
   // Добавляем колонку role_id

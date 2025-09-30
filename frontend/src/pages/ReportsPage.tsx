@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';

@@ -1,3 +1,5 @@
+// © 2025 Бит.Цифра - Стас Чашин
+
 // Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
