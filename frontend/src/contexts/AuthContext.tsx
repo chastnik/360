@@ -86,19 +86,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       const response = await authAPI.login(email, password);
       
-      if (response.success && response.token && response.user) {
-        const { token: authToken, user: userData } = response;
+      if (response.success && response.token) {
+        const authToken = response.token;
         setToken(authToken);
-        setUser(userData);
-        // Извлекаем permissions из корневого уровня ответа при логине
-        if ((response as any).permissions) {
-          setPermissions((response as any).permissions);
-        } else if ((response.user as any).permissions) {
-          setPermissions((response.user as any).permissions);
-        } else {
-          setPermissions([]);
-        }
         localStorage.setItem('auth_token', authToken);
+        
+        // Загружаем полные данные пользователя с сервера для получения permissions
+        try {
+          const userResponse = await authAPI.getCurrentUser(authToken);
+          if (userResponse.success && userResponse.data) {
+            setUser(userResponse.data);
+            // Извлекаем permissions из ответа
+            if ((userResponse as any).permissions) {
+              setPermissions((userResponse as any).permissions);
+            } else {
+              setPermissions([]);
+            }
+          } else if (response.user) {
+            // Если не удалось загрузить полные данные, используем данные из ответа логина
+            setUser(response.user);
+            // Извлекаем permissions из корневого уровня ответа при логине
+            if ((response as any).permissions) {
+              setPermissions((response as any).permissions);
+            } else if ((response.user as any).permissions) {
+              setPermissions((response.user as any).permissions);
+            } else {
+              setPermissions([]);
+            }
+          } else {
+            throw new Error(userResponse.error || 'Не удалось загрузить данные пользователя');
+          }
+        } catch (userError) {
+          console.error('Ошибка загрузки пользователя после логина:', userError);
+          // Используем данные из ответа логина как fallback
+          if (response.user) {
+            setUser(response.user);
+            if ((response as any).permissions) {
+              setPermissions((response as any).permissions);
+            } else {
+              setPermissions([]);
+            }
+          } else {
+            throw new Error('Не удалось загрузить данные пользователя');
+          }
+        }
         
         console.log('Добро пожаловать!');
         navigate('/dashboard');
@@ -107,8 +138,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      console.error(error.message || 'Ошибка авторизации');
-      throw error;
+      const errorMessage = error?.response?.data?.error || error?.message || 'Ошибка авторизации';
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }

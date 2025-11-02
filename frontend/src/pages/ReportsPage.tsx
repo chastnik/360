@@ -18,6 +18,7 @@ import {
   CategoryTrendSplineChart
 } from '../components/ReportCharts';
 import api, { reportsAPI } from '../services/api';
+import { exportToPDF, printReport } from '../utils/pdfExport';
 
 // Removed unused Report interface
 
@@ -366,7 +367,7 @@ export const ReportsPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Боковая панель с управлением */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6" data-no-export="true" data-no-print="true">
               <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                 Управление отчетами
               </h2>
@@ -415,7 +416,31 @@ export const ReportsPage: React.FC = () => {
                 </p>
               </div>
             ) : cycleAnalytics ? (
-              <div className="space-y-6">
+              <div id="report-cycle" className="space-y-6">
+                {/* Кнопки экспорта и печати */}
+                <div className="flex justify-end gap-2 mb-4" data-no-export="true" data-no-print="true">
+                  <button
+                    onClick={() => printReport('report-cycle')}
+                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Печать
+                  </button>
+                  <button
+                    onClick={() => {
+                      const cycleName = cycles.find(c => c.id === selectedCycle)?.name || 'Цикл';
+                      exportToPDF('report-cycle', `Отчет_Аналитика_цикла_${cycleName.replace(/\s+/g, '_')}.pdf`, `Аналитика цикла: ${cycleName}`);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Экспорт PDF
+                  </button>
+                </div>
                 {/* Общая статистика */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <OverallScoreDisplay
@@ -498,7 +523,7 @@ export const ReportsPage: React.FC = () => {
 
         {activeTab === 'users' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Подбор сотрудников</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Добавьте минимум двух сотрудников (можно из разных циклов) для сравнения</p>
@@ -569,7 +594,28 @@ export const ReportsPage: React.FC = () => {
             </div>
             <div className="lg:col-span-2">
               {comparisonData.length>0 ? (
-                <div className="space-y-6">
+                <div id="report-users" className="space-y-6">
+                  {/* Кнопки экспорта и печати */}
+                  <div className="flex justify-end gap-2 mb-4" data-no-export="true" data-no-print="true">
+                    <button
+                      onClick={() => printReport('report-users')}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Печать
+                    </button>
+                    <button
+                      onClick={() => exportToPDF('report-users', 'Отчет_Сравнение_сотрудников.pdf', 'Сравнение сотрудников')}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Экспорт PDF
+                    </button>
+                  </div>
                   <ComparisonChart data={comparisonData as any} title="Сравнение сотрудников (столбцы)" />
                   <OverlayRadarChart data={comparisonData as any} title="Сравнение профилей (радар)" />
                 </div>
@@ -583,7 +629,7 @@ export const ReportsPage: React.FC = () => {
         {activeTab === 'employee' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Справочник сотрудников + выбор цикла */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор сотрудника</h3>
                 <input
@@ -637,7 +683,33 @@ export const ReportsPage: React.FC = () => {
               {!employeeData ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">Выберите сотрудника и нажмите "Показать аналитику"</div>
               ) : (
-                <>
+                <div id="report-employee">
+                  {/* Кнопки экспорта и печати */}
+                  <div className="flex justify-end gap-2 mb-4" data-no-export="true" data-no-print="true">
+                    <button
+                      onClick={() => printReport('report-employee')}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Печать
+                    </button>
+                    <button
+                      onClick={() => {
+                        const employeeName = usersAll.find(u => u.id === employeeUserId) 
+                          ? `${usersAll.find(u => u.id === employeeUserId)?.first_name} ${usersAll.find(u => u.id === employeeUserId)?.last_name}`
+                          : 'Сотрудник';
+                        exportToPDF('report-employee', `Отчет_Аналитика_сотрудника_${employeeName.replace(/\s+/g, '_')}.pdf`, `Аналитика сотрудника: ${employeeName}`);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Экспорт PDF
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <OverallScoreDisplay score={Number(employeeData?.overallAverage || 0)} title="Общий средний балл" />
                     <ScoreDistributionChart title="Распределение оценок" distribution={(()=>{const init:any={1:0,2:0,3:0,4:0,5:0}; (employeeData?.scoreDistribution||[]).forEach((d:any)=>{const s=Number(d.score); if(init[s]!==undefined) init[s]=Number(d.count||0)}); return init;})()} />
@@ -802,7 +874,7 @@ export const ReportsPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -811,7 +883,7 @@ export const ReportsPage: React.FC = () => {
         {activeTab === 'employeeTrend' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Выбор сотрудника */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор сотрудника</h3>
                 <input
@@ -870,8 +942,32 @@ export const ReportsPage: React.FC = () => {
                 }
                 // Линейный график общих средних по циклам
                 const trendData = items.map((it:any) => ({ date: it.cycleName, score: Number(it.overallAverage || 0) }));
+                const employeeName = usersAll.find(u => u.id === employeeUserId) 
+                  ? `${usersAll.find(u => u.id === employeeUserId)?.first_name} ${usersAll.find(u => u.id === employeeUserId)?.last_name}`
+                  : 'Сотрудник';
                 return (
-                  <>
+                  <div id="report-employeeTrend">
+                    {/* Кнопки экспорта и печати */}
+                    <div className="flex justify-end gap-2 mb-4" data-no-export="true" data-no-print="true">
+                      <button
+                        onClick={() => printReport('report-employeeTrend')}
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                        Печать
+                      </button>
+                      <button
+                        onClick={() => exportToPDF('report-employeeTrend', `Отчет_Динамика_сотрудника_${employeeName.replace(/\s+/g, '_')}.pdf`, `Динамика сотрудника: ${employeeName}`)}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Экспорт PDF
+                      </button>
+                    </div>
                     <OverallScoreDisplay compact score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
                     <div className="grid grid-cols-1 gap-6">
                       {(() => {
@@ -985,7 +1081,7 @@ export const ReportsPage: React.FC = () => {
                         })}
                       </div>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
             </div>
@@ -994,7 +1090,7 @@ export const ReportsPage: React.FC = () => {
 
         {activeTab === 'departments' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор отделов</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Выберите отделы из справочника</p>
@@ -1049,7 +1145,28 @@ export const ReportsPage: React.FC = () => {
             </div>
             <div className="lg:col-span-2">
               {departmentsData.length>0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div id="report-departments" className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  {/* Кнопки экспорта и печати */}
+                  <div className="flex justify-end gap-2 mb-4" data-no-export="true" data-no-print="true">
+                    <button
+                      onClick={() => printReport('report-departments')}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      Печать
+                    </button>
+                    <button
+                      onClick={() => exportToPDF('report-departments', 'Отчет_Сравнение_отделов.pdf', 'Сравнение отделов')}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Экспорт PDF
+                    </button>
+                  </div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Отделы</h3>
                   <CategoryBarChart data={departmentsData.map((d:any, idx:number)=>({ id: idx, name: d.departmentName, color: '#3B82F6', average: d.overallScore, count: 0 }))} title="Общая оценка по отделам" />
                 </div>

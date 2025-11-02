@@ -96,60 +96,68 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Мобильное меню */}
-      <div className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white dark:bg-gray-800">
-          <div className="absolute top-0 right-0 -mr-12 pt-2">
-            <button
-              type="button"
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="sr-only">Закрыть меню</span>
-              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-            <div className="px-4">
-              <Link 
-                to="/admin"
-                onClick={() => setSidebarOpen(false)}
-                className="block hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md p-2 -m-2 transition-colors"
-              >
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
-                  Администрирование
-                </h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Система 360° оценки
-                </p>
-              </Link>
-            </div>
-            <nav className="mt-5 px-2 space-y-1">
-              {adminNavigation.filter(i=>can(i.perm)).map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
+      {/* Мобильное меню (overlay) */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          {/* Затемненный фон */}
+          <div 
+            className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity"
+            onClick={() => setSidebarOpen(false)} 
+          />
+          {/* Само меню */}
+          <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 shadow-xl">
+            <div className="flex flex-col h-full">
+              {/* Заголовок с кнопкой закрытия */}
+              <div className="flex items-center justify-between px-4 pt-5 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <Link 
+                  to="/admin"
                   onClick={() => setSidebarOpen(false)}
-                  className={`${
-                    isActive(item.path)
-                      ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
-                      : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
-                  } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                  className="block"
                 >
-                  <span className="mr-3 text-lg">{item.icon}</span>
-                  {item.name}
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Администрирование
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Система 360° оценки
+                  </p>
                 </Link>
-              ))}
-            </nav>
+                <button
+                  type="button"
+                  className="flex items-center justify-center h-8 w-8 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <span className="sr-only">Закрыть меню</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Навигация */}
+              <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+                {adminNavigation.filter(i => can(i.perm)).map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`${
+                      isActive(item.path)
+                        ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
+                        : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                    } group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors`}
+                  >
+                    <span className="mr-3 text-lg">{item.icon}</span>
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Основной контент area с боковой панелью */}
-      <div className="flex-1 flex">
+      {/* Основной layout с боковым меню */}
+      <div className="flex flex-1">
         {/* Боковая панель для десктопа */}
         <div className="hidden lg:flex lg:flex-shrink-0">
           <div className="flex flex-col w-64">
@@ -160,7 +168,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     to="/admin"
                     className="block hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md p-2 -m-2 transition-colors"
                   >
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Администрирование
                     </h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -169,7 +177,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   </Link>
                 </div>
                 <nav className="mt-5 flex-1 px-2 space-y-1">
-                  {adminNavigation.filter(i=>can(i.perm)).map((item) => (
+                  {adminNavigation.filter(i => can(i.perm)).map((item) => (
                     <Link
                       key={item.path}
                       to={item.path}
@@ -177,7 +185,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         isActive(item.path)
                           ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
                           : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
-                      } group flex items-center px-2 py-2 text-sm font-medium rounded-md`}
+                      } group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors`}
                     >
                       <span className="mr-3 text-lg">{item.icon}</span>
                       {item.name}
@@ -190,12 +198,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
 
         {/* Основной контент */}
-        <div className="flex flex-col flex-1">
-          {/* Кнопка меню для мобильных устройств (оставляем, шапку не дублируем) */}
-          <div className="relative z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 lg:hidden">
+        <div className="flex flex-col flex-1 min-w-0">
+          {/* Верхняя панель с кнопкой меню */}
+          <div className="relative z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
             <button
               type="button"
-              className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden"
+              className="px-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden"
               onClick={() => setSidebarOpen(true)}
             >
               <span className="sr-only">Открыть меню</span>
@@ -203,6 +211,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+            
+            <div className="flex-1 flex justify-end px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center">
+                <Link
+                  to="/dashboard"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  title="Вернуться к основной панели"
+                >
+                  ← Назад
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* Контент страницы */}
