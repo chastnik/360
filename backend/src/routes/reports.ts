@@ -90,12 +90,19 @@ router.post('/user/:userId/recommendations', authenticateToken, async (req: any,
       .where('assessment_respondents.participant_id', participant.participant_id)
       .orderBy('categories.name');
 
+    // Получаем активные курсы обучения из БД
+    const courses = await knex('training_courses')
+      .select('name', 'description')
+      .where('is_active', true)
+      .orderBy('name');
+
     const llmText = await generateEmployeeRecommendations({
       employeeFullName: `${participant.first_name} ${participant.last_name}`.trim(),
       cycleName: participant.cycle_name,
       overallAverage,
       categories: avgScores.map((r: any) => ({ category: r.category_name, avgScore: Math.round(Number(r.avg_score || 0) * 100) / 100 })),
-      responses: responses.map((r: any) => ({ category: r.category_name, question: r.question_text, score: Number(r.score || 0), comment: r.comment }))
+      responses: responses.map((r: any) => ({ category: r.category_name, question: r.question_text, score: Number(r.score || 0), comment: r.comment })),
+      courses: courses.map((c: any) => ({ name: c.name, description: c.description }))
     });
 
     // Сохраняем/обновляем в assessment_reports.recommendations

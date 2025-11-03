@@ -16,12 +16,18 @@ export interface LlmResponseItem {
   comment?: string | null;
 }
 
+export interface LlmCourse {
+  name: string;
+  description: string | null;
+}
+
 export async function generateEmployeeRecommendations(params: {
   employeeFullName: string;
   cycleName: string;
   overallAverage: number;
   categories: LlmCategorySummary[];
   responses: LlmResponseItem[];
+  courses?: LlmCourse[];
 }): Promise<string> {
   const baseUrl = process.env.LLM_BASE_URL;
   const token = process.env.LLM_PROXY_TOKEN;
@@ -36,6 +42,7 @@ export async function generateEmployeeRecommendations(params: {
     'Ты HR-эксперт по развитию персонала.',
     'Проанализируй результаты 360-градусной оценки и дай персональные рекомендации на русском языке.',
     'Учитывай числовые оценки по категориям и текстовые комментарии респондентов.',
+    'При формировании рекомендаций обязательно учитывай доступные курсы обучения и предлагай конкретные курсы, которые помогут сотруднику развить выявленные зоны роста.',
     '',
     'Формат ответа (строго без лишних заголовков):',
     '',
@@ -54,6 +61,8 @@ export async function generateEmployeeRecommendations(params: {
     '- [ ] Конкретное действие с измеримым результатом',
     '- [ ] Следующий шаг с дедлайном',
     '- [ ] И так далее (5-8 пунктов)',
+    '',
+    'При формировании плана развития обязательно ссылайся на конкретные доступные курсы обучения, если они релевантны выявленным зонам роста.',
   ].join('\n');
 
   // Сокращаем данные для экономии токенов
@@ -64,6 +73,24 @@ export async function generateEmployeeRecommendations(params: {
     .map(r => `${r.category}: "${r.comment}"`)
     .join('\n');
 
+  // Формируем информацию о курсах
+  let coursesInfo = '';
+  if (params.courses && params.courses.length > 0) {
+    const coursesList = params.courses
+      .map(c => {
+        const desc = c.description ? ` (${c.description})` : '';
+        return `- ${c.name}${desc}`;
+      })
+      .join('\n');
+    coursesInfo = [
+      '',
+      'Доступные курсы обучения:',
+      coursesList,
+    ].join('\n');
+  } else {
+    coursesInfo = '\nДоступные курсы обучения: курсы не найдены';
+  }
+
   const userContent = [
     `Сотрудник: ${params.employeeFullName}`,
     `Цикл: ${params.cycleName}`,
@@ -73,6 +100,7 @@ export async function generateEmployeeRecommendations(params: {
     '',
     'Ключевые комментарии:',
     sampleComments || 'Комментарии отсутствуют',
+    coursesInfo,
   ].join('\n');
 
   const url = `${baseUrl.replace(/\/$/, '')}/api/chat`;
