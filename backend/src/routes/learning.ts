@@ -3,6 +3,7 @@
 import express from 'express';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import knex from '../database/connection';
+import { calculateEndDate } from '../services/calendar';
 
 const router = express.Router();
 
@@ -303,6 +304,39 @@ router.post('/growth-plans', authenticateToken, async (req: AuthRequest, res) =>
       })
       .returning('*');
     
+    // Получаем ID курсов для расчета общей нагрузки
+    const courseIds: number[] = [];
+    if (courseSelections && Object.keys(courseSelections).length > 0) {
+      courseIds.push(...Object.keys(courseSelections).map(id => parseInt(id)));
+    } else if (courses && courses.length > 0) {
+      courseIds.push(...courses);
+    }
+    
+    // Рассчитываем дату завершения на основе календаря
+    let endDate: Date | null = null;
+    if (courseIds.length > 0) {
+      // Получаем общее количество часов курсов
+      const courseHours = await knex('training_courses')
+        .whereIn('id', courseIds)
+        .sum('hours as total_hours')
+        .first();
+      
+      const totalHours = Number(courseHours?.total_hours || 0);
+      
+      if (totalHours > 0 && start_date && study_load_percent) {
+        const startDateObj = new Date(start_date);
+        endDate = await calculateEndDate(startDateObj, study_load_percent, totalHours);
+        
+        // Обновляем план с рассчитанной датой завершения
+        if (endDate) {
+          await knex('growth_plans')
+            .where('id', plan.id)
+            .update({ end_date: endDate.toISOString().split('T')[0] });
+          plan.end_date = endDate.toISOString().split('T')[0];
+        }
+      }
+    }
+    
     // Добавляем курсы к плану с расширенной информацией
     if (courseSelections && Object.keys(courseSelections).length > 0) {
       const courseData = Object.entries(courseSelections).map(([courseId, selection]: [string, any]) => ({
@@ -368,7 +402,31 @@ router.put('/growth-plans/:id', authenticateToken, async (req: AuthRequest, res)
       await knex('growth_plan_courses').insert(courseData);
     }
     
-    res.json(plan);
+    // Пересчитываем дату завершения при изменении параметров
+    if (start_date && study_load_percent && courses && courses.length > 0) {
+      const courseHours = await knex('training_courses')
+        .whereIn('id', courses)
+        .sum('hours as total_hours')
+        .first();
+      
+      const totalHours = Number(courseHours?.total_hours || 0);
+      
+      if (totalHours > 0) {
+        const startDateObj = new Date(start_date);
+        const endDate = await calculateEndDate(startDateObj, study_load_percent, totalHours);
+        
+        if (endDate) {
+          await knex('growth_plans')
+            .where('id', id)
+            .update({ end_date: endDate.toISOString().split('T')[0] });
+          plan.end_date = endDate.toISOString().split('T')[0];
+        }
+      }
+    }
+    
+    // Получаем обновленный план
+    const updatedPlan = await knex('growth_plans').where('id', id).first();
+    res.json(updatedPlan || plan);
   } catch (error) {
     console.error('Error updating growth plan:', error);
     res.status(500).json({ error: 'Internal server error' });

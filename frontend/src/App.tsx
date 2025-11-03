@@ -40,6 +40,7 @@ import AdminMattermost from './pages/admin/AdminMattermost';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminRoles from './pages/admin/AdminRoles';
 import AdminCompetencies from './pages/admin/AdminCompetencies';
+import AdminCalendar from './pages/admin/AdminCalendar';
 
 function App() {
   return (
@@ -283,6 +284,16 @@ function App() {
                   <Layout>
                     <AdminLayout>
                       <AdminCompetencies />
+                    </AdminLayout>
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/admin/calendar" element={
+                <PrivateRoute requiredRole="admin">
+                  <Layout>
+                    <AdminLayout>
+                      <AdminCalendar />
                     </AdminLayout>
                   </Layout>
                 </PrivateRoute>
