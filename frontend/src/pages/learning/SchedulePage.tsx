@@ -231,17 +231,41 @@ const SchedulePage: React.FC = () => {
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {course.target_level}
                         </span>
-                        {testResult ? (
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            testResult.status === 'passed'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                          }`}>
-                            {testResult.status === 'passed' ? '✅ Пройден' : '❌ Не пройден'}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">Не тестирован</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {testResult ? (
+                            <>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                testResult.status === 'passed'
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                              }`}>
+                                {testResult.status === 'passed' ? '✅ Пройден' : '❌ Не пройден'}
+                              </span>
+                              {testResult.status === 'failed' && (
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Вы уверены, что хотите пересдать тест? Результат текущего теста будет удален, и тест снова появится на странице "Тестирование".')) {
+                                      try {
+                                        await api.delete(`/learning/test-results/${testResult.id}`);
+                                        fetchSchedule(); // Обновляем список
+                                      } catch (error) {
+                                        console.error('Ошибка при удалении результата теста:', error);
+                                        alert('Не удалось удалить результат теста');
+                                      }
+                                    }
+                                  }}
+                                  className="text-xs px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                                  title="Пересдать тест"
+                                >
+                                  🔄 Пересдать
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-400">Не тестирован</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -261,7 +285,7 @@ const SchedulePage: React.FC = () => {
                       key={test.id}
                       className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                     >
-                      <div>
+                      <div className="flex-1">
                         <div className="font-medium text-gray-900 dark:text-white">
                           {test.course_name}
                         </div>
@@ -269,13 +293,34 @@ const SchedulePage: React.FC = () => {
                           {new Date(test.test_date).toLocaleDateString('ru-RU')}
                         </div>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        test.status === 'passed'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                      }`}>
-                        {test.status === 'passed' ? '✅ Пройден' : '❌ Не пройден'}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          test.status === 'passed'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                        }`}>
+                          {test.status === 'passed' ? '✅ Пройден' : '❌ Не пройден'}
+                        </span>
+                        {test.status === 'failed' && (
+                          <button
+                            onClick={async () => {
+                              if (window.confirm('Вы уверены, что хотите пересдать тест? Результат текущего теста будет удален, и тест снова появится на странице "Тестирование".')) {
+                                try {
+                                  await api.delete(`/learning/test-results/${test.id}`);
+                                  fetchSchedule(); // Обновляем список
+                                } catch (error) {
+                                  console.error('Ошибка при удалении результата теста:', error);
+                                  alert('Не удалось удалить результат теста');
+                                }
+                              }
+                            }}
+                            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
+                            title="Пересдать тест"
+                          >
+                            🔄 Пересдать
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

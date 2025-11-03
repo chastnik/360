@@ -395,19 +395,82 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
       return res.status(404).json({ error: 'Growth plan not found' });
     }
     
-    const [testResult] = await knex('test_results')
-      .insert({
-        growth_plan_id,
-        course_id,
-        status,
-        test_date,
-        notes
-      })
-      .returning('*');
+    // Проверяем, есть ли уже результат теста для этого курса
+    const existingTest = await knex('test_results')
+      .where('growth_plan_id', growth_plan_id)
+      .where('course_id', course_id)
+      .first();
     
-    res.status(201).json(testResult);
+    if (existingTest) {
+      // Обновляем существующий результат
+      const [updatedTest] = await knex('test_results')
+        .where('id', existingTest.id)
+        .update({
+          status,
+          test_date,
+          notes,
+          updated_at: knex.fn.now()
+        })
+        .returning('*');
+      
+      res.json(updatedTest);
+    } else {
+      // Создаем новый результат
+      const [testResult] = await knex('test_results')
+        .insert({
+          growth_plan_id,
+          course_id,
+          status,
+          test_date,
+          notes
+        })
+        .returning('*');
+      
+      res.status(201).json(testResult);
+    }
   } catch (error) {
     console.error('Error creating test result:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Удалить результат тестирования (для пересдачи)
+router.delete('/test-results/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    
+    // Получаем результат теста
+    const testResult = await knex('test_results')
+      .where('id', id)
+      .first();
+    
+    if (!testResult) {
+      return res.status(404).json({ error: 'Test result not found' });
+    }
+    
+    // Проверяем доступ к плану
+    let planQuery = knex('growth_plans').where('id', testResult.growth_plan_id);
+    
+    // Обычные пользователи могут удалять результаты только своих планов
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      planQuery = planQuery.where('user_id', userId);
+    }
+    
+    const plan = await planQuery.first();
+    
+    if (!plan) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Удаляем результат теста
+    await knex('test_results')
+      .where('id', id)
+      .delete();
+    
+    res.json({ success: true, message: 'Test result deleted' });
+  } catch (error) {
+    console.error('Error deleting test result:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -417,15 +480,72 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
   try {
     const userId = req.user?.id;
     
-    const matrix = await knex('competence_matrix as cm')
-      .join('competencies as c', 'cm.competency_id', 'c.id')
-      .select('cm.*', 'c.name as competency_name', 'c.description as competency_description')
-      .where('cm.user_id', userId)
-      .orderBy('c.name');
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    const matrix = await knex('competence_matrix')
+      .join('competencies', 'competence_matrix.competency_id', 'competencies.id')
+      .where('competence_matrix.user_id', userId)
+      .select(
+        'competence_matrix.id',
+        'competence_matrix.competency_id',
+        'competence_matrix.user_id',
+        'competence_matrix.level',
+        'competence_matrix.score',
+        'competence_matrix.assessment_date',
+        'competence_matrix.notes',
+        'competence_matrix.created_at',
+        'competence_matrix.updated_at',
+        'competencies.name as competency_name',
+        'competencies.description as competency_description'
+      )
+      .orderBy('competencies.name');
     
     res.json(matrix);
   } catch (error) {
     console.error('Error fetching competence matrix:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Получить матрицу компетенций всех пользователей
+router.get('/competence-matrix/all', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    // Проверяем права доступа - только админы и HR могут видеть матрицу всех пользователей
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const matrix = await knex('competence_matrix')
+      .join('competencies', 'competence_matrix.competency_id', 'competencies.id')
+      .join('users', 'competence_matrix.user_id', 'users.id')
+      .where('users.is_active', true)
+      .select(
+        'competence_matrix.id',
+        'competence_matrix.competency_id',
+        'competence_matrix.user_id',
+        'competence_matrix.level',
+        'competence_matrix.score',
+        'competence_matrix.assessment_date',
+        'competence_matrix.notes',
+        'competence_matrix.created_at',
+        'competence_matrix.updated_at',
+        'competencies.name as competency_name',
+        'competencies.description as competency_description',
+        'users.id as user_id',
+        'users.first_name',
+        'users.last_name',
+        'users.email',
+        'users.position',
+        'users.old_department as department'
+      )
+      .orderBy('users.last_name', 'users.first_name')
+      .orderBy('competencies.name');
+    
+    res.json(matrix);
+  } catch (error) {
+    console.error('Error fetching all users competence matrix:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

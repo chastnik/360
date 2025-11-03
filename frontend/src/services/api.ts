@@ -39,13 +39,24 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const requestUrl: string | undefined = error.config?.url;
       const isLoginRequest = requestUrl?.includes('/auth/login');
+      const isAuthRequest = requestUrl?.includes('/auth/me') || requestUrl?.includes('/auth/register') || requestUrl?.includes('/auth/forgot-password') || requestUrl?.includes('/auth/reset-password');
       const isOnLoginPage = window.location.pathname === '/login';
 
-      // Очищаем просроченный токен, но избегаем жёсткого редиректа во время логина
-      localStorage.removeItem('auth_token');
-
-      if (!isLoginRequest && !isOnLoginPage) {
-        window.location.href = '/login';
+      // Очищаем просроченный токен, но избегаем жёсткого редиректа во время логина/регистрации
+      // и для запросов, которые могут быть недоступны (например, некоторые learning endpoints)
+      if (!isLoginRequest && !isAuthRequest) {
+        // Не перенаправляем, если запрос специально обрабатывает ошибку через catch
+        // Перенаправляем только если это критичная ошибка авторизации на важных страницах
+        const isLearningRequest = requestUrl?.includes('/learning/');
+        const isProtectedPage = !window.location.pathname.includes('/learning') && !window.location.pathname.includes('/survey');
+        
+        if (!isLearningRequest && !isOnLoginPage && isProtectedPage) {
+          localStorage.removeItem('auth_token');
+          window.location.href = '/login';
+        } else if (isLearningRequest) {
+          // Для learning запросов не перенаправляем - пусть компоненты обрабатывают ошибку
+          console.warn('401 error on learning endpoint:', requestUrl);
+        }
       }
     }
     return Promise.reject(error);

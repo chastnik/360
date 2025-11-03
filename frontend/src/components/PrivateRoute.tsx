@@ -52,7 +52,16 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
 
   // Если требуется конкретное право, проверяем его
   if (requiredPermission) {
-    const has = permissions?.includes(requiredPermission);
+    // Если permissions еще не загружены, ждем
+    if (isLoading || permissions === undefined) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="loading-spinner w-8 h-8"></div>
+        </div>
+      );
+    }
+    
+    const has = Array.isArray(permissions) && permissions.includes(requiredPermission);
     if (!has) {
       return (
         <div className="min-h-screen flex items-center justify-center">
@@ -60,6 +69,7 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
             <h1 className="text-6xl font-bold text-red-500 mb-4">403</h1>
             <p className="text-xl text-gray-600 mb-8">Доступ запрещен</p>
             <p className="text-gray-500">У вас нет прав для просмотра этой страницы</p>
+            <p className="text-sm text-gray-400 mt-2">Требуемое право: {requiredPermission}</p>
           </div>
         </div>
       );

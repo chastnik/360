@@ -88,45 +88,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success && response.token) {
         const authToken = response.token;
+        
+        // Сначала сохраняем токен
         setToken(authToken);
         localStorage.setItem('auth_token', authToken);
         
-        // Загружаем полные данные пользователя с сервера для получения permissions
-        try {
-          const userResponse = await authAPI.getCurrentUser(authToken);
-          if (userResponse.success && userResponse.data) {
-            setUser(userResponse.data);
-            // Извлекаем permissions из ответа
-            if ((userResponse as any).permissions) {
-              setPermissions((userResponse as any).permissions);
-            } else {
-              setPermissions([]);
-            }
-          } else if (response.user) {
-            // Если не удалось загрузить полные данные, используем данные из ответа логина
-            setUser(response.user);
-            // Извлекаем permissions из корневого уровня ответа при логине
-            if ((response as any).permissions) {
-              setPermissions((response as any).permissions);
-            } else if ((response.user as any).permissions) {
-              setPermissions((response.user as any).permissions);
-            } else {
-              setPermissions([]);
-            }
+        // Используем данные пользователя из ответа логина, если они есть
+        if (response.user) {
+          setUser(response.user);
+          // Извлекаем permissions из ответа логина
+          if ((response as any).permissions) {
+            setPermissions((response as any).permissions);
+          } else if ((response.user as any).permissions) {
+            setPermissions((response.user as any).permissions);
           } else {
-            throw new Error(userResponse.error || 'Не удалось загрузить данные пользователя');
+            setPermissions([]);
           }
-        } catch (userError) {
-          console.error('Ошибка загрузки пользователя после логина:', userError);
-          // Используем данные из ответа логина как fallback
-          if (response.user) {
-            setUser(response.user);
-            if ((response as any).permissions) {
-              setPermissions((response as any).permissions);
-            } else {
-              setPermissions([]);
+          
+          // Пытаемся загрузить полные данные пользователя в фоне (не критично)
+          authAPI.getCurrentUser(authToken).then((userResponse) => {
+            if (userResponse.success && userResponse.data) {
+              setUser(userResponse.data);
+              if ((userResponse as any).permissions) {
+                setPermissions((userResponse as any).permissions);
+              }
             }
-          } else {
+          }).catch((err) => {
+            // Не критично, если не удалось - используем данные из логина
+            console.warn('Не удалось загрузить полные данные пользователя:', err);
+          });
+        } else {
+          // Если данных пользователя нет в ответе, пытаемся загрузить их
+          try {
+            const userResponse = await authAPI.getCurrentUser(authToken);
+            if (userResponse.success && userResponse.data) {
+              setUser(userResponse.data);
+              if ((userResponse as any).permissions) {
+                setPermissions((userResponse as any).permissions);
+              } else {
+                setPermissions([]);
+              }
+            } else {
+              throw new Error(userResponse.error || 'Не удалось загрузить данные пользователя');
+            }
+          } catch (userError) {
+            console.error('Ошибка загрузки пользователя после логина:', userError);
+            // Очищаем токен, если не удалось загрузить пользователя
+            setToken(null);
+            localStorage.removeItem('auth_token');
             throw new Error('Не удалось загрузить данные пользователя');
           }
         }
@@ -140,6 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Login error:', error);
       const errorMessage = error?.response?.data?.error || error?.message || 'Ошибка авторизации';
       console.error(errorMessage);
+      // Очищаем токен при ошибке
+      setToken(null);
+      localStorage.removeItem('auth_token');
       throw new Error(errorMessage);
     } finally {
       setIsLoading(false);

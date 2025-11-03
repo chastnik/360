@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 // import { Link } from 'react-router-dom';
 // Layout убран - компонент оборачивается в Layout на уровне роутинга
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext'; // Не используется
 import { 
   CategoryBarChart, 
   CategoryRadarChart, 
@@ -59,7 +59,7 @@ interface CycleAnalytics {
 }
 
 export const ReportsPage: React.FC = () => {
-  const { user } = useAuth();
+  // useAuth больше не используется
   const [activeTab, setActiveTab] = useState<'cycle' | 'users' | 'departments' | 'employee' | 'employeeTrend'>('cycle');
   const [userCompareItems, setUserCompareItems] = useState<Array<{ userId: string; cycleId?: string }>>([]);
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
@@ -85,7 +85,7 @@ export const ReportsPage: React.FC = () => {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<string | null>(null);
   const [cycleAnalytics, setCycleAnalytics] = useState<CycleAnalytics | null>(null);
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  // const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]); // Не используется
   const [comparisonData, setComparisonData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setGenerating] = useState<string | null>(null);
@@ -306,7 +306,7 @@ export const ReportsPage: React.FC = () => {
   const handleCycleChange = (cycleId: string) => {
     setSelectedCycle(cycleId);
     setCycleAnalytics(null);
-    setSelectedParticipants([]);
+    // setSelectedParticipants([]); // Не используется
     setComparisonData([]);
     loadCycleAnalytics(cycleId);
   };
@@ -364,43 +364,41 @@ export const ReportsPage: React.FC = () => {
         )}
 
         {activeTab === 'cycle' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Боковая панель с управлением */}
-          <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6" data-no-export="true" data-no-print="true">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                Управление отчетами
-              </h2>
-              
-              {/* Выбор цикла */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Выберите цикл
-                </label>
-                <select
-                  value={selectedCycle || ''}
-                  onChange={(e) => handleCycleChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Выберите цикл</option>
-                  {Array.isArray(cycles) ? cycles.map(cycle => (
-                    <option key={cycle.id} value={cycle.id}>
-                      {cycle.name}
-                    </option>
-                  )) : null}
-                </select>
-              </div>
-
-              {/* Блок "Генерация отчетов" удален по требованию */}
-
-              {/* Блок "Сравнение участников" удален по требованию */}
-
-              {/* Удален блок сохраненных отчетов по требованию */}
+        <div className="space-y-6">
+          {/* Панель фильтров сверху */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6" data-no-export="true" data-no-print="true">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+              Управление отчетами
+            </h2>
+            
+            {/* Выбор цикла */}
+            <div className="max-w-md">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Выберите цикл
+              </label>
+              <select
+                value={selectedCycle || ''}
+                onChange={(e) => handleCycleChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Выберите цикл</option>
+                {Array.isArray(cycles) ? cycles.map(cycle => (
+                  <option key={cycle.id} value={cycle.id}>
+                    {cycle.name}
+                  </option>
+                )) : null}
+              </select>
             </div>
+
+            {/* Блок "Генерация отчетов" удален по требованию */}
+
+            {/* Блок "Сравнение участников" удален по требованию */}
+
+            {/* Удален блок сохраненных отчетов по требованию */}
           </div>
 
           {/* Основная область с аналитикой */}
-          <div className="lg:col-span-2">
+          <div className="w-full">
             {!selectedCycle ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
                 <div className="text-gray-500 dark:text-gray-400 mb-4">
@@ -475,7 +473,7 @@ export const ReportsPage: React.FC = () => {
                 </div>
 
                 {/* Графики */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                   <CategoryBarChart
                     data={cycleAnalytics.categoryAverages}
                     title="Средние оценки по категориям"
@@ -489,7 +487,7 @@ export const ReportsPage: React.FC = () => {
                 {/* Блок "Сравнение участников" удален по требованию */}
 
                 {/* Список участников */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mt-6">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                     Участники цикла
                   </h3>
@@ -522,77 +520,82 @@ export const ReportsPage: React.FC = () => {
         )}
 
         {activeTab === 'users' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
+          <div className="space-y-6">
+            <div data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Подбор сотрудников</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Добавьте минимум двух сотрудников (можно из разных циклов) для сравнения</p>
-                <input
-                  value={usersQuery}
-                  onChange={e => setUsersQuery(e.target.value)}
-                  className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-                  placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
-                />
-                <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
-                  {usersAll
-                    .filter(u => {
-                      if (!usersQuery.trim()) return true;
-                      const q = usersQuery.toLowerCase();
-                      const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase();
-                      return hay.includes(q);
-                    })
-                    .slice(0, 20)
-                    .map(u => (
-                      <div key={u.id} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          <div className="font-medium">{u.first_name} {u.last_name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
-                        </div>
-                        <button
-                          onClick={() => setUserCompareItems(prev => prev.find(p => p.userId === u.id) ? prev : [...prev, { userId: u.id, cycleId: undefined }])}
-                          className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
-                        >Добавить</button>
-                      </div>
-                  ))}
-                </div>
-
-                {userCompareItems.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {userCompareItems.map((it, idx) => {
-                      const u = usersAll.find(x => x.id === it.userId);
-                      return (
-                        <div key={idx} className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                          <div className="flex items-center justify-between">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      value={usersQuery}
+                      onChange={e => setUsersQuery(e.target.value)}
+                      className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+                      placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
+                    />
+                    <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
+                      {usersAll
+                        .filter(u => {
+                          if (!usersQuery.trim()) return true;
+                          const q = usersQuery.toLowerCase();
+                          const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase();
+                          return hay.includes(q);
+                        })
+                        .slice(0, 20)
+                        .map(u => (
+                          <div key={u.id} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700">
                             <div className="text-sm text-gray-900 dark:text-white">
-                              {u ? `${u.first_name} ${u.last_name} • ${u.email}` : it.userId}
+                              <div className="font-medium">{u.first_name} {u.last_name}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
                             </div>
-                            <button onClick={() => setUserCompareItems(prev => prev.filter((_,i)=>i!==idx))} className="px-2 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded">Удалить</button>
+                            <button
+                              onClick={() => setUserCompareItems(prev => prev.find(p => p.userId === u.id) ? prev : [...prev, { userId: u.id, cycleId: undefined }])}
+                              className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
+                            >Добавить</button>
                           </div>
-                          <div className="mt-2">
-                            <select
-                              value={it.cycleId || ''}
-                              onChange={e => setUserCompareItems(prev => prev.map((p,i)=> i===idx ? { ...p, cycleId: e.target.value || undefined } : p))}
-                              className="w-full px-2 py-1 border rounded dark:bg-gray-800 dark:text-white"
-                            >
-                              <option value="">Без указания цикла (последний)</option>
-                              {cycles.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                )}
-
-                <button onClick={loadUserComparison} disabled={userCompareItems.filter(i=>i.userId).length<2} className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Сравнить сотрудников</button>
+                  <div>
+                    {userCompareItems.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Выбранные сотрудники:</h4>
+                        {userCompareItems.map((it, idx) => {
+                          const u = usersAll.find(x => x.id === it.userId);
+                          return (
+                            <div key={idx} className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  {u ? `${u.first_name} ${u.last_name} • ${u.email}` : it.userId}
+                                </div>
+                                <button onClick={() => setUserCompareItems(prev => prev.filter((_,i)=>i!==idx))} className="px-2 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded">Удалить</button>
+                              </div>
+                              <div className="mt-2">
+                                <select
+                                  value={it.cycleId || ''}
+                                  onChange={e => setUserCompareItems(prev => prev.map((p,i)=> i===idx ? { ...p, cycleId: e.target.value || undefined } : p))}
+                                  className="w-full px-2 py-1 border rounded dark:bg-gray-800 dark:text-white"
+                                >
+                                  <option value="">Без указания цикла (последний)</option>
+                                  {cycles.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <button onClick={loadUserComparison} disabled={userCompareItems.filter(i=>i.userId).length<2} className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Сравнить сотрудников</button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="lg:col-span-2">
+            <div className="w-full">
               {comparisonData.length>0 ? (
                 <div id="report-users" className="space-y-6">
                   {/* Кнопки экспорта и печати */}
@@ -617,7 +620,9 @@ export const ReportsPage: React.FC = () => {
                     </button>
                   </div>
                   <ComparisonChart data={comparisonData as any} title="Сравнение сотрудников (столбцы)" />
-                  <OverlayRadarChart data={comparisonData as any} title="Сравнение профилей (радар)" />
+                  <div className="mt-6">
+                    <OverlayRadarChart data={comparisonData as any} title="Сравнение профилей (радар)" />
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">Добавьте сотрудников и нажмите "Сравнить"</div>
@@ -627,59 +632,63 @@ export const ReportsPage: React.FC = () => {
         )}
 
         {activeTab === 'employee' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             {/* Справочник сотрудников + выбор цикла */}
-            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
+            <div data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор сотрудника</h3>
-                <input
-                  value={usersQuery}
-                  onChange={e => setUsersQuery(e.target.value)}
-                  className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-                  placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
-                />
-                <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
-                  {usersAll
-                    .filter(u => {
-                      if (!usersQuery.trim()) return true;
-                      const q = usersQuery.toLowerCase();
-                      const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase();
-                      return hay.includes(q);
-                    })
-                    .slice(0, 20)
-                    .map(u => (
-                      <button
-                        key={u.id}
-                        onClick={() => { setEmployeeUserId(String(u.id)); }}
-                        className={`w-full text-left px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700 ${employeeUserId===u.id?'bg-gray-100 dark:bg-gray-700':''}`}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <input
+                      value={usersQuery}
+                      onChange={e => setUsersQuery(e.target.value)}
+                      className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+                      placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
+                    />
+                    <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
+                      {usersAll
+                        .filter(u => {
+                          if (!usersQuery.trim()) return true;
+                          const q = usersQuery.toLowerCase();
+                          const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase();
+                          return hay.includes(q);
+                        })
+                        .slice(0, 20)
+                        .map(u => (
+                          <button
+                            key={u.id}
+                            onClick={() => { setEmployeeUserId(String(u.id)); }}
+                            className={`w-full text-left px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700 ${employeeUserId===u.id?'bg-gray-100 dark:bg-gray-700':''}`}
+                          >
+                            <div className="text-sm text-gray-900 dark:text-white font-medium">{u.first_name} {u.last_name}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
+                          </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Цикл (опционально)</label>
+                      <select
+                        value={employeeCycleId || ''}
+                        onChange={(e)=> setEmployeeCycleId(e.target.value || null)}
+                        className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
                       >
-                        <div className="text-sm text-gray-900 dark:text-white font-medium">{u.first_name} {u.last_name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
-                      </button>
-                  ))}
+                        <option value="">Последний</option>
+                        {cycles.map(c=>(<option key={c.id} value={c.id}>{c.name}</option>))}
+                      </select>
+                    </div>
+                    <button onClick={loadEmployeeAnalytics} disabled={!employeeUserId} className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Показать аналитику</button>
+                  </div>
                 </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Цикл (опционально)</label>
-                  <select
-                    value={employeeCycleId || ''}
-                    onChange={(e)=> setEmployeeCycleId(e.target.value || null)}
-                    className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="">Последний</option>
-                    {cycles.map(c=>(<option key={c.id} value={c.id}>{c.name}</option>))}
-                  </select>
-                </div>
-
-                <button onClick={loadEmployeeAnalytics} disabled={!employeeUserId} className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Показать аналитику</button>
               </div>
             </div>
 
             {/* Вывод аналитики */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="w-full space-y-6">
               {!employeeData ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">Выберите сотрудника и нажмите "Показать аналитику"</div>
               ) : (
@@ -714,7 +723,7 @@ export const ReportsPage: React.FC = () => {
                     <OverallScoreDisplay score={Number(employeeData?.overallAverage || 0)} title="Общий средний балл" />
                     <ScoreDistributionChart title="Распределение оценок" distribution={(()=>{const init:any={1:0,2:0,3:0,4:0,5:0}; (employeeData?.scoreDistribution||[]).forEach((d:any)=>{const s=Number(d.score); if(init[s]!==undefined) init[s]=Number(d.count||0)}); return init;})()} />
                   </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                     <CategoryBarChart data={(employeeData?.avgScores||[]).map((x:any,i:number)=>({id:i,name:x.category,color:x.color,average:Number(x.avgScore||0),count:0}))} title="Средние оценки по категориям" />
                     <CategoryRadarChart data={(employeeData?.avgScores||[]).map((x:any,i:number)=>({id:i,name:x.category,color:x.color,average:Number(x.avgScore||0),count:0}))} title="Профиль компетенций" />
                   </div>
@@ -743,11 +752,13 @@ export const ReportsPage: React.FC = () => {
                     });
                   });
                   return (
-                    <HeatmapGrid rows={categories} columns={responders} values={values} title="Тепловая карта компетенций (по респондентам)" />
+                    <div className="mt-6">
+                      <HeatmapGrid rows={categories} columns={responders} values={values} title="Тепловая карта компетенций (по респондентам)" />
+                    </div>
                   );
                 })()}
                   {/* AI рекомендации — перед блоком ответов */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mt-6">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white">AI рекомендации</h3>
                       <button
@@ -789,14 +800,14 @@ export const ReportsPage: React.FC = () => {
                       <div className="markdown-body leading-7 text-gray-800 dark:text-gray-100">
                         <ReactMarkdown
                           components={{
-                            h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white" {...props} />,
-                            h2: ({node, ...props}) => <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white" {...props} />,
-                            h3: ({node, ...props}) => <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white" {...props} />,
+                            h1: ({node, children, ...props}) => <h1 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white" {...props}>{children || ''}</h1>,
+                            h2: ({node, children, ...props}) => <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white" {...props}>{children || ''}</h2>,
+                            h3: ({node, children, ...props}) => <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white" {...props}>{children || ''}</h3>,
                             p: ({node, ...props}) => <p className="mb-3 whitespace-pre-line text-gray-800 dark:text-gray-100" {...props} />,
                             ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
                             ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
                             li: ({node, ...props}) => <li className="mb-1 text-gray-800 dark:text-gray-100" {...props} />,
-                            a: ({node, ...props}) => <a className="underline text-blue-600 dark:text-blue-400" target="_blank" rel="noreferrer" {...props} />,
+                            a: ({node, children, ...props}) => <a className="underline text-blue-600 dark:text-blue-400" target="_blank" rel="noreferrer" {...props}>{children || props.href || ''}</a>,
                             strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
                             code: ({node, inline, ...props}: any) => inline
                               ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />
@@ -810,7 +821,7 @@ export const ReportsPage: React.FC = () => {
                       <div className="text-gray-500 dark:text-gray-400 text-sm">Рекомендации ещё не сформированы.</div>
                     )}
                   </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mt-6">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Ответы респондентов</h3>
                     {/* Панель фильтрации/сортировки */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
@@ -881,57 +892,63 @@ export const ReportsPage: React.FC = () => {
         )}
 
         {activeTab === 'employeeTrend' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
             {/* Выбор сотрудника */}
-            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
+            <div data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор сотрудника</h3>
-                <input
-                  value={usersQuery}
-                  onChange={e => setUsersQuery(e.target.value)}
-                  className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-                  placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
-                />
-                <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
-                  {usersAll
-                    .filter(u => {
-                      if (!usersQuery.trim()) return true;
-                      const q = usersQuery.toLowerCase();
-                      const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase();
-                      return hay.includes(q);
-                    })
-                    .slice(0, 20)
-                    .map(u => (
-                      <button
-                        key={u.id}
-                        onClick={() => { setEmployeeUserId(u.id); }}
-                        className={`w-full text-left px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700 ${employeeUserId===u.id?'bg-gray-100 dark:bg-gray-700':''}`}
-                      >
-                        <div className="text-sm text-gray-900 dark:text-white font-medium">{u.first_name} {u.last_name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
-                      </button>
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <input
+                      value={usersQuery}
+                      onChange={e => setUsersQuery(e.target.value)}
+                      className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+                      placeholder="Поиск: имя, фамилия, email, должность, Mattermost..."
+                    />
+                    <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
+                      {usersAll
+                        .filter(u => {
+                          if (!usersQuery.trim()) return true;
+                          const q = usersQuery.toLowerCase();
+                          const hay = [u.first_name, u.last_name, u.email, u.position, u.old_department, u.mattermost_username]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase();
+                          return hay.includes(q);
+                        })
+                        .slice(0, 20)
+                        .map(u => (
+                          <button
+                            key={u.id}
+                            onClick={() => { setEmployeeUserId(u.id); }}
+                            className={`w-full text-left px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700 ${employeeUserId===u.id?'bg-gray-100 dark:bg-gray-700':''}`}
+                          >
+                            <div className="text-sm text-gray-900 dark:text-white font-medium">{u.first_name} {u.last_name}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}</div>
+                          </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <button onClick={async ()=>{
+                      if (!employeeUserId) return;
+                      try {
+                        setGenerating('trend');
+                        const res = await reportsAPI.getEmployeeTrend(employeeUserId, true);
+                        setEmployeeData(res as any);
+                        setError(null);
+                      } catch (e) {
+                        setError('Не удалось загрузить динамику');
+                      } finally {
+                        setGenerating(null);
+                      }
+                    }} disabled={!employeeUserId} className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Показать динамику</button>
+                  </div>
                 </div>
-                <button onClick={async ()=>{
-                  if (!employeeUserId) return;
-                  try {
-                    setGenerating('trend');
-                    const res = await reportsAPI.getEmployeeTrend(employeeUserId, true);
-                    setEmployeeData(res as any);
-                    setError(null);
-                  } catch (e) {
-                    setError('Не удалось загрузить динамику');
-                  } finally {
-                    setGenerating(null);
-                  }
-                }} disabled={!employeeUserId} className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium disabled:opacity-50">Показать динамику</button>
               </div>
             </div>
             {/* Вывод динамики */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="w-full space-y-6">
               {(() => {
                 const items = (employeeData as any)?.items as Array<any> | undefined;
                 if (!Array.isArray(items)) {
@@ -969,7 +986,7 @@ export const ReportsPage: React.FC = () => {
                       </button>
                     </div>
                     <OverallScoreDisplay compact score={Number(items[items.length-1].overallAverage || 0)} title="Текущий общий балл (последний цикл)" />
-                    <div className="grid grid-cols-1 gap-6">
+                    <div className="grid grid-cols-1 gap-6 mt-6">
                       {(() => {
                         // Считаем ранги (места) каждой оценки 1..5 по каждому циклу
                         // Ранг 1 — самая частая оценка в цикле; 5 — наименее частая
@@ -1004,7 +1021,7 @@ export const ReportsPage: React.FC = () => {
                         );
                       })()}
                     </div>
-                    <div className="grid grid-cols-1 gap-6">
+                    <div className="grid grid-cols-1 gap-6 mt-6">
                       <TrendChart data={trendData} title="Динамика общего среднего по циклам" />
                     </div>
                     {/* Динамика по категориям (сплайны) */}
@@ -1023,11 +1040,13 @@ export const ReportsPage: React.FC = () => {
                       });
                       const categories = categoryList.map((key, idx) => ({ key }));
                       return (
-                        <CategoryTrendSplineChart data={series} categories={categories} title="Динамика по категориям" />
+                        <div className="mt-6">
+                          <CategoryTrendSplineChart data={series} categories={categories} title="Динамика по категориям" />
+                        </div>
                       );
                     })()}
                     {/* Табличное представление по циклам до уровня ответов */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mt-6">
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Детализация по циклам</h3>
                       <div className="space-y-3">
                         {items.map((it:any, idx:number)=> {
@@ -1089,61 +1108,68 @@ export const ReportsPage: React.FC = () => {
         )}
 
         {activeTab === 'departments' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1" data-no-export="true" data-no-print="true">
+          <div className="space-y-6">
+            <div data-no-export="true" data-no-print="true">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">Выбор отделов</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Выберите отделы из справочника</p>
-                <input
-                  value={departmentsQuery}
-                  onChange={e => setDepartmentsQuery(e.target.value)}
-                  className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
-                  placeholder="Поиск отдела: название, код, руководитель..."
-                />
-                <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
-                  {departmentsAll
-                    .filter(d => {
-                      if (!departmentsQuery.trim()) return true;
-                      const q = departmentsQuery.toLowerCase();
-                      const hay = [d.name, d.description, d.code, d.head_name]
-                        .filter(Boolean)
-                        .join(' ')
-                        .toLowerCase();
-                      return hay.includes(q);
-                    })
-                    .slice(0, 20)
-                    .map(d => (
-                      <div key={d.id} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          <div className="font-medium">{d.name}{d.code ? ` • ${d.code}` : ''}</div>
-                          {d.head_name && (<div className="text-xs text-gray-500 dark:text-gray-400">Руководитель: {d.head_name}</div>)}
-                        </div>
-                        <button
-                          onClick={() => setDepartmentIds(prev => prev.includes(d.id) ? prev : [...prev, d.id])}
-                          className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
-                        >Добавить</button>
-                      </div>
-                  ))}
-                </div>
-
-                {departmentIds.length > 0 && (
-                  <div className="mt-3 space-y-1">
-                    {departmentIds.map((id, idx) => {
-                      const d = departmentsAll.find(x => x.id === id);
-                      return (
-                        <div key={id} className="flex items-center justify-between px-2 py-1 bg-gray-50 dark:bg-gray-700 rounded">
-                          <span className="text-sm text-gray-900 dark:text-white">{d ? d.name : id}</span>
-                          <button onClick={() => setDepartmentIds(prev => prev.filter((_,i)=>i!==idx))} className="px-2 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded">Удалить</button>
-                        </div>
-                      );
-                    })}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      value={departmentsQuery}
+                      onChange={e => setDepartmentsQuery(e.target.value)}
+                      className="w-full mb-2 px-3 py-2 border rounded dark:bg-gray-700 dark:text-white"
+                      placeholder="Поиск отдела: название, код, руководитель..."
+                    />
+                    <div className="max-h-60 overflow-auto border border-gray-200 dark:border-gray-700 rounded">
+                      {departmentsAll
+                        .filter(d => {
+                          if (!departmentsQuery.trim()) return true;
+                          const q = departmentsQuery.toLowerCase();
+                          const hay = [d.name, d.description, d.code, d.head_name]
+                            .filter(Boolean)
+                            .join(' ')
+                            .toLowerCase();
+                          return hay.includes(q);
+                        })
+                        .slice(0, 20)
+                        .map(d => (
+                          <div key={d.id} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-700">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              <div className="font-medium">{d.name}{d.code ? ` • ${d.code}` : ''}</div>
+                              {d.head_name && (<div className="text-xs text-gray-500 dark:text-gray-400">Руководитель: {d.head_name}</div>)}
+                            </div>
+                            <button
+                              onClick={() => setDepartmentIds(prev => prev.includes(d.id) ? prev : [...prev, d.id])}
+                              className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
+                            >Добавить</button>
+                          </div>
+                      ))}
+                    </div>
                   </div>
-                )}
-
-                <button onClick={loadDepartmentsComparison} className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium">Сравнить отделы</button>
+                  <div>
+                    {departmentIds.length > 0 && (
+                      <div className="mb-3">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Выбранные отделы:</h4>
+                        <div className="space-y-1 max-h-48 overflow-auto">
+                          {departmentIds.map((id, idx) => {
+                            const d = departmentsAll.find(x => x.id === id);
+                            return (
+                              <div key={id} className="flex items-center justify-between px-2 py-1 bg-gray-50 dark:bg-gray-700 rounded">
+                                <span className="text-sm text-gray-900 dark:text-white">{d ? d.name : id}</span>
+                                <button onClick={() => setDepartmentIds(prev => prev.filter((_,i)=>i!==idx))} className="px-2 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded">Удалить</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <button onClick={loadDepartmentsComparison} className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium">Сравнить отделы</button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="lg:col-span-2">
+            <div className="w-full">
               {departmentsData.length>0 ? (
                 <div id="report-departments" className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                   {/* Кнопки экспорта и печати */}

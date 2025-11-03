@@ -1,12 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 
-interface CompetenceMatrix {
+interface CompetenceMatrixEntry {
   id: number;
-  competency_id: string; // UUID в базе данных
+  competency_id: string;
   competency_name: string;
   competency_description: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_position?: string;
+  user_department?: string;
   level: 'junior' | 'middle' | 'senior';
   score: number;
   assessment_date: string;
@@ -14,31 +19,30 @@ interface CompetenceMatrix {
 }
 
 interface Competency {
-  id: string; // UUID в базе данных
+  id: string;
   name: string;
   description: string;
   is_active?: boolean;
 }
 
+interface User {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  position?: string;
+  department?: string;
+}
+
 const CompetenceMatrixPage: React.FC = () => {
-  const [matrix, setMatrix] = useState<CompetenceMatrix[]>([]);
+  const [matrixData, setMatrixData] = useState<CompetenceMatrixEntry[]>([]);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
-  const [selectedCompetency, setSelectedCompetency] = useState<Competency | null>(null);
-  
-  // Form states for assessment modal
-  const [assessmentFormData, setAssessmentFormData] = useState({
-    competency_id: '',
-    user_id: '',
-    level: 'middle' as 'junior' | 'middle' | 'senior',
-    score: 50,
-    assessment_date: new Date().toISOString().split('T')[0],
-    notes: ''
-  });
-  const [users, setUsers] = useState<any[]>([]);
-  const [assessmentFormErrors, setAssessmentFormErrors] = useState<{[key: string]: string}>({});
-  const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedCompetencyIds, setSelectedCompetencyIds] = useState<string[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [competencySearchQuery, setCompetencySearchQuery] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -46,10 +50,14 @@ const CompetenceMatrixPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [matrixResponse, competenciesResponse, usersResponse] = await Promise.all([
-        api.get('/learning/competence-matrix').catch(err => {
+      setLoading(true);
+      
+      // Загружаем матрицу компетенций всех пользователей
+      const [matrixResponse, competenciesResponse, usersResponse, growthPlansResponse] = await Promise.all([
+        api.get('/learning/competence-matrix/all').catch(err => {
           console.error('Matrix API error:', err);
-          return { data: [] };
+          // Если нет прав, пробуем получить только свои компетенции
+          return api.get('/learning/competence-matrix').catch(() => ({ data: [] }));
         }),
         api.get('/learning/competencies').catch(err => {
           console.error('Competencies API error:', err);
@@ -58,16 +66,93 @@ const CompetenceMatrixPage: React.FC = () => {
         api.get('/learning/users').catch(err => {
           console.error('Users API error:', err);
           return { data: [] };
+        }),
+        api.get('/learning/growth-plans').catch(err => {
+          console.error('Growth plans API error:', err);
+          return { data: [] };
         })
       ]);
+
+      let matrixEntries: CompetenceMatrixEntry[] = [];
       
-      setMatrix(Array.isArray(matrixResponse.data) ? matrixResponse.data : []);
+      // Обрабатываем данные матрицы
+      const matrixItems = Array.isArray(matrixResponse.data) ? matrixResponse.data : [];
+      matrixItems.forEach((item: any) => {
+        matrixEntries.push({
+          id: item.id,
+          competency_id: item.competency_id,
+          competency_name: item.competency_name,
+          competency_description: item.competency_description || '',
+          user_id: item.user_id,
+          user_name: item.first_name && item.last_name 
+            ? `${item.last_name} ${item.first_name}` 
+            : item.email || '',
+          user_email: item.email || '',
+          user_position: item.position,
+          user_department: item.department,
+          level: item.level,
+          score: item.score || 0,
+          assessment_date: item.assessment_date,
+          notes: item.notes
+        });
+      });
+
+      // Обрабатываем компетенции из пройденных тестов
+      const growthPlans = Array.isArray(growthPlansResponse.data) ? growthPlansResponse.data : [];
+      const competenciesList = Array.isArray(competenciesResponse.data) ? competenciesResponse.data : [];
       
-      // Обрабатываем ответ от learning API (возвращает данные напрямую)
-      const competenciesData = competenciesResponse.data;
-      setCompetencies(Array.isArray(competenciesData) ? competenciesData : []);
-      
-      // Устанавливаем пользователей
+      growthPlans.forEach((plan: any) => {
+        if (Array.isArray(plan.test_results) && Array.isArray(plan.courses)) {
+          plan.test_results.forEach((testResult: any) => {
+            if (testResult.status === 'passed' && testResult.course_id) {
+              const course = plan.courses.find((c: any) => c.id === testResult.course_id);
+              
+              if (course) {
+                // Ищем компетенцию по названию
+                let matchedCompetency: Competency | null = null;
+                matchedCompetency = competenciesList.find((comp: any) => 
+                  comp.name && course.name && 
+                  (comp.name.toLowerCase().includes(course.name.toLowerCase()) ||
+                   course.name.toLowerCase().includes(comp.name.toLowerCase()))
+                );
+                
+                // Проверяем, есть ли уже запись в матрице
+                const existingEntry = matrixEntries.find(
+                  (e: CompetenceMatrixEntry) => 
+                    e.user_id === plan.user_id &&
+                    ((matchedCompetency && e.competency_id === matchedCompetency.id) ||
+                     (!matchedCompetency && e.competency_name === course.name))
+                );
+                
+                if (!existingEntry) {
+                  const userName = plan.first_name && plan.last_name 
+                    ? `${plan.last_name} ${plan.first_name}` 
+                    : plan.email || '';
+                  
+                  matrixEntries.push({
+                    id: `test-${testResult.id}` as any,
+                    competency_id: matchedCompetency?.id || `course-${course.id}`,
+                    competency_name: matchedCompetency?.name || course.name,
+                    competency_description: matchedCompetency?.description || course.description || '',
+                    user_id: plan.user_id,
+                    user_name: userName,
+                    user_email: plan.email || '',
+                    user_position: plan.position,
+                    user_department: plan.department,
+                    level: course.target_level as 'junior' | 'middle' | 'senior',
+                    score: 75,
+                    assessment_date: testResult.test_date,
+                    notes: `Получено через успешное прохождение теста по курсу "${course.name}"`
+                  });
+                }
+              }
+            }
+          });
+        }
+      });
+
+      setMatrixData(matrixEntries);
+      setCompetencies(competenciesList);
       setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
       
     } catch (error) {
@@ -76,6 +161,102 @@ const CompetenceMatrixPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Фильтруем пользователей для поиска
+  const filteredUsers = useMemo(() => {
+    if (!userSearchQuery) return users;
+    const query = userSearchQuery.toLowerCase();
+    return users.filter(user => 
+      `${user.last_name} ${user.first_name}`.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query) ||
+      (user.position && user.position.toLowerCase().includes(query))
+    );
+  }, [users, userSearchQuery]);
+
+  // Фильтруем компетенции для поиска
+  const filteredCompetencies = useMemo(() => {
+    if (!competencySearchQuery) return competencies;
+    const query = competencySearchQuery.toLowerCase();
+    return competencies.filter(comp => 
+      comp.name.toLowerCase().includes(query) ||
+      (comp.description && comp.description.toLowerCase().includes(query))
+    );
+  }, [competencies, competencySearchQuery]);
+
+  // Получаем уникальный список компетенций из матрицы
+  const uniqueCompetencies = useMemo(() => {
+    const compMap = new Map<string, Competency>();
+    matrixData.forEach(entry => {
+      if (!compMap.has(entry.competency_id)) {
+        compMap.set(entry.competency_id, {
+          id: entry.competency_id,
+          name: entry.competency_name,
+          description: entry.competency_description
+        });
+      }
+    });
+    return Array.from(compMap.values());
+  }, [matrixData]);
+
+  // Получаем уникальный список пользователей из матрицы
+  const uniqueUsers = useMemo(() => {
+    const userMap = new Map<string, User>();
+    matrixData.forEach(entry => {
+      if (!userMap.has(entry.user_id)) {
+        userMap.set(entry.user_id, {
+          id: entry.user_id,
+          first_name: entry.user_name.split(' ')[1] || '',
+          last_name: entry.user_name.split(' ')[0] || '',
+          email: entry.user_email,
+          position: entry.user_position,
+          department: entry.user_department
+        });
+      }
+    });
+    return Array.from(userMap.values());
+  }, [matrixData]);
+
+  // Фильтруем данные матрицы
+  const filteredMatrix = useMemo(() => {
+    let filtered = matrixData;
+
+    // Фильтр по пользователям
+    if (selectedUserIds.length > 0) {
+      filtered = filtered.filter(entry => selectedUserIds.includes(entry.user_id));
+    }
+
+    // Фильтр по компетенциям (показываем сотрудников, у которых есть хотя бы одна из выбранных)
+    if (selectedCompetencyIds.length > 0) {
+      const userIdsWithSelectedCompetencies = new Set<string>();
+      filtered.forEach(entry => {
+        if (selectedCompetencyIds.includes(entry.competency_id)) {
+          userIdsWithSelectedCompetencies.add(entry.user_id);
+        }
+      });
+      filtered = filtered.filter(entry => userIdsWithSelectedCompetencies.has(entry.user_id));
+    }
+
+    return filtered;
+  }, [matrixData, selectedUserIds, selectedCompetencyIds]);
+
+  // Группируем данные по пользователям
+  const matrixByUser = useMemo(() => {
+    const userMap = new Map<string, Map<string, CompetenceMatrixEntry>>();
+    
+    filteredMatrix.forEach(entry => {
+      if (!userMap.has(entry.user_id)) {
+        userMap.set(entry.user_id, new Map());
+      }
+      const userCompetencies = userMap.get(entry.user_id)!;
+      // Если компетенция уже есть, берем более свежую
+      const existing = userCompetencies.get(entry.competency_id);
+      if (!existing || new Date(entry.assessment_date) > new Date(existing.assessment_date)) {
+        userCompetencies.set(entry.competency_id, entry);
+      }
+    });
+
+    return userMap;
+  }, [filteredMatrix]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -102,77 +283,20 @@ const CompetenceMatrixPage: React.FC = () => {
     return 'text-red-600 dark:text-red-400';
   };
 
-  const getScoreBarColor = (score: number) => {
-    if (score >= 80) return 'bg-green-500';
-    if (score >= 60) return 'bg-blue-500';
-    if (score >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
-  const getSuggestedLevelByScore = (score: number): 'junior' | 'middle' | 'senior' => {
-    if (score >= 75) return 'senior';
-    if (score >= 50) return 'middle';
-    return 'junior';
-  };
-
-  const getStatistics = () => {
-    const total = matrix.length;
-    const junior = matrix.filter(m => m.level === 'junior').length;
-    const middle = matrix.filter(m => m.level === 'middle').length;
-    const senior = matrix.filter(m => m.level === 'senior').length;
-    const avgScore = total > 0 ? Math.round(matrix.reduce((sum, m) => sum + m.score, 0) / total) : 0;
-
-    return { total, junior, middle, senior, avgScore };
-  };
-
-  const handleAssessmentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingAssessment(true);
-    setAssessmentFormErrors({});
-
-    try {
-      await api.post('/learning/competence-matrix', {
-        competency_id: assessmentFormData.competency_id || selectedCompetency?.id,
-        user_id: assessmentFormData.user_id,
-        level: assessmentFormData.level,
-        score: assessmentFormData.score,
-        assessment_date: assessmentFormData.assessment_date,
-        notes: assessmentFormData.notes || null
-      });
-      
-      setShowAssessmentModal(false);
-      setSelectedCompetency(null);
-      setAssessmentFormData({
-        competency_id: '',
-        user_id: '',
-        level: 'middle',
-        score: 50,
-        assessment_date: new Date().toISOString().split('T')[0],
-        notes: ''
-      });
-      fetchData();
-    } catch (error) {
-      console.error('Error adding assessment:', error);
-      setAssessmentFormErrors({
-        general: 'Произошла ошибка при сохранении оценки'
-      });
-    } finally {
-      setIsSubmittingAssessment(false);
-    }
-  };
-
-  const handleAddAssessment = async (formData: any) => {
-    try {
-      await api.post('/learning/competence-matrix', {
-        ...formData,
-        competency_id: selectedCompetency?.id
-      });
-      setShowAssessmentModal(false);
-      setSelectedCompetency(null);
-      fetchData();
-    } catch (error) {
-      console.error('Error adding assessment:', error);
-    }
+  const toggleCompetencySelection = (competencyId: string) => {
+    setSelectedCompetencyIds(prev => 
+      prev.includes(competencyId)
+        ? prev.filter(id => id !== competencyId)
+        : [...prev, competencyId]
+    );
   };
 
   if (loading) {
@@ -183,407 +307,215 @@ const CompetenceMatrixPage: React.FC = () => {
     );
   }
 
-  const stats = getStatistics();
+  const sortedUsers = Array.from(matrixByUser.keys())
+    .map(userId => uniqueUsers.find(u => u.id === userId))
+    .filter((u): u is User => u !== undefined)
+    .sort((a, b) => {
+      const nameA = `${a.last_name} ${a.first_name}`;
+      const nameB = `${b.last_name} ${b.first_name}`;
+      return nameA.localeCompare(nameB);
+    });
+
+  const sortedCompetencies = uniqueCompetencies.sort((a, b) => 
+    a.name.localeCompare(b.name)
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            🧠 Матрица компетенций
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Оценка профессиональных компетенций
-          </p>
-        </div>
-        <button
-          onClick={() => setShowAssessmentModal(true)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
-        >
-          <span className="mr-2">➕</span>
-          Добавить оценку
-        </button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          🧠 Матрица компетенций
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Просмотр компетенций всех сотрудников
+        </p>
       </div>
 
-      {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="text-3xl mr-4">📊</div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Оцененных компетенций</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="text-3xl mr-4">📈</div>
-            <div>
-              <div className={`text-2xl font-bold ${getScoreColor(stats.avgScore)}`}>{stats.avgScore}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Средний балл</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="text-3xl mr-4">🌳</div>
-            <div>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.senior}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Senior</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="text-3xl mr-4">🌿</div>
-            <div>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.middle}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Middle</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Матрица компетенций */}
-      <div className="grid gap-6">
-        {matrix.map((item) => (
-          <div
-            key={item.id}
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {item.competency_name}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  {item.competency_description}
-                </p>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getLevelColor(item.level)}`}>
-                {getLevelIcon(item.level)} {item.level}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Уровень</div>
-                <div className="font-medium text-gray-900 dark:text-white flex items-center">
-                  {getLevelIcon(item.level)} {item.level}
+      {/* Фильтры */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Фильтр по сотрудникам */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Поиск сотрудников
+            </label>
+            <input
+              type="text"
+              value={userSearchQuery}
+              onChange={(e) => setUserSearchQuery(e.target.value)}
+              placeholder="Введите имя, email или должность..."
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white mb-3"
+            />
+            <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md">
+              {filteredUsers.length === 0 ? (
+                <div className="p-3 text-gray-500 dark:text-gray-400 text-sm">
+                  Сотрудники не найдены
                 </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Балл</div>
-                <div className={`font-medium ${getScoreColor(item.score)}`}>
-                  {item.score}/100
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Дата оценки</div>
-                <div className="font-medium text-gray-900 dark:text-white">
-                  {new Date(item.assessment_date).toLocaleDateString('ru-RU')}
-                </div>
-              </div>
+              ) : (
+                filteredUsers.map(user => (
+                  <label
+                    key={user.id}
+                    className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIds.includes(user.id)}
+                      onChange={() => toggleUserSelection(user.id)}
+                      className="mr-2 text-blue-500"
+                    />
+                    <span className="text-sm text-gray-900 dark:text-white">
+                      {user.last_name} {user.first_name}
+                      {user.position && <span className="text-gray-500 dark:text-gray-400 ml-2">({user.position})</span>}
+                    </span>
+                  </label>
+                ))
+              )}
             </div>
-
-            {/* Прогресс-бар */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Уровень компетенции
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {item.score}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full ${getScoreBarColor(item.score)}`}
-                  style={{ width: `${item.score}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {item.notes && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <div className="text-sm font-medium text-blue-800 dark:text-blue-400 mb-2">
-                  📝 Заметки
-                </div>
-                <div className="text-blue-700 dark:text-blue-300">
-                  {item.notes}
-                </div>
-              </div>
+            {selectedUserIds.length > 0 && (
+              <button
+                onClick={() => setSelectedUserIds([])}
+                className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Очистить выбранные ({selectedUserIds.length})
+              </button>
             )}
           </div>
-        ))}
-      </div>
 
-      {/* Компетенции без оценки */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          📋 Компетенции без оценки
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {competencies.map((competency) => {
-            const hasAssessment = matrix.some(m => m.competency_id === competency.id);
-            if (hasAssessment) return null;
-
-            return (
-              <div
-                key={competency.id}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-2 border-dashed border-gray-300 dark:border-gray-600"
+          {/* Фильтр по компетенциям */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Поиск компетенций
+            </label>
+            <input
+              type="text"
+              value={competencySearchQuery}
+              onChange={(e) => setCompetencySearchQuery(e.target.value)}
+              placeholder="Введите название компетенции..."
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white mb-3"
+            />
+            <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md">
+              {filteredCompetencies.length === 0 ? (
+                <div className="p-3 text-gray-500 dark:text-gray-400 text-sm">
+                  Компетенции не найдены
+                </div>
+              ) : (
+                filteredCompetencies.map(comp => (
+                  <label
+                    key={comp.id}
+                    className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCompetencyIds.includes(comp.id)}
+                      onChange={() => toggleCompetencySelection(comp.id)}
+                      className="mr-2 text-blue-500"
+                    />
+                    <span className="text-sm text-gray-900 dark:text-white">
+                      {comp.name}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+            {selectedCompetencyIds.length > 0 && (
+              <button
+                onClick={() => setSelectedCompetencyIds([])}
+                className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
               >
-                <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-                  {competency.name}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-                  {competency.description}
-                </p>
-                <button
-                  onClick={() => {
-                    setSelectedCompetency(competency);
-                    setShowAssessmentModal(true);
-                  }}
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm"
-                >
-                  📝 Добавить оценку
-                </button>
-              </div>
-            );
-          })}
+                Очистить выбранные ({selectedCompetencyIds.length})
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {matrix.length === 0 && (
-        <div className="text-center py-12">
+      {/* Таблица матрицы */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-700 z-10">
+                  Сотрудник
+                </th>
+                {sortedCompetencies.map(comp => (
+                  <th
+                    key={comp.id}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]"
+                    title={comp.description}
+                  >
+                    <div className="truncate">{comp.name}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {sortedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={sortedCompetencies.length + 1} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                    Нет данных для отображения
+                  </td>
+                </tr>
+              ) : (
+                sortedUsers.map(user => {
+                  const userCompetencies = matrixByUser.get(user.id) || new Map();
+                  return (
+                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800 z-10 border-r border-gray-200 dark:border-gray-700">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {user.last_name} {user.first_name}
+                        </div>
+                        {user.position && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {user.position}
+                          </div>
+                        )}
+                        {user.email && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            {user.email}
+                          </div>
+                        )}
+                      </td>
+                      {sortedCompetencies.map(comp => {
+                        const entry = userCompetencies.get(comp.id);
+                        return (
+                          <td key={comp.id} className="px-4 py-3 text-center">
+                            {entry ? (
+                              <div className="flex flex-col items-center">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getLevelColor(entry.level)}`}>
+                                  {getLevelIcon(entry.level)} {entry.level}
+                                </span>
+                                <span className={`text-xs font-medium mt-1 ${getScoreColor(entry.score)}`}>
+                                  {entry.score}/100
+                                </span>
+                                <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                  {new Date(entry.assessment_date).toLocaleDateString('ru-RU')}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300 dark:text-gray-600">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {sortedUsers.length === 0 && (
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow-md mt-6">
           <div className="text-6xl mb-4">🧠</div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Оценки компетенций не найдены
+            Данные не найдены
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Начните оценивать свои профессиональные компетенции
+            Используйте фильтры для поиска сотрудников и компетенций
           </p>
-          <button
-            onClick={() => setShowAssessmentModal(true)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-          >
-            Добавить оценку
-          </button>
-        </div>
-      )}
-
-      {/* Add Assessment Modal */}
-      {showAssessmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Оценка компетенции
-            </h2>
-            {selectedCompetency && (
-              <div className="mb-4">
-                <p className="text-gray-600 dark:text-gray-400">
-                  Компетенция: <strong>{selectedCompetency.name}</strong>
-                </p>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                  {selectedCompetency.description}
-                </p>
-              </div>
-            )}
-
-            {assessmentFormErrors.general && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                {assessmentFormErrors.general}
-              </div>
-            )}
-
-            <form onSubmit={handleAssessmentSubmit}>
-              {/* Выбор компетенции */}
-              {!selectedCompetency && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Компетенция
-                  </label>
-                  <select
-                    value={assessmentFormData.competency_id}
-                    onChange={(e) => setAssessmentFormData({...assessmentFormData, competency_id: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    required
-                    disabled={competencies.length === 0}
-                  >
-                    <option value="">
-                      {competencies.length === 0 ? 'Загрузка компетенций...' : 'Выберите компетенцию'}
-                    </option>
-                    {competencies.map((competency) => (
-                      <option key={competency.id} value={competency.id}>
-                        {competency.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Выбор пользователя */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Оцениваемый пользователь
-                </label>
-                <select
-                  value={assessmentFormData.user_id}
-                  onChange={(e) => setAssessmentFormData({...assessmentFormData, user_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  required
-                  disabled={users.length === 0}
-                >
-                  <option value="">
-                    {users.length === 0 ? 'Загрузка пользователей...' : 'Выберите пользователя'}
-                  </option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.last_name} {user.first_name} ({user.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Уровень компетенции */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Уровень компетенции
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const suggestedLevel = getSuggestedLevelByScore(assessmentFormData.score);
-                      setAssessmentFormData({...assessmentFormData, level: suggestedLevel});
-                    }}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                  >
-                    🤖 Определить по баллу
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { value: 'junior', label: 'Junior', icon: '🌱', description: 'Начальный уровень' },
-                    { value: 'middle', label: 'Middle', icon: '🌿', description: 'Средний уровень' },
-                    { value: 'senior', label: 'Senior', icon: '🌳', description: 'Старший уровень' }
-                  ].map((level) => (
-                    <label key={level.value} className="flex items-center p-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="level"
-                        value={level.value}
-                        checked={assessmentFormData.level === level.value}
-                        onChange={(e) => setAssessmentFormData({...assessmentFormData, level: e.target.value as any})}
-                        className="mr-3 text-blue-500"
-                      />
-                      <span className="text-lg mr-2">{level.icon}</span>
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">{level.label}</div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{level.description}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Балл */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Балл (0-100)
-                </label>
-                <div className="flex items-center space-x-4">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={assessmentFormData.score}
-                    onChange={(e) => setAssessmentFormData({...assessmentFormData, score: parseInt(e.target.value)})}
-                    className="flex-1"
-                  />
-                  <div className="w-16 text-center">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={assessmentFormData.score}
-                      onChange={(e) => setAssessmentFormData({...assessmentFormData, score: parseInt(e.target.value) || 0})}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-center dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
-                </div>
-                <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Текущий балл: <span className={`font-medium ${getScoreColor(assessmentFormData.score)}`}>{assessmentFormData.score}</span>
-                </div>
-              </div>
-
-              {/* Дата оценки */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Дата оценки
-                </label>
-                <input
-                  type="date"
-                  value={assessmentFormData.assessment_date}
-                  onChange={(e) => setAssessmentFormData({...assessmentFormData, assessment_date: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  required
-                />
-              </div>
-
-              {/* Заметки */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Заметки (опционально)
-                </label>
-                <textarea
-                  value={assessmentFormData.notes}
-                  onChange={(e) => setAssessmentFormData({...assessmentFormData, notes: e.target.value})}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Дополнительные комментарии к оценке..."
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAssessmentModal(false);
-                    setSelectedCompetency(null);
-                    setAssessmentFormData({
-                      competency_id: '',
-                      user_id: '',
-                      level: 'middle',
-                      score: 50,
-                      assessment_date: new Date().toISOString().split('T')[0],
-                      notes: ''
-                    });
-                    setAssessmentFormErrors({});
-                  }}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                  disabled={isSubmittingAssessment}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                  disabled={isSubmittingAssessment}
-                >
-                  {isSubmittingAssessment ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
-                      Сохранение...
-                    </>
-                  ) : (
-                    'Сохранить'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
     </div>
