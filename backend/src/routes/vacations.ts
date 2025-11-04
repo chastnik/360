@@ -120,9 +120,16 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { user_id, start_date, end_date, type, comment } = req.body;
     
+    console.log('📝 Создание отпуска:', { user_id, start_date, end_date, type, comment, userRole: req.user?.role, userId: req.user?.id });
+    
     // Проверяем права: админы и HR могут создавать для любого пользователя
     const targetUserId = (req.user?.role === 'admin' || req.user?.role === 'hr') ? 
       (user_id || req.user?.id) : req.user?.id;
+    
+    if (!targetUserId) {
+      console.error('❌ Ошибка: не указан user_id');
+      return res.status(400).json({ error: 'Не указан идентификатор пользователя' });
+    }
 
     // Валидация данных
     if (!start_date || !end_date) {
@@ -165,31 +172,48 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       });
 
     if (overlapping.length > 0) {
+      console.log('⚠️ Найдены пересекающиеся отпуска:', overlapping);
       return res.status(400).json({ error: 'На выбранные даты уже запланирован отпуск' });
     }
 
     // Создаем отпуск
+    const insertData = {
+      user_id: targetUserId,
+      start_date,
+      end_date,
+      days_count: workingDays,
+      type: type || 'vacation',
+      comment: comment || null,
+      status: (req.user?.role === 'admin' || req.user?.role === 'hr') ? 'approved' : 'pending',
+      approved_by: (req.user?.role === 'admin' || req.user?.role === 'hr') ? req.user?.id : null,
+      approved_at: (req.user?.role === 'admin' || req.user?.role === 'hr') ? new Date() : null
+    };
+    
+    console.log('💾 Данные для вставки:', insertData);
+    
     const [vacation] = await db('vacations')
-      .insert({
-        user_id: targetUserId,
-        start_date,
-        end_date,
-        days_count: workingDays,
-        type: type || 'vacation',
-        comment,
-        status: (req.user?.role === 'admin' || req.user?.role === 'hr') ? 'approved' : 'pending',
-        approved_by: (req.user?.role === 'admin' || req.user?.role === 'hr') ? req.user?.id : null,
-        approved_at: (req.user?.role === 'admin' || req.user?.role === 'hr') ? new Date() : null
-      })
+      .insert(insertData)
       .returning('*');
+    
+    console.log('✅ Отпуск создан:', vacation);
 
     res.status(201).json({
       success: true,
       data: vacation
     });
-  } catch (error) {
-    console.error('Ошибка создания отпуска:', error);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  } catch (error: any) {
+    console.error('❌ Ошибка создания отпуска:', error);
+    console.error('❌ Детали ошибки:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Внутренняя ошибка сервера',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -236,6 +260,25 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
           workingDays++;
         }
         currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Проверяем пересечения с другими отпусками (исключая текущий)
+      const overlapping = await db('vacations')
+        .where('user_id', existingVacation.user_id)
+        .where('id', '!=', id)
+        .where('status', '!=', 'rejected')
+        .where(function() {
+          this.whereBetween('start_date', [start_date, end_date])
+            .orWhereBetween('end_date', [start_date, end_date])
+            .orWhere(function() {
+              this.where('start_date', '<=', start_date)
+                .andWhere('end_date', '>=', end_date);
+            });
+        });
+
+      if (overlapping.length > 0) {
+        console.log('⚠️ Найдены пересекающиеся отпуска при обновлении:', overlapping);
+        return res.status(400).json({ error: 'На выбранные даты уже запланирован отпуск' });
       }
 
       updateData.start_date = start_date;

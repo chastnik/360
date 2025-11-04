@@ -51,8 +51,12 @@ api.interceptors.response.use(
         const isProtectedPage = !window.location.pathname.includes('/learning') && !window.location.pathname.includes('/survey');
         
         if (!isLearningRequest && !isOnLoginPage && isProtectedPage) {
+          // Очищаем токен перед перенаправлением
           localStorage.removeItem('auth_token');
-          window.location.href = '/login';
+          // Используем setTimeout для избежания проблем с навигацией
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
         } else if (isLearningRequest) {
           // Для learning запросов не перенаправляем - пусть компоненты обрабатывают ошибку
           console.warn('401 error on learning endpoint:', requestUrl);

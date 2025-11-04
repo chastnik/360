@@ -32,8 +32,26 @@ initializeRoleConstraint();
 
 const router = Router();
 
-router.get('/', authenticateToken, requirePermission('ui:view:admin.users'), async (_req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => {
   try {
+    // Проверяем, что пользователь имеет либо право на просмотр админов, либо право на просмотр дашборда
+    const roleId = req.user?.roleId;
+    if (!roleId) {
+      return res.status(403).json({ error: 'У пользователя не назначена роль' });
+    }
+    
+    const hasAdminPermission = await db('role_permissions')
+      .where({ role_id: roleId, permission: 'ui:view:admin.users' })
+      .first();
+    
+    const hasDashboardPermission = await db('role_permissions')
+      .where({ role_id: roleId, permission: 'ui:view:dashboard' })
+      .first();
+    
+    if (!hasAdminPermission && !hasDashboardPermission) {
+      return res.status(403).json({ error: 'Недостаточно прав доступа' });
+    }
+    
     const users = await db('users')
       .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
       .where('is_active', true)

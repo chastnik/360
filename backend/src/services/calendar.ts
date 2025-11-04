@@ -10,11 +10,13 @@ import knex from '../database/connection';
  * - нагрузки в % от рабочего времени
  * - общего количества часов курсов
  * - рабочего календаря (рабочие дни + праздники)
+ * - отпусков пользователя
  */
 export async function calculateEndDate(
   startDate: Date,
   studyLoadPercent: number,
-  totalCourseHours: number
+  totalCourseHours: number,
+  userId?: string
 ): Promise<Date | null> {
   try {
     // Получаем рабочее расписание
@@ -32,6 +34,31 @@ export async function calculateEndDate(
       .where('date', '>=', startDate.toISOString().split('T')[0]);
     
     const holidayDates = new Set(holidays.map((h: any) => h.date.toISOString().split('T')[0]));
+    
+    // Получаем отпуска пользователя (утвержденные)
+    let userVacationDates = new Set<string>();
+    if (userId) {
+      const userVacations = await knex('vacations')
+        .select('start_date', 'end_date')
+        .where('user_id', userId)
+        .where('status', 'approved')
+        .where('end_date', '>=', startDate.toISOString().split('T')[0]);
+      
+      // Добавляем все даты из диапазона отпусков
+      for (const vacation of userVacations) {
+        const start = new Date(vacation.start_date);
+        const end = new Date(vacation.end_date);
+        const currentDate = new Date(start);
+        
+        while (currentDate <= end) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          if (dateStr >= startDate.toISOString().split('T')[0]) {
+            userVacationDates.add(dateStr);
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+    }
     
     // Создаем мапу рабочих дней по номеру дня недели (1=пн, 7=вс)
     const scheduleMap = new Map<number, { is_workday: boolean; work_hours: number }>();
@@ -81,7 +108,7 @@ export async function calculateEndDate(
       
       // Проверяем, является ли день рабочим
       const schedule = scheduleMap.get(dayOfWeek);
-      const isWorkday = schedule?.is_workday && !holidayDates.has(dateStr);
+      const isWorkday = schedule?.is_workday && !holidayDates.has(dateStr) && !userVacationDates.has(dateStr);
       
       if (isWorkday) {
         workDaysCounted++;

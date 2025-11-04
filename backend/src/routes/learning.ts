@@ -325,7 +325,7 @@ router.post('/growth-plans', authenticateToken, async (req: AuthRequest, res) =>
       
       if (totalHours > 0 && start_date && study_load_percent) {
         const startDateObj = new Date(start_date);
-        endDate = await calculateEndDate(startDateObj, study_load_percent, totalHours);
+        endDate = await calculateEndDate(startDateObj, study_load_percent, totalHours, targetUserId);
         
         // Обновляем план с рассчитанной датой завершения
         if (endDate) {
@@ -413,7 +413,10 @@ router.put('/growth-plans/:id', authenticateToken, async (req: AuthRequest, res)
       
       if (totalHours > 0) {
         const startDateObj = new Date(start_date);
-        const endDate = await calculateEndDate(startDateObj, study_load_percent, totalHours);
+        // Получаем user_id из существующего плана
+        const existingPlan = await knex('growth_plans').where('id', id).first();
+        const userId = existingPlan?.user_id;
+        const endDate = await calculateEndDate(startDateObj, study_load_percent, totalHours, userId);
         
         if (endDate) {
           await knex('growth_plans')

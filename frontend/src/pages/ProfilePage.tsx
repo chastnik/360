@@ -5,6 +5,7 @@ import api from '../services/api';
 import { User, Department } from '../types/common';
 import Avatar from '../components/Avatar';
 import { Link } from 'react-router-dom';
+import VacationModal from '../components/VacationModal';
 
 export const ProfilePage: React.FC = () => {
   const { user, setUser } = useAuth();
@@ -29,6 +30,12 @@ export const ProfilePage: React.FC = () => {
 
   // История циклов/оценок
   const [pastCycles, setPastCycles] = useState<any[]>([]);
+
+  // Управление отпусками
+  const [vacations, setVacations] = useState<any[]>([]);
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [editingVacation, setEditingVacation] = useState<any | null>(null);
+  const [vacationLoading, setVacationLoading] = useState(false);
 
   const loadAdditionalData = useCallback(async () => {
     if (!user) return;
@@ -95,6 +102,15 @@ export const ProfilePage: React.FC = () => {
         setPastCycles(completedCycles);
       } catch (error) {
         console.error('Ошибка загрузки циклов:', error);
+      }
+
+      // Загрузка отпусков пользователя
+      try {
+        const vacationsResponse = await api.get(`/vacations?user_id=${currentUserData.id}`);
+        const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+        setVacations(Array.isArray(vacationsData) ? vacationsData : []);
+      } catch (error) {
+        console.error('Ошибка загрузки отпусков:', error);
       }
 
       await Promise.all(promises);
@@ -350,6 +366,81 @@ export const ProfilePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Карточка отпусков */}
+      <div className="card p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Мои отпуска</h2>
+          <button
+            onClick={() => {
+              setEditingVacation(null);
+              setShowVacationModal(true);
+            }}
+            className="btn btn-primary btn-sm"
+          >
+            + Добавить отпуск
+          </button>
+        </div>
+
+        {vacations.length > 0 ? (
+          <div className="space-y-3">
+            {vacations
+              .filter((v: any) => v.status !== 'rejected')
+              .sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+              .map((vacation: any) => (
+                <div
+                  key={vacation.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:shadow-md transition-all"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {new Date(vacation.start_date).toLocaleDateString('ru-RU') === new Date(vacation.end_date).toLocaleDateString('ru-RU')
+                          ? new Date(vacation.start_date).toLocaleDateString('ru-RU')
+                          : `${new Date(vacation.start_date).toLocaleDateString('ru-RU')} - ${new Date(vacation.end_date).toLocaleDateString('ru-RU')}`}
+                      </span>
+                      <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {vacation.days_count} {vacation.days_count === 1 ? 'день' : vacation.days_count < 5 ? 'дня' : 'дней'}
+                      </span>
+                      {vacation.type === 'vacation' && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          Отпуск
+                        </span>
+                      )}
+                      {vacation.status === 'pending' && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                          На рассмотрении
+                        </span>
+                      )}
+                      {vacation.status === 'approved' && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          Утверждено
+                        </span>
+                      )}
+                    </div>
+                    {vacation.comment && (
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{vacation.comment}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingVacation(vacation);
+                      setShowVacationModal(true);
+                    }}
+                    className="ml-4 px-3 py-1 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                  >
+                    Редактировать
+                  </button>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">Отпуска не запланированы</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Добавьте отпуск, чтобы он учитывался при расчете ПИР</p>
+          </div>
+        )}
+      </div>
+
       {/* Карточка истории обратной связи */}
       <div className="card p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">История оценок</h2>
@@ -407,6 +498,45 @@ export const ProfilePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Модальное окно для отпусков */}
+      <VacationModal
+        isOpen={showVacationModal}
+        onClose={() => {
+          setShowVacationModal(false);
+          setEditingVacation(null);
+        }}
+        onSave={async (vacationData) => {
+          try {
+            setVacationLoading(true);
+            console.log('💾 Сохранение отпуска:', vacationData);
+            // Убеждаемся, что user_id присутствует в данных
+            const dataToSend = {
+              ...vacationData,
+              user_id: vacationData.user_id || user?.id
+            };
+            if (editingVacation) {
+              await api.put(`/vacations/${editingVacation.id}`, dataToSend);
+            } else {
+              await api.post('/vacations', dataToSend);
+            }
+            // Перезагружаем отпуска
+            const vacationsResponse = await api.get(`/vacations?user_id=${user?.id}`);
+            const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+            setVacations(Array.isArray(vacationsData) ? vacationsData : []);
+            setShowVacationModal(false);
+            setEditingVacation(null);
+          } catch (error: any) {
+            console.error('Ошибка сохранения отпуска:', error);
+            alert(error.response?.data?.error || 'Ошибка сохранения отпуска');
+            throw error;
+          } finally {
+            setVacationLoading(false);
+          }
+        }}
+        vacation={editingVacation}
+        users={user ? [user] : []}
+      />
     </div>
   );
 };

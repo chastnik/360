@@ -24,9 +24,13 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Очищаем старый токен перед входом
+      localStorage.removeItem('auth_token');
       await login(email, password);
     } catch (err: any) {
       setError(err.message || 'Ошибка авторизации');
+      // Убеждаемся, что токен очищен при ошибке
+      localStorage.removeItem('auth_token');
     } finally {
       setIsLoading(false);
     }

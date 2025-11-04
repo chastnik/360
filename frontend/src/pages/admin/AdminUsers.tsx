@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import RoleSelect from './RoleSelect';
 import api from '../../services/api';
 import { User, Department } from '../../types/common';
+import VacationModal from '../../components/VacationModal';
 
 interface UserFormData {
   email: string;
@@ -33,6 +34,11 @@ const AdminUsers: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Управление отпусками для выбранного пользователя
+  const [userVacations, setUserVacations] = useState<any[]>([]);
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [editingVacation, setEditingVacation] = useState<any | null>(null);
 
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
@@ -183,7 +189,7 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const openEditForm = (user: User) => {
+  const openEditForm = async (user: User) => {
     setSelectedUser(user);
     setFormData({
       email: user.email,
@@ -200,6 +206,17 @@ const AdminUsers: React.FC = () => {
       avatar_url: (user as any).avatar_url || '',
       is_manager: user.is_manager || false
     });
+    
+    // Загружаем отпуска пользователя
+    try {
+      const vacationsResponse = await api.get(`/vacations?user_id=${user.id}`);
+      const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+      setUserVacations(Array.isArray(vacationsData) ? vacationsData : []);
+    } catch (error) {
+      console.error('Ошибка загрузки отпусков:', error);
+      setUserVacations([]);
+    }
+    
     setShowEditForm(true);
   };
 
@@ -400,7 +417,7 @@ const AdminUsers: React.FC = () => {
       {/* Модальные окна */}
       {(showCreateForm || showEditForm) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
               {showCreateForm ? 'Создать пользователя' : 'Редактировать пользователя'}
             </h3>
@@ -562,6 +579,101 @@ const AdminUsers: React.FC = () => {
                   Пользователи с этой отметкой будут доступны для выбора в качестве руководителей других сотрудников
                 </p>
               </div>
+
+              {/* Секция управления отпусками (только при редактировании) */}
+              {showEditForm && selectedUser && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">
+                      Отпуска пользователя
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Сбрасываем редактирование отпуска и устанавливаем выбранного пользователя
+                        setEditingVacation(null);
+                        setShowVacationModal(true);
+                      }}
+                      className="px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-md"
+                    >
+                      + Добавить отпуск
+                    </button>
+                  </div>
+
+                  {userVacations.length > 0 ? (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {userVacations
+                        .filter((v: any) => v.status !== 'rejected')
+                        .sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+                        .map((vacation: any) => (
+                          <div
+                            key={vacation.id}
+                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                  {new Date(vacation.start_date).toLocaleDateString('ru-RU') === new Date(vacation.end_date).toLocaleDateString('ru-RU')
+                                    ? new Date(vacation.start_date).toLocaleDateString('ru-RU')
+                                    : `${new Date(vacation.start_date).toLocaleDateString('ru-RU')} - ${new Date(vacation.end_date).toLocaleDateString('ru-RU')}`}
+                                </span>
+                                <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  {vacation.days_count} {vacation.days_count === 1 ? 'день' : vacation.days_count < 5 ? 'дня' : 'дней'}
+                                </span>
+                                {vacation.status === 'pending' && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                    На рассмотрении
+                                  </span>
+                                )}
+                                {vacation.status === 'approved' && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    Утверждено
+                                  </span>
+                                )}
+                              </div>
+                              {vacation.comment && (
+                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{vacation.comment}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingVacation(vacation);
+                                  setShowVacationModal(true);
+                                }}
+                                className="px-2 py-1 text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                              >
+                                Редактировать
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!window.confirm('Вы уверены, что хотите удалить этот отпуск?')) return;
+                                  try {
+                                    await api.delete(`/vacations/${vacation.id}`);
+                                    const vacationsResponse = await api.get(`/vacations?user_id=${selectedUser.id}`);
+                                    const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+                                    setUserVacations(Array.isArray(vacationsData) ? vacationsData : []);
+                                  } catch (error: any) {
+                                    alert(error.response?.data?.error || 'Ошибка удаления отпуска');
+                                  }
+                                }}
+                                className="px-2 py-1 text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              >
+                                Удалить
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+                      Отпуска не запланированы
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="flex justify-end space-x-3 pt-4">
                 <button
@@ -585,6 +697,45 @@ const AdminUsers: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Модальное окно для отпусков */}
+      {showVacationModal && selectedUser && (
+        <VacationModal
+          isOpen={showVacationModal}
+          onClose={() => {
+            setShowVacationModal(false);
+            setEditingVacation(null);
+          }}
+          onSave={async (vacationData) => {
+            try {
+              console.log('💾 Сохранение отпуска (Admin):', vacationData, 'selectedUser:', selectedUser);
+              // Убеждаемся, что user_id присутствует в данных (всегда используем selectedUser.id)
+              const dataToSend = {
+                ...vacationData,
+                user_id: selectedUser.id
+              };
+              if (editingVacation) {
+                await api.put(`/vacations/${editingVacation.id}`, dataToSend);
+              } else {
+                await api.post('/vacations', dataToSend);
+              }
+              // Перезагружаем отпуска
+              const vacationsResponse = await api.get(`/vacations?user_id=${selectedUser.id}`);
+              const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+              setUserVacations(Array.isArray(vacationsData) ? vacationsData : []);
+              setShowVacationModal(false);
+              setEditingVacation(null);
+            } catch (error: any) {
+              console.error('Ошибка сохранения отпуска:', error);
+              alert(error.response?.data?.error || 'Ошибка сохранения отпуска');
+              throw error;
+            }
+          }}
+          vacation={editingVacation}
+          users={users}
+          preselectedUserId={selectedUser.id}
+        />
       )}
     </div>
   );

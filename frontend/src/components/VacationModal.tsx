@@ -31,6 +31,7 @@ interface VacationModalProps {
   onSave: (vacationData: any) => Promise<void>;
   vacation?: Vacation | null;
   users: User[];
+  preselectedUserId?: string; // ID пользователя, который должен быть предустановлен
 }
 
 const VacationModal: React.FC<VacationModalProps> = ({
@@ -38,7 +39,8 @@ const VacationModal: React.FC<VacationModalProps> = ({
   onClose,
   onSave,
   vacation,
-  users
+  users,
+  preselectedUserId
 }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -78,8 +80,12 @@ const VacationModal: React.FC<VacationModalProps> = ({
         status: vacation.status
       });
     } else {
+      // Если передан preselectedUserId, используем его (для админов/HR при редактировании пользователя)
+      // Для обычных пользователей всегда используем их ID
+      // Для админов/HR без preselectedUserId - пустая строка, чтобы они могли выбрать пользователя
+      const defaultUserId = preselectedUserId || (!canEdit ? (user?.id || '') : '');
       setFormData({
-        user_id: canEdit ? '' : (user?.id || ''),
+        user_id: defaultUserId,
         start_date: '',
         end_date: '',
         type: 'vacation',
@@ -87,7 +93,8 @@ const VacationModal: React.FC<VacationModalProps> = ({
         status: 'pending'
       });
     }
-  }, [vacation, canEdit, user?.id]);
+    console.log('📋 FormData обновлен:', { vacation, canEdit, userId: user?.id, preselectedUserId });
+  }, [vacation, canEdit, user?.id, preselectedUserId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,13 +113,23 @@ const VacationModal: React.FC<VacationModalProps> = ({
       alert('Пожалуйста, выберите сотрудника');
       return;
     }
+    
+    // Для обычных пользователей убеждаемся, что user_id установлен
+    if (!canEdit && !formData.user_id && user?.id) {
+      formData.user_id = user.id;
+    }
 
     try {
       setLoading(true);
+      console.log('📤 Отправка данных отпуска:', formData);
       await onSave(formData);
       onClose();
-    } catch (error) {
-      console.error('Ошибка сохранения отпуска:', error);
+    } catch (error: any) {
+      console.error('❌ Ошибка сохранения отпуска:', error);
+      // Показываем ошибку пользователю, если она не была обработана в onSave
+      if (error.response?.data?.error) {
+        alert(error.response.data.error);
+      }
     } finally {
       setLoading(false);
     }
@@ -151,8 +168,8 @@ const VacationModal: React.FC<VacationModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          {/* Выбор сотрудника (только для админов и HR) */}
-          {canEdit && (
+          {/* Выбор сотрудника (только для админов и HR, если не передан preselectedUserId) */}
+          {canEdit && !preselectedUserId && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Сотрудник *
@@ -172,32 +189,62 @@ const VacationModal: React.FC<VacationModalProps> = ({
               </select>
             </div>
           )}
+          
+          {/* Показываем имя пользователя, если он предустановлен */}
+          {canEdit && preselectedUserId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Сотрудник
+              </label>
+              <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white">
+                {users.find(u => u.id === preselectedUserId) 
+                  ? `${users.find(u => u.id === preselectedUserId)?.last_name} ${users.find(u => u.id === preselectedUserId)?.first_name} ${users.find(u => u.id === preselectedUserId)?.middle_name || ''}`.trim()
+                  : 'Пользователь не найден'}
+              </div>
+            </div>
+          )}
 
           {/* Даты */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Дата начала *
+                Дата начала (включительно) *
               </label>
               <input
                 type="date"
                 value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, start_date: e.target.value });
+                  // Если дата окончания меньше даты начала, устанавливаем её равной дате начала
+                  if (formData.end_date && new Date(e.target.value) > new Date(formData.end_date)) {
+                    setFormData(prev => ({ ...prev, start_date: e.target.value, end_date: e.target.value }));
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Дата окончания *
+                Дата окончания (включительно) *
               </label>
               <input
                 type="date"
                 value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, end_date: e.target.value });
+                  // Если дата начала больше даты окончания, устанавливаем её равной дате окончания
+                  if (formData.start_date && new Date(e.target.value) < new Date(formData.start_date)) {
+                    setFormData(prev => ({ ...prev, start_date: e.target.value, end_date: e.target.value }));
+                  }
+                }}
+                min={formData.start_date || undefined}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 required
               />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Для однодневного отпуска выберите одинаковые даты
+              </p>
             </div>
           </div>
 
