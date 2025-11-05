@@ -22,7 +22,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const can = (perm?: string) => !perm || permissions.includes(perm);
   const navigation = [
-    { name: 'Дашборд', href: '/dashboard', icon: '📊' },
+    { name: 'Дашборд', href: '/dashboard', icon: '📊', perm: 'ui:view:dashboard' },
+    { name: 'Мой дашборд', href: '/my-dashboard', icon: '📋' },
     { name: 'Циклы', href: '/cycles', icon: '🔄', perm: 'ui:view:cycles' },
     { name: 'Оценки', href: '/assessments', icon: '📝', perm: 'ui:view:assessments' },
     { name: 'Отчеты', href: '/reports', icon: '📈', perm: 'ui:view:reports' },
@@ -33,6 +34,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
+      return location.pathname === href;
+    }
+    if (href === '/my-dashboard') {
       return location.pathname === href;
     }
     return location.pathname.startsWith(href);

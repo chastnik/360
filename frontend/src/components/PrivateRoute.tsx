@@ -46,8 +46,8 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
       );
     }
     
-    // Для других ролей перенаправляем на дашборд
-    return <Navigate to="/dashboard" replace />;
+    // Для других ролей перенаправляем на мой дашборд
+    return <Navigate to="/my-dashboard" replace />;
   }
 
   // Если требуется конкретное право, проверяем его

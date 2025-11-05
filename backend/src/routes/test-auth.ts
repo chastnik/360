@@ -3,7 +3,11 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import Joi from 'joi';
+import crypto from 'crypto';
 import db from '../database/connection';
+import emailService from '../services/email';
+import mattermostService from '../services/mattermost';
 
 const router = Router();
 
@@ -474,6 +478,155 @@ router.get('/me', async (req, res) => {
     return res.status(401).json({
       success: false,
       error: 'Недействительный токен'
+    });
+  }
+});
+
+// Валидация для запроса сброса пароля
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Некорректный email',
+    'any.required': 'Email обязателен'
+  })
+});
+
+// Валидация для сброса пароля
+const resetPasswordSchema = Joi.object({
+  token: Joi.string().required().messages({
+    'any.required': 'Токен сброса обязателен'
+  }),
+  password: Joi.string().min(6).required().messages({
+    'string.min': 'Пароль должен содержать минимум 6 символов',
+    'any.required': 'Новый пароль обязателен'
+  })
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res): Promise<void> => {
+  try {
+    const { error } = forgotPasswordSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({
+        success: false,
+        error: error.details?.[0]?.message || 'Ошибка валидации'
+      });
+      return;
+    }
+
+    const { email } = req.body;
+
+    // Найти пользователя
+    const user = await db('users')
+      .where({ email: email.toLowerCase(), is_active: true })
+      .first();
+
+    // Всегда возвращаем успех, чтобы не раскрывать существование email
+    if (!user) {
+      res.json({
+        success: true,
+        message: 'Если пользователь с таким email существует, на него будет отправлено письмо с инструкциями по сбросу пароля'
+      });
+      return;
+    }
+
+    // Генерировать токен сброса
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 час
+
+    // Сохранить токен в БД
+    await db('users')
+      .where({ id: user.id })
+      .update({
+        reset_token: resetToken,
+        reset_token_expiry: resetTokenExpiry
+      });
+
+    // Отправить email и Mattermost уведомление параллельно
+    const [emailSent, mattermostSent] = await Promise.allSettled([
+      emailService.sendPasswordResetEmail(email, resetToken),
+      mattermostService.sendPasswordResetNotification(email, resetToken, user.mattermost_username || undefined)
+    ]);
+
+    // Проверяем результаты отправки email
+    if (emailSent.status === 'rejected' || (emailSent.status === 'fulfilled' && !emailSent.value)) {
+      // Если email не настроен, выводим токен в консоль для разработки
+      console.log(`⚠️  Email сервис не настроен. Токен сброса пароля для ${email}: ${resetToken}`);
+      console.log(`Ссылка для сброса: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`);
+    }
+
+    // Проверяем результаты отправки Mattermost
+    if (mattermostSent.status === 'rejected') {
+      console.error('Ошибка отправки уведомления в Mattermost:', mattermostSent.reason);
+    }
+
+    res.json({
+      success: true,
+      message: 'Если пользователь с таким email существует, на него будет отправлено письмо с инструкциями по сбросу пароля'
+    });
+
+  } catch (error) {
+    console.error('Ошибка запроса сброса пароля:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Внутренняя ошибка сервера'
+    });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res): Promise<void> => {
+  try {
+    const { error } = resetPasswordSchema.validate(req.body);
+    if (error) {
+      res.status(400).json({
+        success: false,
+        error: error.details?.[0]?.message || 'Ошибка валидации'
+      });
+      return;
+    }
+
+    const { token, password } = req.body;
+
+    // Найти пользователя по токену
+    const user = await db('users')
+      .where({ 
+        reset_token: token,
+        is_active: true 
+      })
+      .where('reset_token_expiry', '>', new Date())
+      .first();
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        error: 'Недействительный или просроченный токен сброса'
+      });
+      return;
+    }
+
+    // Хешировать новый пароль
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Обновить пароль и очистить токен сброса
+    await db('users')
+      .where({ id: user.id })
+      .update({
+        password_hash: passwordHash,
+        reset_token: null,
+        reset_token_expiry: null
+      });
+
+    res.json({
+      success: true,
+      message: 'Пароль успешно сброшен'
+    });
+
+  } catch (error) {
+    console.error('Ошибка сброса пароля:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Внутренняя ошибка сервера'
     });
   }
 });

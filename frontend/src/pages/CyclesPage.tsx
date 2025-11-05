@@ -14,6 +14,7 @@ interface Cycle {
   status: 'draft' | 'active' | 'completed';
   created_at: string;
   participants?: Participant[];
+  participants_count?: number;
 }
 
 interface Participant {
@@ -113,9 +114,11 @@ export const CyclesPage: React.FC = () => {
     try {
       await api.post(`/cycles/${cycleId}/start`);
       loadCycles();
-    } catch (error) {
+      setError(null); // Очистить ошибку при успехе
+    } catch (error: any) {
       console.error('Ошибка при запуске цикла:', error);
-      setError('Не удалось запустить цикл');
+      const errorMessage = error.response?.data?.error || 'Не удалось запустить цикл';
+      setError(errorMessage);
     }
   };
 
@@ -273,6 +276,9 @@ export const CyclesPage: React.FC = () => {
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               <div>Начало: {new Date(cycle.start_date).toLocaleDateString()}</div>
               <div>Окончание: {new Date(cycle.end_date).toLocaleDateString()}</div>
+              <div className="mt-2 font-medium text-gray-700 dark:text-gray-300">
+                Участников: {cycle.participants_count ?? cycle.participants?.length ?? 0}
+              </div>
             </div>
             
             <div className="flex justify-between items-center">

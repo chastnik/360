@@ -17,7 +17,7 @@ export const RegisterPage: React.FC = () => {
   const { register, isAuthenticated } = useAuth();
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/my-dashboard" replace />;
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -14,12 +14,14 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MyDashboardPage } from './pages/MyDashboardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { CyclesPage } from './pages/CyclesPage';
 import { AssessmentsPage } from './pages/AssessmentsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SurveyPage } from './pages/SurveyPage';
 import { ReportViewPage } from './pages/ReportViewPage';
+import { SelectRespondentsPage } from './pages/SelectRespondentsPage';
 import EmployeeAnalyticsPage from './pages/EmployeeAnalyticsPage';
 import StructurePage from './pages/StructurePage';
 import EmployeesPage from './pages/EmployeesPage';
@@ -58,18 +60,33 @@ function App() {
               <Route path="/report/:token" element={<ReportViewPage />} />
               
               {/* Приватные маршруты */}
+              <Route path="/assessments/select-respondents/:participantId" element={
+                <PrivateRoute>
+                  <Layout>
+                    <SelectRespondentsPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
               <Route path="/" element={
                 <PrivateRoute>
                   <Layout>
-                    <Navigate to="/dashboard" replace />
+                    <Navigate to="/my-dashboard" replace />
                   </Layout>
                 </PrivateRoute>
               } />
               
               <Route path="/dashboard" element={
-                <PrivateRoute>
+                <PrivateRoute requiredPermission="ui:view:dashboard">
                   <Layout>
                     <DashboardPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+              
+              <Route path="/my-dashboard" element={
+                <PrivateRoute>
+                  <Layout>
+                    <MyDashboardPage />
                   </Layout>
                 </PrivateRoute>
               } />

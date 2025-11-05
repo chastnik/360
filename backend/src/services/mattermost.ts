@@ -274,6 +274,67 @@ class MattermostService {
   }
 
   /**
+   * Отправить уведомление о сбросе пароля по email
+   */
+  async sendPasswordResetNotification(email: string, resetToken: string, mattermostUsername?: string): Promise<boolean> {
+    try {
+      let mmUser: MattermostUser | null = null;
+
+      // Если передан mattermost_username, попробуем найти по username
+      if (mattermostUsername) {
+        mmUser = await this.getUserByUsername(mattermostUsername);
+      }
+
+      // Если не найден по username, попробуем найти по email
+      if (!mmUser) {
+        mmUser = await this.getUserByEmail(email);
+      }
+
+      if (!mmUser) {
+        console.log(`⚠️  Пользователь ${email} не найден в Mattermost. Уведомление не отправлено.`);
+        return false;
+      }
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+      const channel = await this.createDirectChannel(mmUser.id);
+      if (!channel) {
+        console.error(`Не удалось создать канал с пользователем ${mmUser.username}`);
+        return false;
+      }
+
+      const message = `**🔐 Сброс пароля - 360 Assessment**
+
+Здравствуйте!
+
+Вы запросили сброс пароля для вашей учетной записи в системе 360 Assessment.
+
+Для сброса пароля перейдите по следующей ссылке:
+[Сбросить пароль](${resetUrl})
+
+**Ссылка действительна в течение 1 часа.**
+
+Если вы не запрашивали сброс пароля, просто проигнорируйте это сообщение.
+
+С уважением,
+Команда 360 Assessment`;
+
+      const post = await this.sendMessage(channel.id, message);
+      
+      if (post) {
+        console.log(`✅ Mattermost уведомление о сбросе пароля отправлено: ${email} -> @${mmUser.username}`);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Ошибка отправки уведомления о сбросе пароля в Mattermost:', error);
+      return false;
+    }
+  }
+
+  /**
    * Отправить уведомление о начале цикла оценки
    */
   async notifyAssessmentCycleStart(participantUsername: string, cycleTitle: string): Promise<boolean> {

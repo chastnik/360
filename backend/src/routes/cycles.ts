@@ -17,12 +17,95 @@ router.get('/', authenticateToken, async (_req: AuthRequest, res: Response): Pro
       .select('id', 'name', 'description', 'status', 'start_date', 'end_date', 'created_at')
       .orderBy('created_at', 'desc');
 
+    // Получить количество участников для каждого цикла
+    const cyclesWithParticipantsCount = await Promise.all(
+      cycles.map(async (cycle) => {
+        const participantsCount = await db('assessment_participants')
+          .where('cycle_id', cycle.id)
+          .count('id as count')
+          .first();
+
+        return {
+          ...cycle,
+          participants_count: Number(participantsCount?.count || 0)
+        };
+      })
+    );
+
     res.json({
       success: true,
-      data: cycles
+      data: cyclesWithParticipantsCount
     });
   } catch (error) {
     console.error('Ошибка получения циклов оценки:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// Получить информацию об участнике для выбора респондентов (должен быть ДО /:id)
+router.get('/participants/:participantId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    const { participantId } = req.params;
+
+    if (!user?.userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
+
+    // Получить информацию об участнике
+    const participant = await db('assessment_participants')
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .join('users', 'assessment_participants.user_id', 'users.id')
+      .where('assessment_participants.id', participantId)
+      .select(
+        'assessment_participants.id',
+        'assessment_participants.cycle_id',
+        'assessment_participants.status as participant_status',
+        'assessment_cycles.id as cycle_id',
+        'assessment_cycles.name as cycle_name',
+        'assessment_cycles.description as cycle_description',
+        'assessment_cycles.status as cycle_status',
+        'users.id as user_id',
+        'users.first_name',
+        'users.last_name',
+        'users.email'
+      )
+      .first();
+
+    if (!participant) {
+      res.status(404).json({ error: 'Участник не найден' });
+      return;
+    }
+
+    // Проверить, что пользователь является именно этим участником (строгая проверка)
+    if (user.userId !== participant.user_id) {
+      res.status(403).json({ error: 'Доступ запрещен. Вы можете выбрать респондентов только для своего участия в цикле.' });
+      return;
+    }
+
+    // Получить уже добавленных респондентов
+    const existingRespondents = await db('assessment_respondents')
+      .join('users', 'assessment_respondents.respondent_user_id', 'users.id')
+      .where('assessment_respondents.participant_id', participantId)
+      .select(
+        'assessment_respondents.id',
+        'users.id as user_id',
+        'users.first_name',
+        'users.last_name',
+        'users.email',
+        'assessment_respondents.status'
+      );
+
+    res.json({
+      success: true,
+      data: {
+        ...participant,
+        existingRespondents
+      }
+    });
+  } catch (error) {
+    console.error('Ошибка получения информации об участнике:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
@@ -153,7 +236,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res): Promise<voi
         description,
         start_date,
         end_date,
-        updated_at: db.fn.now()
+        updated_at: db.raw('NOW()')
       });
 
     const updatedCycle = await db('assessment_cycles')
@@ -232,9 +315,25 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
     const { id, participantId } = req.params;
     const { respondentIds } = req.body;
 
-    // Проверить права доступа
-    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
-      res.status(403).json({ error: 'Недостаточно прав доступа' });
+    if (!user?.userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
+
+    // Получить информацию об участнике для проверки прав
+    const participant = await db('assessment_participants')
+      .where('id', participantId)
+      .where('cycle_id', id)
+      .first();
+
+    if (!participant) {
+      res.status(404).json({ error: 'Участник не найден' });
+      return;
+    }
+
+    // Проверить права доступа: только сам участник может добавлять респондентов для себя
+    if (user.userId !== participant.user_id) {
+      res.status(403).json({ error: 'Доступ запрещен. Вы можете добавлять респондентов только для своего участия в цикле.' });
       return;
     }
 
@@ -247,19 +346,9 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       return;
     }
 
-    const participant = await db('assessment_participants')
-      .where('id', participantId)
-      .where('cycle_id', id)
-      .first();
-
-    if (!participant) {
-      res.status(404).json({ error: 'Участник не найден' });
-      return;
-    }
-
-    // Проверить, что цикл не активен
-    if (cycle.status === 'active') {
-      res.status(400).json({ error: 'Нельзя добавлять респондентов в активный цикл' });
+    // Проверить, что цикл активен (участники могут выбирать респондентов только в активном цикле)
+    if (cycle.status !== 'active') {
+      res.status(400).json({ error: 'Респондентов можно добавлять только в активном цикле' });
       return;
     }
 
@@ -374,27 +463,30 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
       return;
     }
 
-    // Запустить цикл
-    await db('assessment_cycles')
-      .where('id', id)
-      .update({
-        status: 'active',
-        start_date: db.fn.now()
-      });
+    // Запустить цикл в транзакции
+    await db.transaction(async (trx) => {
+      // Запустить цикл
+      await trx('assessment_cycles')
+        .where('id', id)
+        .update({
+          status: 'active',
+          start_date: trx.raw('NOW()')
+        });
 
-    // Обновить статус участников
-    await db('assessment_participants')
-      .where('cycle_id', id)
-      .update({ status: 'active' });
+      // Обновить статус участников
+      await trx('assessment_participants')
+        .where('cycle_id', id)
+        .update({ status: 'in_progress' });
 
-    // Обновить статус респондентов
-    await db('assessment_respondents')
-      .whereIn('participant_id', 
-        db('assessment_participants')
-          .where('cycle_id', id)
-          .select('id')
-      )
-      .update({ status: 'active' });
+      // Обновить статус респондентов
+      await trx('assessment_respondents')
+        .whereIn('participant_id', 
+          trx('assessment_participants')
+            .where('cycle_id', id)
+            .select('id')
+        )
+        .update({ status: 'in_progress' });
+    });
 
     // Отправить запросы на выбор респондентов участникам
     try {

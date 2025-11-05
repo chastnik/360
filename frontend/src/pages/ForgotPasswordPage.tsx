@@ -15,7 +15,7 @@ export const ForgotPasswordPage: React.FC = () => {
 
   // Если уже авторизован, перенаправляем на dashboard
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/my-dashboard" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

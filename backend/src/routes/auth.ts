@@ -10,6 +10,8 @@ import crypto from 'crypto';
 import db from '../database/connection';
 import { LoginRequest, RegisterRequest } from '../types';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import emailService from '../services/email';
+import mattermostService from '../services/mattermost';
 
 const router = Router();
 
@@ -371,10 +373,23 @@ router.post('/forgot-password', async (req, res): Promise<void> => {
         reset_token_expiry: resetTokenExpiry
       });
 
-    // TODO: Отправить email с токеном сброса
-    // В реальном приложении здесь должна быть отправка email
-    console.log(`Токен сброса пароля для ${email}: ${resetToken}`);
-    console.log(`Ссылка для сброса: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`);
+    // Отправить email и Mattermost уведомление параллельно
+    const [emailSent, mattermostSent] = await Promise.allSettled([
+      emailService.sendPasswordResetEmail(email, resetToken),
+      mattermostService.sendPasswordResetNotification(email, resetToken, user.mattermost_username || undefined)
+    ]);
+
+    // Проверяем результаты отправки email
+    if (emailSent.status === 'rejected' || (emailSent.status === 'fulfilled' && !emailSent.value)) {
+      // Если email не настроен, выводим токен в консоль для разработки
+      console.log(`⚠️  Email сервис не настроен. Токен сброса пароля для ${email}: ${resetToken}`);
+      console.log(`Ссылка для сброса: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`);
+    }
+
+    // Проверяем результаты отправки Mattermost
+    if (mattermostSent.status === 'rejected') {
+      console.error('Ошибка отправки уведомления в Mattermost:', mattermostSent.reason);
+    }
 
     res.json({
       success: true,

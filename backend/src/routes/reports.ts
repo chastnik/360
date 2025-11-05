@@ -419,6 +419,217 @@ router.get('/user/:userId/recommendations', authenticateToken, async (req: any, 
   }
 });
 
+// Персонализированный дашборд пользователя
+router.get('/my-dashboard', authenticateToken, async (req: any, res: any): Promise<void> => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
+
+    // 1. Последние оценки пользователя (где он был участником)
+    const recentAssessments = await knex('assessment_participants')
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .where('assessment_participants.user_id', userId)
+      .select(
+        'assessment_cycles.id as cycle_id',
+        'assessment_cycles.name as cycle_name',
+        'assessment_cycles.end_date',
+        'assessment_participants.status',
+        'assessment_participants.completed_at',
+        'assessment_cycles.created_at'
+      )
+      .orderBy('assessment_cycles.created_at', 'desc')
+      .limit(5);
+
+    // Получаем средние баллы для каждой оценки
+    const assessmentsWithScores = await Promise.all(
+      recentAssessments.map(async (assessment: any) => {
+        const participant = await knex('assessment_participants')
+          .where('user_id', userId)
+          .where('cycle_id', assessment.cycle_id)
+          .first();
+
+        if (!participant) return { ...assessment, averageScore: 0 };
+
+        const avgScoreResult = await knex('assessment_responses')
+          .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+          .where('assessment_respondents.participant_id', participant.id)
+          .avg('assessment_responses.rating_value as avg_score')
+          .first();
+
+        return {
+          ...assessment,
+          averageScore: avgScoreResult ? Math.round(Number(avgScoreResult.avg_score || 0) * 100) / 100 : 0
+        };
+      })
+    );
+
+    // 2. Области для развития (категории с низкими оценками)
+    const latestParticipant = await knex('assessment_participants')
+      .where('user_id', userId)
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .where('assessment_cycles.status', 'completed')
+      .orderBy('assessment_cycles.end_date', 'desc')
+      .select('assessment_participants.id as participant_id')
+      .first();
+
+    let improvementAreas: any[] = [];
+    if (latestParticipant) {
+      const categoryScores = await knex('assessment_responses')
+        .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+        .join('questions', 'assessment_responses.question_id', 'questions.id')
+        .join('categories', 'questions.category_id', 'categories.id')
+        .where('assessment_respondents.participant_id', latestParticipant.participant_id)
+        .select('categories.name as category_name', 'categories.color as category_color')
+        .avg('assessment_responses.rating_value as avg_score')
+        .groupBy('categories.id', 'categories.name', 'categories.color')
+        .orderBy('avg_score', 'asc')
+        .limit(3);
+
+      improvementAreas = categoryScores.map((item: any) => ({
+        category: item.category_name,
+        color: item.category_color,
+        averageScore: Math.round(Number(item.avg_score || 0) * 100) / 100
+      }));
+    }
+
+    // 3. Прогресс по компетенциям
+    const competenceProgress = await knex('competence_matrix')
+      .join('competencies', 'competence_matrix.competency_id', 'competencies.id')
+      .where('competence_matrix.user_id', userId)
+      .select(
+        'competencies.name as competency_name',
+        'competence_matrix.level',
+        'competence_matrix.score',
+        'competence_matrix.assessment_date'
+      )
+      .orderBy('competence_matrix.assessment_date', 'desc')
+      .limit(5);
+
+    // 4. Ближайшие дедлайны (активные оценки, где пользователь респондент)
+    const upcomingDeadlines = await knex('assessment_respondents')
+      .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .join('users', 'assessment_participants.user_id', 'users.id')
+      .where('assessment_respondents.respondent_user_id', userId)
+      .where('assessment_cycles.status', 'active')
+      .where('assessment_respondents.status', '!=', 'completed')
+      .where('assessment_cycles.end_date', '>=', knex.fn.now())
+      .select(
+        'assessment_respondents.id as respondent_id',
+        'assessment_cycles.name as cycle_name',
+        'assessment_cycles.end_date',
+        knex.raw("concat(users.first_name, ' ', users.last_name) as participant_name"),
+        'assessment_respondents.status'
+      )
+      .orderBy('assessment_cycles.end_date', 'asc')
+      .limit(5);
+
+    // 5. Общий средний балл пользователя по всем его участиям
+    const allParticipants = await knex('assessment_participants')
+      .where('user_id', userId)
+      .select('id');
+    
+    const participantIds = allParticipants.map((p: any) => p.id);
+    let overallAverage = 0;
+    if (participantIds.length > 0) {
+      const overallAvgResult = await knex('assessment_responses')
+        .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+        .whereIn('assessment_respondents.participant_id', participantIds)
+        .avg('assessment_responses.rating_value as avg_score')
+        .first();
+      
+      overallAverage = overallAvgResult ? Math.round(Number(overallAvgResult.avg_score || 0) * 100) / 100 : 0;
+    }
+
+    // 6. Динамика общего среднего балла по циклам
+    const participantsForTrend = await knex('assessment_participants')
+      .where('assessment_participants.user_id', userId)
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .where('assessment_cycles.status', 'completed')
+      .select(
+        'assessment_participants.id as participant_id',
+        'assessment_cycles.end_date',
+        'assessment_cycles.name as cycle_name'
+      )
+      .orderBy('assessment_cycles.end_date', 'asc')
+      .limit(6);
+
+    const trendData: Array<{ date: string; score: number }> = [];
+    if (participantsForTrend.length > 0) {
+      for (const participant of participantsForTrend) {
+        const avgScoreResult = await knex('assessment_responses')
+          .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+          .where('assessment_respondents.participant_id', participant.participant_id)
+          .avg('assessment_responses.rating_value as avg_score')
+          .first();
+        
+        const score = avgScoreResult ? Math.round(Number(avgScoreResult.avg_score || 0) * 100) / 100 : 0;
+        const endDate = new Date(participant.end_date);
+        const monthName = endDate.toLocaleDateString('ru-RU', { month: 'short' });
+        
+        trendData.push({
+          date: monthName,
+          score: score
+        });
+      }
+    }
+
+    // 7. Средние оценки по категориям для последнего завершенного цикла
+    let categoryData: any[] = [];
+    if (latestParticipant) {
+      const categoryScores = await knex('assessment_responses')
+        .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+        .join('questions', 'assessment_responses.question_id', 'questions.id')
+        .join('categories', 'questions.category_id', 'categories.id')
+        .where('assessment_respondents.participant_id', latestParticipant.participant_id)
+        .select(
+          'categories.id as category_id',
+          'categories.name as category_name',
+          'categories.color as category_color'
+        )
+        .avg('assessment_responses.rating_value as avg_score')
+        .groupBy('categories.id', 'categories.name', 'categories.color')
+        .orderBy('categories.name');
+
+      categoryData = categoryScores.map((item: any, idx: number) => ({
+        id: idx,
+        name: item.category_name,
+        color: item.category_color || '#3B82F6',
+        average: Math.round(Number(item.avg_score || 0) * 100) / 100,
+        count: 0
+      }));
+    }
+
+    res.json({
+      recentAssessments: assessmentsWithScores,
+      improvementAreas,
+      competenceProgress: competenceProgress.map((item: any) => ({
+        competency: item.competency_name,
+        level: item.level,
+        score: item.score,
+        assessmentDate: item.assessment_date
+      })),
+      upcomingDeadlines: upcomingDeadlines.map((item: any) => ({
+        id: item.respondent_id,
+        cycleName: item.cycle_name,
+        participantName: item.participant_name,
+        endDate: item.end_date,
+        status: item.status
+      })),
+      overallAverage,
+      trendData,
+      categoryData
+    });
+  } catch (error) {
+    console.error('Ошибка получения персонализированного дашборда:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 // Сводка по системе (кол-ва и общий средний балл)
 // ВАЖНО: этот маршрут должен объявляться ДО маршрута "/:id",
 // чтобы "/summary" не перехватывался как ":id"

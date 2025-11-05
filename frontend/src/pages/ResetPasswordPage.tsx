@@ -21,7 +21,7 @@ export const ResetPasswordPage: React.FC = () => {
 
   // Если уже авторизован, перенаправляем на dashboard
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/my-dashboard" replace />;
   }
 
   // Если нет токена, перенаправляем на страницу входа
