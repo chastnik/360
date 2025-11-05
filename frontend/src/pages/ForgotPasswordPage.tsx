@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
+import { MeshGradient } from '@paper-design/shaders-react';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -40,36 +41,54 @@ export const ForgotPasswordPage: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-dark-100 dark:to-dark-200 flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          {/* Логотип и заголовок */}
-          <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
-              <span className="text-2xl text-white">✅</span>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Запрос отправлен
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Проверьте вашу электронную почту
-            </p>
-          </div>
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Background Shader */}
+        <div className="fixed inset-0 z-0">
+          <MeshGradient
+            style={{ height: "100vh", width: "100vw" }}
+            distortion={0.8}
+            swirl={0.1}
+            offsetX={0}
+            offsetY={0}
+            scale={1}
+            rotation={0}
+            speed={1}
+            colors={["hsl(216, 90%, 27%)", "hsl(243, 68%, 36%)", "hsl(205, 91%, 64%)", "hsl(211, 61%, 57%)"]}
+          />
+        </div>
 
-          {/* Сообщение об успехе */}
-          <div className="card p-8 shadow-large">
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
-              <p className="text-sm text-green-600 dark:text-green-400">
-                Если пользователь с таким email существует, на него будет отправлено письмо с инструкциями по сбросу пароля.
+        {/* Main content */}
+        <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
+          <div className="max-w-md w-full">
+            {/* Логотип и заголовок */}
+            <div className="text-center mb-8">
+              <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-4">
+                <span className="text-2xl text-white">✅</span>
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+                Запрос отправлен
+              </h1>
+              <p className="text-white/90 drop-shadow-md">
+                Проверьте вашу электронную почту
               </p>
             </div>
 
-            <div className="text-center">
-              <Link 
-                to="/login" 
-                className="text-primary-600 hover:text-primary-500 font-medium"
-              >
-                Вернуться к входу
-              </Link>
+            {/* Сообщение об успехе */}
+            <div className="card p-8 shadow-large">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  Если пользователь с таким email существует, на него будет отправлено письмо с инструкциями по сбросу пароля.
+                </p>
+              </div>
+
+              <div className="text-center">
+                <Link 
+                  to="/login" 
+                  className="text-primary-600 hover:text-primary-500 font-medium"
+                >
+                  Вернуться к входу
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -78,20 +97,37 @@ export const ForgotPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-dark-100 dark:to-dark-200 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Логотип и заголовок */}
-        <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl text-white">🔑</span>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Shader */}
+      <div className="fixed inset-0 z-0">
+        <MeshGradient
+          style={{ height: "100vh", width: "100vw" }}
+          distortion={0.8}
+          swirl={0.1}
+          offsetX={0}
+          offsetY={0}
+          scale={1}
+          rotation={0}
+          speed={1}
+          colors={["hsl(216, 90%, 27%)", "hsl(243, 68%, 36%)", "hsl(205, 91%, 64%)", "hsl(211, 61%, 57%)"]}
+        />
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
+        <div className="max-w-md w-full">
+          {/* Логотип и заголовок */}
+          <div className="text-center mb-8">
+            <div className="mx-auto w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mb-4">
+              <span className="text-2xl text-white">🔑</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+              Забыли пароль?
+            </h1>
+            <p className="text-white/90 drop-shadow-md">
+              Введите ваш email для получения инструкций по сбросу пароля
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Забыли пароль?
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Введите ваш email для получения инструкций по сбросу пароля
-          </p>
-        </div>
 
         {/* Форма сброса пароля */}
         <div className="card p-8 shadow-large">
@@ -156,10 +192,11 @@ export const ForgotPasswordPage: React.FC = () => {
         </div>
 
         {/* Дополнительная информация */}
-        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        <div className="mt-8 text-center text-sm text-white/80 drop-shadow-sm">
           <p>
-            © 2025 360° Assessment System. Все права защищены.
+           © 2025 БИТ.Цифра. Все права защищены.
           </p>
+        </div>
         </div>
       </div>
     </div>

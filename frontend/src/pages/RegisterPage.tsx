@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { MeshGradient } from '@paper-design/shaders-react';
 
 export const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -43,27 +44,44 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-dark-100 dark:to-dark-200 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Логотип и заголовок */}
-        <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl text-white">🏢</span>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Shader */}
+      <div className="fixed inset-0 z-0">
+        <MeshGradient
+          style={{ height: "100vh", width: "100vw" }}
+          distortion={0.8}
+          swirl={0.1}
+          offsetX={0}
+          offsetY={0}
+          scale={1}
+          rotation={0}
+          speed={1}
+          colors={["hsl(216, 90%, 27%)", "hsl(243, 68%, 36%)", "hsl(205, 91%, 64%)", "hsl(211, 61%, 57%)"]}
+        />
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
+        <div className="max-w-md w-full">
+          {/* Логотип и заголовок */}
+          <div className="text-center mb-8">
+            <div className="mx-auto w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mb-4">
+              <span className="text-2xl text-white">🏢</span>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+              Регистрация
+            </h1>
+            <p className="text-white/90 drop-shadow-md">
+              Создайте аккаунт для участия в оценке
+            </p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Регистрация
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Создайте аккаунт для участия в оценке
-          </p>
-        </div>
 
         {/* Форма регистрации */}
-        <div className="bg-white dark:bg-dark-300 rounded-xl shadow-lg p-8">
+        <div className="card p-8 shadow-large">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                {error}
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
               </div>
             )}
 
@@ -202,6 +220,7 @@ export const RegisterPage: React.FC = () => {
               </p>
             </div>
           </form>
+        </div>
         </div>
       </div>
     </div>

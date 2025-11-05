@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { MeshGradient } from '@paper-design/shaders-react';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -53,17 +54,34 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-dark-100 dark:to-dark-200 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Shader */}
+      <div className="fixed inset-0 z-0">
+        <MeshGradient
+          style={{ height: "100vh", width: "100vw" }}
+          distortion={0.8}
+          swirl={0.1}
+          offsetX={0}
+          offsetY={0}
+          scale={1}
+          rotation={0}
+          speed={1}
+          colors={["hsl(216, 90%, 27%)", "hsl(243, 68%, 36%)", "hsl(205, 91%, 64%)", "hsl(211, 61%, 57%)"]}
+        />
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
+        <div className="max-w-md w-full">
         {/* Логотип и заголовок */}
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center mb-4">
                             <span className="text-2xl text-white">🏢</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            360° Оценка
+          <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+            360°
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-white/90 drop-shadow-md">
             Система оценки персонала
           </p>
         </div>
@@ -175,10 +193,11 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Дополнительная информация */}
-        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        <div className="mt-8 text-center text-sm text-white/80 drop-shadow-sm">
           <p>
-            © 2025 360° Assessment System. Все права защищены.
+            © 2025 БИТ.Цифра. Все права защищены.
           </p>
+        </div>
         </div>
       </div>
     </div>
