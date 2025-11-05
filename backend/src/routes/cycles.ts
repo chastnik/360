@@ -42,6 +42,61 @@ router.get('/', authenticateToken, async (_req: AuthRequest, res: Response): Pro
   }
 });
 
+// Получить участников, которым нужно выбрать респондентов (для текущего пользователя)
+router.get('/participants-pending-respondents', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
+
+    // Получаем всех участников пользователя со статусом 'invited' в активных циклах
+    const participants = await db('assessment_participants')
+      .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
+      .where('assessment_participants.user_id', userId)
+      .where('assessment_participants.status', 'invited')
+      .where('assessment_cycles.status', 'active')
+      .select(
+        'assessment_participants.id as participant_id',
+        'assessment_cycles.id as cycle_id',
+        'assessment_cycles.name as cycle_name',
+        'assessment_cycles.description as cycle_description'
+      );
+
+    // Для каждого участника проверяем количество выбранных респондентов
+    const participantsNeedingRespondents = [];
+    for (const participant of participants) {
+      const respondentsCount = await db('assessment_respondents')
+        .where('participant_id', participant.participant_id)
+        .count('id as count')
+        .first();
+
+      const count = Number(respondentsCount?.count || 0);
+      // Если респондентов меньше 4 или их нет вообще, добавляем в список
+      if (count < 4) {
+        participantsNeedingRespondents.push({
+          participantId: participant.participant_id,
+          cycleId: participant.cycle_id,
+          cycleName: participant.cycle_name,
+          cycleDescription: participant.cycle_description,
+          respondentsCount: count,
+          minRequired: 4
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: participantsNeedingRespondents
+    });
+  } catch (error) {
+    console.error('Ошибка получения участников для выбора респондентов:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 // Получить информацию об участнике для выбора респондентов (должен быть ДО /:id)
 router.get('/participants/:participantId', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {

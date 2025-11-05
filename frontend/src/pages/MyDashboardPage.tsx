@@ -47,6 +47,15 @@ interface CategoryDataItem {
   count: number;
 }
 
+interface PendingRespondentSelection {
+  participantId: string;
+  cycleId: string;
+  cycleName: string;
+  cycleDescription?: string;
+  respondentsCount: number;
+  minRequired: number;
+}
+
 interface DashboardData {
   recentAssessments: RecentAssessment[];
   improvementAreas: ImprovementArea[];
@@ -61,13 +70,18 @@ export const MyDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [pendingRespondents, setPendingRespondents] = useState<PendingRespondentSelection[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await api.get('/reports/my-dashboard');
-        setData(res.data);
+        const [dashboardRes, pendingRes] = await Promise.all([
+          api.get('/reports/my-dashboard'),
+          api.get('/cycles/participants-pending-respondents').catch(() => ({ data: { success: true, data: [] } }))
+        ]);
+        setData(dashboardRes.data);
+        setPendingRespondents(pendingRes.data?.success ? pendingRes.data.data : []);
         setError(null);
       } catch (e: any) {
         console.error(e);
@@ -158,6 +172,49 @@ export const MyDashboardPage: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300">Персональная информация о ваших оценках и прогрессе</p>
         </div>
       </div>
+
+      {/* Уведомление о необходимости выбора респондентов */}
+      {pendingRespondents.length > 0 && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 shadow-sm">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                  Требуется выбрать респондентов
+                </h3>
+                <p className="text-yellow-800 dark:text-yellow-200 mb-4">
+                  У вас есть {pendingRespondents.length} {pendingRespondents.length === 1 ? 'цикл оценки' : 'цикла оценки'}, для которых необходимо выбрать респондентов.
+                </p>
+                <div className="space-y-2">
+                  {pendingRespondents.map((item, index) => (
+                    <div key={index} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-gray-900 dark:text-white">{item.cycleName}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            Выбрано: {item.respondentsCount} из {item.minRequired} респондентов
+                          </p>
+                        </div>
+                        <Link
+                          to={`/assessments/select-respondents/${item.participantId}`}
+                          className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+                        >
+                          Выбрать респондентов
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Основные графики */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

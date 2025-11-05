@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
+import api from '../services/api';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,10 +18,30 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [pendingRespondents, setPendingRespondents] = useState<any[]>([]);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
 
   const can = (perm?: string) => !perm || permissions.includes(perm);
+
+  // Загружаем участников, которым нужно выбрать респондентов
+  useEffect(() => {
+    const loadPendingRespondents = async () => {
+      try {
+        const response = await api.get('/cycles/participants-pending-respondents').catch(() => ({ data: { success: true, data: [] } }));
+        if (response.data?.success) {
+          setPendingRespondents(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки участников для выбора респондентов:', error);
+      }
+    };
+    loadPendingRespondents();
+    // Обновляем каждые 30 секунд
+    const interval = setInterval(loadPendingRespondents, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const navigation = [
     { name: 'Дашборд', href: '/dashboard', icon: '📊', perm: 'ui:view:dashboard' },
     { name: 'Мой дашборд', href: '/my-dashboard', icon: '📋' },
@@ -95,7 +116,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               {/* Заголовок с кнопкой закрытия */}
               <div className="flex items-center justify-between px-4 pt-5 pb-4 border-b border-gray-200 dark:border-gray-700">
                 <Link 
-                  to="/dashboard"
+                  to="/my-dashboard"
                   onClick={() => setSidebarOpen(false)}
                   className="block"
                 >
@@ -135,6 +156,37 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     {item.name}
                   </Link>
                 ))}
+                {/* Временный раздел для выбора респондентов */}
+                {pendingRespondents.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="px-3 mb-2">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Требуется действие
+                      </p>
+                    </div>
+                    {pendingRespondents.map((item, index) => (
+                      <Link
+                        key={index}
+                        to={`/assessments/select-respondents/${item.participantId}`}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`${
+                          location.pathname === `/assessments/select-respondents/${item.participantId}`
+                            ? 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-100'
+                            : 'text-yellow-700 hover:bg-yellow-50 dark:text-yellow-300 dark:hover:bg-yellow-900/20'
+                        } group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative`}
+                      >
+                        <span className="mr-3 text-lg">👥</span>
+                        <span className="flex-1">Выбор респондентов</span>
+                        <span className="ml-2 flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                        {pendingRespondents.length > 1 && (
+                          <span className="ml-2 flex-shrink-0 bg-yellow-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {pendingRespondents.length}
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </nav>
               
               {/* Информация о пользователе в мобильном меню */}
@@ -173,7 +225,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
                 <div className="px-4">
                   <Link 
-                    to="/dashboard"
+                    to="/my-dashboard"
                     className="block hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md p-2 -m-2 transition-colors"
                   >
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -199,6 +251,36 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       {item.name}
                     </Link>
                   ))}
+                  {/* Временный раздел для выбора респондентов */}
+                  {pendingRespondents.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="px-3 mb-2">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Требуется действие
+                        </p>
+                      </div>
+                      {pendingRespondents.map((item, index) => (
+                        <Link
+                          key={index}
+                          to={`/assessments/select-respondents/${item.participantId}`}
+                          className={`${
+                            location.pathname === `/assessments/select-respondents/${item.participantId}`
+                              ? 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900/30 dark:text-yellow-100'
+                              : 'text-yellow-700 hover:bg-yellow-50 dark:text-yellow-300 dark:hover:bg-yellow-900/20'
+                          } group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors relative`}
+                        >
+                          <span className="mr-3 text-lg">👥</span>
+                          <span className="flex-1">Выбор респондентов</span>
+                          <span className="ml-2 flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                          {pendingRespondents.length > 1 && (
+                            <span className="ml-2 flex-shrink-0 bg-yellow-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                              {pendingRespondents.length}
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </nav>
               </div>
             </div>

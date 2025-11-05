@@ -47,6 +47,7 @@ export const SelectRespondentsPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedRespondents, setSelectedRespondents] = useState<number[]>([]);
+  const [selectedUsersData, setSelectedUsersData] = useState<Map<number, User>>(new Map());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -82,10 +83,10 @@ export const SelectRespondentsPage: React.FC = () => {
       const errorMessage = err.response?.data?.error || 'Не удалось загрузить информацию об участнике';
       setError(errorMessage);
       
-      // Если ошибка доступа, перенаправляем на страницу циклов
+      // Если ошибка доступа, перенаправляем на мой дашборд
       if (err.response?.status === 403) {
         setTimeout(() => {
-          navigate('/cycles');
+          navigate('/my-dashboard');
         }, 3000);
       }
     } finally {
@@ -131,11 +132,41 @@ export const SelectRespondentsPage: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
+  // Синхронизируем данные выбранных пользователей из результатов поиска
+  useEffect(() => {
+    if (searchResults.length > 0) {
+      setSelectedUsersData(prevData => {
+        const newData = new Map(prevData);
+        searchResults.forEach(user => {
+          if (selectedRespondents.includes(user.id)) {
+            newData.set(user.id, user);
+          }
+        });
+        return newData;
+      });
+    }
+  }, [searchResults, selectedRespondents]);
+
   const toggleRespondent = (userId: number) => {
     setSelectedRespondents(prev => {
       if (prev.includes(userId)) {
+        // Удаляем пользователя из выбранных
+        setSelectedUsersData(prevData => {
+          const newData = new Map(prevData);
+          newData.delete(userId);
+          return newData;
+        });
         return prev.filter(id => id !== userId);
       } else {
+        // Добавляем пользователя в выбранные
+        const user = searchResults.find(u => u.id === userId);
+        if (user) {
+          setSelectedUsersData(prevData => {
+            const newData = new Map(prevData);
+            newData.set(userId, user);
+            return newData;
+          });
+        }
         return [...prev, userId];
       }
     });
@@ -167,6 +198,11 @@ export const SelectRespondentsPage: React.FC = () => {
 
   const removeRespondent = (userId: number) => {
     setSelectedRespondents(prev => prev.filter(id => id !== userId));
+    setSelectedUsersData(prevData => {
+      const newData = new Map(prevData);
+      newData.delete(userId);
+      return newData;
+    });
   };
 
   if (loading) {
@@ -184,10 +220,10 @@ export const SelectRespondentsPage: React.FC = () => {
           {error}
         </div>
         <button
-          onClick={() => navigate('/cycles')}
+          onClick={() => navigate('/my-dashboard')}
           className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium"
         >
-          Вернуться к циклам
+          Вернуться в мой дашборд
         </button>
       </div>
     );
@@ -316,14 +352,22 @@ export const SelectRespondentsPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex flex-wrap gap-2">
               {selectedRespondents.map((userId) => {
-                const user = searchResults.find(u => u.id === userId);
-                if (!user) return null;
+                // Ищем пользователя сначала в кэше, затем в результатах поиска
+                const user = selectedUsersData.get(userId) || searchResults.find(u => u.id === userId);
+                if (!user) {
+                  return null;
+                }
                 return (
                   <div
                     key={userId}
                     className="flex items-center gap-2 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 px-3 py-1 rounded-full"
                   >
                     <span>{user.first_name} {user.last_name}</span>
+                    {user.email && (
+                      <span className="text-xs text-primary-600 dark:text-primary-400">
+                        ({user.email})
+                      </span>
+                    )}
                     <button
                       onClick={() => removeRespondent(userId)}
                       className="text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200"
@@ -341,7 +385,7 @@ export const SelectRespondentsPage: React.FC = () => {
       {/* Кнопки действий */}
       <div className="flex justify-end gap-3">
         <button
-          onClick={() => navigate('/cycles')}
+          onClick={() => navigate('/my-dashboard')}
           className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
         >
           Отмена
