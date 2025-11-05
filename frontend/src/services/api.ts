@@ -10,7 +10,15 @@ import {
   AssessmentCycle 
 } from '../types/common';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Используем относительный путь для прокси (работает и в dev, и в production)
+// Если установлена переменная окружения REACT_APP_API_URL, используем её
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+
+console.log('API Configuration:', {
+  API_BASE_URL,
+  NODE_ENV: process.env.NODE_ENV,
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL
+});
 
 // Создаем экземпляр axios с базовой конфигурацией
 const api = axios.create({
@@ -48,9 +56,14 @@ api.interceptors.response.use(
         // Не перенаправляем, если запрос специально обрабатывает ошибку через catch
         // Перенаправляем только если это критичная ошибка авторизации на важных страницах
         const isLearningRequest = requestUrl?.includes('/learning/');
+        const isReportsRequest = requestUrl?.includes('/reports/');
         const isProtectedPage = !window.location.pathname.includes('/learning') && !window.location.pathname.includes('/survey');
         
-        if (!isLearningRequest && !isOnLoginPage && isProtectedPage) {
+        // Для запросов /reports/ и /learning/ не вызываем logout, если это не критичная ошибка
+        // (например, запрос к несуществующему циклу может вернуть 401, но это не значит что токен невалиден)
+        const isCriticalError = !isLearningRequest && !isReportsRequest && !isOnLoginPage && isProtectedPage;
+        
+        if (isCriticalError) {
           // Очищаем токен перед перенаправлением
           localStorage.removeItem('auth_token');
           
@@ -60,9 +73,10 @@ api.interceptors.response.use(
           
           // Не делаем дополнительный редирект - пусть AuthContext обработает через navigate
           // Это предотвращает двойной редирект и проблемы с навигацией
-        } else if (isLearningRequest) {
-          // Для learning запросов не перенаправляем - пусть компоненты обрабатывают ошибку
-          console.warn('401 error on learning endpoint:', requestUrl);
+        } else if (isLearningRequest || isReportsRequest) {
+          // Для learning и reports запросов не перенаправляем - пусть компоненты обрабатывают ошибку
+          console.warn(`401 error on ${isLearningRequest ? 'learning' : 'reports'} endpoint:`, requestUrl);
+          // Не очищаем токен и не вызываем logout - возможно это просто ошибка доступа к ресурсу
         }
       }
     }
@@ -75,11 +89,15 @@ export const authAPI = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
     try {
       const response = await api.post('/auth/login', { email, password });
+      console.log('Login API response:', response.data);
       return response.data;
     } catch (error: any) {
+      console.error('Login API error:', error);
+      console.error('Login API error response:', error.response?.data);
+      const errorMessage = error.response?.data?.error || error.message || 'Ошибка авторизации';
       return {
         success: false,
-        error: error.response?.data?.error || 'Ошибка авторизации'
+        error: errorMessage
       };
     }
   },

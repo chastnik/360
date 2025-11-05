@@ -141,7 +141,7 @@ export const ProfilePage: React.FC = () => {
     } finally {
       isLoadingDataRef.current = false;
     }
-  }, [user?.id, setUser]); // Используем только user.id, чтобы избежать бесконечного цикла
+  }, [user?.id, user?.department, user?.email, user?.first_name, user?.last_name, user?.position, setUser]);
 
   // Загрузка дополнительных данных (только один раз при монтировании или изменении user.id)
   useEffect(() => {

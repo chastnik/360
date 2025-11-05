@@ -100,7 +100,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      console.log('AuthContext: Starting login for:', email);
       const response = await authAPI.login(email, password);
+      console.log('AuthContext: Login response:', response);
       
       if (response.success && response.token) {
         const authToken = response.token;
@@ -163,8 +165,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
         
-        console.log('Добро пожаловать!');
-        navigate('/dashboard');
+        console.log('Добро пожаловать!', response.user);
+        // Перенаправляем на мой дашборд, который доступен всем пользователям
+        navigate('/my-dashboard');
       } else {
         throw new Error(response.error || 'Ошибка авторизации');
       }

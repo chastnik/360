@@ -24,11 +24,27 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Очищаем старый токен перед входом
+      // Полностью очищаем состояние перед входом
+      console.log('LoginPage: Clearing auth state before login');
       localStorage.removeItem('auth_token');
-      await login(email, password);
+      sessionStorage.clear();
+      
+      // Очищаем поля формы для безопасности
+      const emailToLogin = email.trim();
+      const passwordToLogin = password;
+      
+      console.log('LoginPage: Attempting login for:', emailToLogin);
+      await login(emailToLogin, passwordToLogin);
+      console.log('LoginPage: Login successful');
     } catch (err: any) {
-      setError(err.message || 'Ошибка авторизации');
+      console.error('LoginPage: Login error:', err);
+      console.error('LoginPage: Error details:', {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status
+      });
+      const errorMessage = err?.response?.data?.error || err?.message || 'Ошибка авторизации. Проверьте правильность email и пароля.';
+      setError(errorMessage);
       // Убеждаемся, что токен очищен при ошибке
       localStorage.removeItem('auth_token');
     } finally {

@@ -56,25 +56,74 @@ export const DashboardPage: React.FC = () => {
           setRecentCycles([]);
         }
 
-        // Пытаемся получить аналитику первого цикла (если есть)
-        let analytics: any = { avgScores: [], overallAverage: 0 };
+        // Получаем агрегированные данные по всем циклам
+        let categoryDataList: any[] = [];
         if (Array.isArray(cycles) && cycles.length > 0) {
           try {
-            const firstCycleId = cycles[0].id;
-            const analyticsRes = await api.get(`/reports/cycle/${firstCycleId}/analytics`);
-            analytics = analyticsRes.data || analytics;
-          } catch {
-            // оставляем дефолты, если аналитика недоступна
+            // Получаем аналитику по всем циклам и агрегируем данные
+            const analyticsPromises = cycles.map((cycle: any) => 
+              api.get(`/reports/cycle/${cycle.id}/analytics`).catch((error: any) => {
+                // Не логируем 401 ошибки - они обрабатываются interceptor'ом
+                if (error?.response?.status !== 401) {
+                  console.warn(`Ошибка получения аналитики для цикла ${cycle.id}:`, error?.response?.data?.error || error?.message);
+                }
+                return null;
+              })
+            );
+            const analyticsResults = await Promise.all(analyticsPromises);
+            
+            // Агрегируем данные по категориям из всех циклов
+            const categoryMap = new Map<string, { total: number; count: number; color: string }>();
+            
+            analyticsResults.forEach((result: any) => {
+              if (result?.data?.avgScores && Array.isArray(result.data.avgScores)) {
+                result.data.avgScores.forEach((item: any) => {
+                  const categoryName = item.category || item.category_name || '';
+                  const avgScore = Number(item.avgScore || item.avg_score || 0);
+                  const color = item.color || item.category_color || '#3B82F6';
+                  
+                  if (categoryName) {
+                    const existing = categoryMap.get(categoryName);
+                    if (existing) {
+                      existing.total += avgScore;
+                      existing.count += 1;
+                    } else {
+                      categoryMap.set(categoryName, { total: avgScore, count: 1, color });
+                    }
+                  }
+                });
+              }
+            });
+            
+            // Преобразуем в массив со средними значениями
+            categoryDataList = Array.from(categoryMap.entries()).map(([name, data], idx) => ({
+              id: idx,
+              name: name,
+              color: data.color,
+              average: data.count > 0 ? Math.round((data.total / data.count) * 100) / 100 : 0,
+              count: 0
+            })).sort((a, b) => a.name.localeCompare(b.name));
+          } catch (error) {
+            console.error('Ошибка получения агрегированной аналитики:', error);
+            // Если ошибка, пробуем получить данные хотя бы из первого цикла
+            try {
+              const firstCycleId = cycles[0].id;
+              const analyticsRes = await api.get(`/reports/cycle/${firstCycleId}/analytics`);
+              const analytics = analyticsRes.data || { avgScores: [] };
+              categoryDataList = Array.isArray(analytics.avgScores) ? analytics.avgScores.map((item: any, idx: number) => ({
+                id: idx,
+                name: item.category || item.category_name || `Категория ${idx + 1}`,
+                color: item.color || '#3B82F6',
+                average: Number(item.avgScore || item.avg_score || 0),
+                count: 0
+              })) : [];
+            } catch {
+              // оставляем пустой массив, если аналитика недоступна
+            }
           }
         }
 
-        const categories = Array.isArray(analytics.avgScores) ? analytics.avgScores.map((item: any, idx: number) => ({
-          id: idx,
-          name: item.category || item.category_name || `Категория ${idx + 1}`,
-          color: item.color || '#3B82F6',
-          average: Number(item.avgScore || item.avg_score || 0),
-          count: 0
-        })) : [];
+        const categories = categoryDataList;
 
         setCategoryData(categories);
         setSummary({
@@ -83,11 +132,11 @@ export const DashboardPage: React.FC = () => {
           cyclesActive: Number(activeCount ?? 0),
           participantsTotal: Number(summaryData.participantsTotal ?? 0),
           responsesTotal: Number(summaryData.responsesTotal ?? 0),
-          overallAverage: Number(summaryData.overallAverage ?? analytics.overallAverage ?? 0)
+          overallAverage: Number(summaryData.overallAverage ?? 0)
         });
 
         // Простой тренд (замок)
-        const base = Number(analytics.overallAverage || 3);
+        const base = Number(summaryData.overallAverage || 3);
         setTrendData([
           { date: 'Янв', score: Math.max(0, base - 0.3) },
           { date: 'Фев', score: Math.max(0, base - 0.2) },

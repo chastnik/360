@@ -47,6 +47,18 @@ interface CategoryBarChartProps {
 
 export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({ data, title }) => {
   const { isDark } = useTheme();
+  
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
+          Нет данных для отображения
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
@@ -80,6 +92,18 @@ interface RadarChartProps {
 
 export const CategoryRadarChart: React.FC<RadarChartProps> = ({ data, title }) => {
   const { isDark } = useTheme();
+  
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
+          Нет данных для отображения
+        </div>
+      </div>
+    );
+  }
+  
   const radarData = data.map(item => ({
     category: item.name,
     score: item.average,

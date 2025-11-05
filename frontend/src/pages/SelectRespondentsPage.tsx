@@ -54,7 +54,8 @@ export const SelectRespondentsPage: React.FC = () => {
     if (participantId) {
       loadParticipantInfo();
     }
-  }, [participantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participantId]); // loadParticipantInfo не добавляем в зависимости, чтобы избежать бесконечного цикла
 
   const loadParticipantInfo = async () => {
     try {
@@ -130,7 +131,8 @@ export const SelectRespondentsPage: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]); // searchUsers не добавляем в зависимости, чтобы избежать бесконечного цикла
 
   // Синхронизируем данные выбранных пользователей из результатов поиска
   useEffect(() => {

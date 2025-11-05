@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import StructurePage from './StructurePage';
 import VacationsPage from './VacationsPage';
+import CompetenceMatrixPage from './learning/CompetenceMatrixPage';
 
 const EmployeesPage: React.FC = () => {
   const location = useLocation();
@@ -12,12 +13,16 @@ const EmployeesPage: React.FC = () => {
     if (location.pathname.includes('/employees/vacations')) {
       return 'vacations';
     }
+    if (location.pathname.includes('/employees/competence-matrix')) {
+      return 'competence-matrix';
+    }
     return 'structure';
   });
 
   const tabs = [
     { id: 'structure', name: 'Структура', icon: '🏢' },
-    { id: 'vacations', name: 'Отпуска', icon: '🏖️' }
+    { id: 'vacations', name: 'Отпуска', icon: '🏖️' },
+    { id: 'competence-matrix', name: 'Матрица компетенций', icon: '🧠' }
   ];
 
   const renderContent = () => {
@@ -26,6 +31,8 @@ const EmployeesPage: React.FC = () => {
         return <StructurePage />;
       case 'vacations':
         return <VacationsPage />;
+      case 'competence-matrix':
+        return <CompetenceMatrixPage />;
       default:
         return <StructurePage />;
     }
