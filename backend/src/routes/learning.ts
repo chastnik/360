@@ -20,13 +20,13 @@ router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
     } else {
       users = await knex('users')
         .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department')
-        .where({ id: req.user?.id, is_active: true });
+        .where({ id: req.user?.userId, is_active: true });
     }
     
-    res.json(users);
+    return res.json(users);
   } catch (error) {
     console.error('Error fetching users for growth plans:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -43,20 +43,76 @@ router.get('/competencies', authenticateToken, async (req: AuthRequest, res) => 
       .where('is_active', true)
       .orderBy('name');
     
-    res.json(competencies);
+    return res.json(competencies);
   } catch (error) {
     console.error('Error fetching competencies:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Получить все курсы
 router.get('/courses', authenticateToken, async (req, res) => {
   try {
-    const courses = await knex('training_courses')
-      .select('*')
-      .where('is_active', true)
-      .orderBy('name');
+    const { competency_id, search } = req.query;
+    
+    // Проверяем, существует ли колонка competency_id
+    const hasCompetencyColumn = await knex.schema.hasColumn('training_courses', 'competency_id');
+    
+    let query;
+    if (hasCompetencyColumn) {
+      // Если колонка существует, используем JOIN
+      query = knex('training_courses')
+        .leftJoin('competencies as c', 'training_courses.competency_id', 'c.id')
+        .select(
+          'training_courses.*',
+          'c.id as competency_id',
+          'c.name as competency_name',
+          'c.description as competency_description'
+        )
+        .where('training_courses.is_active', true);
+    } else {
+      // Если колонка не существует, получаем курсы без JOIN
+      query = knex('training_courses')
+        .select('*')
+        .where('is_active', true);
+    }
+    
+    // Фильтр по компетенции
+    if (hasCompetencyColumn && competency_id) {
+      const competencyIdStr = String(competency_id).trim();
+      if (competencyIdStr && competencyIdStr !== '' && competencyIdStr !== 'null') {
+        console.log('Filtering by competency_id:', competencyIdStr);
+        query = query.where('training_courses.competency_id', competencyIdStr);
+      }
+    } else if (hasCompetencyColumn && competency_id === '') {
+      // Если выбрано "Все компетенции", не фильтруем
+      console.log('No competency filter applied');
+    } else if (!hasCompetencyColumn && competency_id) {
+      console.log('Warning: competency_id column does not exist, filter ignored');
+    }
+    
+    // Поиск (полнотекстовый) по названию и описанию
+    if (search && typeof search === 'string') {
+      const searchTerm = `%${search.trim()}%`;
+      query = query.where(function() {
+        if (hasCompetencyColumn) {
+          this.where('training_courses.name', 'ilike', searchTerm)
+            .orWhere('training_courses.description', 'ilike', searchTerm);
+        } else {
+          this.where('name', 'ilike', searchTerm)
+            .orWhere('description', 'ilike', searchTerm);
+        }
+      });
+    }
+    
+    // Сортировка
+    if (hasCompetencyColumn) {
+      query = query.orderBy('training_courses.name');
+    } else {
+      query = query.orderBy('name');
+    }
+    
+    const courses = await query;
     
     // Добавляем информацию о связях для каждого курса
     for (const course of courses) {
@@ -74,12 +130,28 @@ router.get('/courses', authenticateToken, async (req, res) => {
       
       course.prerequisites = prerequisites;
       course.corequisites = corequisites;
+      
+      // Формируем объект компетенции, если она есть
+      if (hasCompetencyColumn && course.competency_id) {
+        course.competency = {
+          id: course.competency_id,
+          name: course.competency_name,
+          description: course.competency_description
+        };
+      }
+      
+      // Удаляем промежуточные поля
+      if (hasCompetencyColumn) {
+        delete course.competency_id;
+        delete course.competency_name;
+        delete course.competency_description;
+      }
     }
     
-    res.json(courses);
+    return res.json(courses);
   } catch (error) {
     console.error('Error fetching courses:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -88,10 +160,29 @@ router.get('/courses/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const course = await knex('training_courses')
-      .select('*')
-      .where('id', id)
-      .first();
+    // Проверяем, существует ли колонка competency_id
+    const hasCompetencyColumn = await knex.schema.hasColumn('training_courses', 'competency_id');
+    
+    let course;
+    if (hasCompetencyColumn) {
+      // Если колонка существует, используем JOIN
+      course = await knex('training_courses')
+        .leftJoin('competencies as c', 'training_courses.competency_id', 'c.id')
+        .select(
+          'training_courses.*',
+          'c.id as competency_id',
+          'c.name as competency_name',
+          'c.description as competency_description'
+        )
+        .where('training_courses.id', id)
+        .first();
+    } else {
+      // Если колонка не существует, получаем курс без JOIN
+      course = await knex('training_courses')
+        .select('*')
+        .where('id', id)
+        .first();
+    }
     
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
@@ -109,36 +200,64 @@ router.get('/courses/:id', authenticateToken, async (req, res) => {
       .select('tc.*')
       .where('cc.course_id', id);
     
-    res.json({
+    // Формируем объект компетенции, если она есть
+    let competency = null;
+    if (hasCompetencyColumn && course.competency_id) {
+      competency = {
+        id: course.competency_id,
+        name: course.competency_name,
+        description: course.competency_description
+      };
+    }
+    
+    // Удаляем промежуточные поля
+    if (hasCompetencyColumn) {
+      delete course.competency_id;
+      delete course.competency_name;
+      delete course.competency_description;
+    }
+    
+    return res.json({
       ...course,
+      competency,
       prerequisites,
       corequisites
     });
   } catch (error) {
     console.error('Error fetching course:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Создать новый курс
 router.post('/courses', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { name, description, hours, target_level, system_id, prerequisites, corequisites } = req.body;
+    const { name, description, hours, target_level, system_id, competency_id, prerequisites, corequisites } = req.body;
     
     // Проверяем права доступа
     if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
       return res.status(403).json({ error: 'Access denied' });
     }
     
+    // Проверяем, существует ли колонка competency_id
+    const hasCompetencyColumn = await knex.schema.hasColumn('training_courses', 'competency_id');
+    
+    const insertData: any = {
+      name,
+      description,
+      hours,
+      target_level,
+      system_id,
+      is_active: true
+    };
+    
+    // Добавляем competency_id только если колонка существует
+    if (hasCompetencyColumn) {
+      insertData.competency_id = competency_id || null;
+    }
+    
     const [course] = await knex('training_courses')
-      .insert({
-        name,
-        description,
-        hours,
-        target_level,
-        system_id,
-        is_active: true
-      })
+      .insert(insertData)
       .returning('*');
     
     // Добавляем prerequisites
@@ -159,10 +278,10 @@ router.post('/courses', authenticateToken, async (req: AuthRequest, res) => {
       await knex('course_corequisites').insert(coreqData);
     }
     
-    res.status(201).json(course);
+    return res.status(201).json(course);
   } catch (error) {
     console.error('Error creating course:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -170,28 +289,49 @@ router.post('/courses', authenticateToken, async (req: AuthRequest, res) => {
 router.put('/courses/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { name, description, hours, target_level, system_id, is_active, prerequisites, corequisites } = req.body;
+    const { name, description, hours, target_level, system_id, competency_id, is_active, prerequisites, corequisites } = req.body;
+    
+    console.log('Updating course:', id, 'competency_id:', competency_id);
     
     // Проверяем права доступа
     if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
       return res.status(403).json({ error: 'Access denied' });
     }
     
+    // Проверяем, существует ли колонка competency_id
+    const hasCompetencyColumn = await knex.schema.hasColumn('training_courses', 'competency_id');
+    console.log('Has competency column:', hasCompetencyColumn);
+    
+    const updateData: any = {
+      name,
+      description,
+      hours,
+      target_level,
+      system_id,
+      is_active
+    };
+    
+    // Добавляем competency_id только если колонка существует
+    if (hasCompetencyColumn) {
+      // Если competency_id передана и не пустая строка, используем её, иначе null
+      if (competency_id !== undefined && competency_id !== null && competency_id !== '') {
+        updateData.competency_id = String(competency_id).trim() || null;
+      } else {
+        updateData.competency_id = null;
+      }
+      console.log('Setting competency_id to:', updateData.competency_id);
+    }
+    
     const [course] = await knex('training_courses')
       .where('id', id)
-      .update({
-        name,
-        description,
-        hours,
-        target_level,
-        system_id,
-        is_active
-      })
+      .update(updateData)
       .returning('*');
     
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
     }
+    
+    console.log('Updated course competency_id:', course.competency_id);
     
     // Обновляем prerequisites
     await knex('course_prerequisites').where('course_id', id).del();
@@ -213,10 +353,48 @@ router.put('/courses/:id', authenticateToken, async (req: AuthRequest, res) => {
       await knex('course_corequisites').insert(coreqData);
     }
     
-    res.json(course);
+    // Получаем обновленный курс с компетенцией для ответа
+    let updatedCourse = course;
+    
+    if (hasCompetencyColumn) {
+      const courseWithCompetency = await knex('training_courses')
+        .leftJoin('competencies as c', 'training_courses.competency_id', 'c.id')
+        .select(
+          'training_courses.*',
+          'c.id as competency_id',
+          'c.name as competency_name',
+          'c.description as competency_description'
+        )
+        .where('training_courses.id', id)
+        .first();
+      
+      if (courseWithCompetency) {
+        // Формируем объект компетенции, если она есть
+        if (courseWithCompetency.competency_id) {
+          updatedCourse = {
+            ...courseWithCompetency,
+            competency: {
+              id: courseWithCompetency.competency_id,
+              name: courseWithCompetency.competency_name,
+              description: courseWithCompetency.competency_description
+            }
+          };
+          delete updatedCourse.competency_id;
+          delete updatedCourse.competency_name;
+          delete updatedCourse.competency_description;
+        } else {
+          updatedCourse = courseWithCompetency;
+          delete updatedCourse.competency_id;
+          delete updatedCourse.competency_name;
+          delete updatedCourse.competency_description;
+        }
+      }
+    }
+    
+    return res.json(updatedCourse);
   } catch (error) {
     console.error('Error updating course:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -238,10 +416,10 @@ router.delete('/courses/:id', authenticateToken, async (req: AuthRequest, res) =
       return res.status(404).json({ error: 'Course not found' });
     }
     
-    res.json({ message: 'Course deleted successfully' });
+    return res.json({ message: 'Course deleted successfully' });
   } catch (error) {
     console.error('Error deleting course:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -254,7 +432,7 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
       .select('gp.*', 'u.first_name', 'u.last_name', 'u.email');
     
     if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
-      plansQuery = plansQuery.where('gp.user_id', req.user?.id);
+      plansQuery = plansQuery.where('gp.user_id', req.user?.userId);
     }
     
     const plans = await plansQuery.orderBy('gp.created_at', 'desc');
@@ -277,10 +455,10 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
       plan.test_results = testResults;
     }
     
-    res.json(plans);
+    return res.json(plans);
   } catch (error) {
     console.error('Error fetching growth plans:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -290,8 +468,8 @@ router.post('/growth-plans', authenticateToken, async (req: AuthRequest, res) =>
     const { user_id, start_date, study_load_percent, courses, courseSelections } = req.body;
     
     // Проверяем права доступа - только админы и HR могут создавать планы для других пользователей
-    const targetUserId = user_id || req.user?.id;
-    if (user_id && user_id !== req.user?.id && req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+    const targetUserId = user_id || req.user?.userId;
+    if (user_id && user_id !== req.user?.userId && req.user?.role !== 'admin' && req.user?.role !== 'hr') {
       return res.status(403).json({ error: 'Access denied' });
     }
     
@@ -360,10 +538,10 @@ router.post('/growth-plans', authenticateToken, async (req: AuthRequest, res) =>
       await knex('growth_plan_courses').insert(courseData);
     }
     
-    res.status(201).json(plan);
+    return res.status(201).json(plan);
   } catch (error) {
     console.error('Error creating growth plan:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -372,7 +550,7 @@ router.put('/growth-plans/:id', authenticateToken, async (req: AuthRequest, res)
   try {
     const { id } = req.params;
     const { start_date, study_load_percent, status, courses } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     
     // Проверяем, что план принадлежит пользователю
     const existingPlan = await knex('growth_plans')
@@ -429,10 +607,10 @@ router.put('/growth-plans/:id', authenticateToken, async (req: AuthRequest, res)
     
     // Получаем обновленный план
     const updatedPlan = await knex('growth_plans').where('id', id).first();
-    res.json(updatedPlan || plan);
+    return res.json(updatedPlan || plan);
   } catch (error) {
     console.error('Error updating growth plan:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -440,7 +618,7 @@ router.put('/growth-plans/:id', authenticateToken, async (req: AuthRequest, res)
 router.post('/test-results', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { growth_plan_id, course_id, status, test_date, notes } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     
     // Проверяем, что план существует и пользователь имеет к нему доступ
     let planQuery = knex('growth_plans').where('id', growth_plan_id);
@@ -474,7 +652,7 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
         })
         .returning('*');
       
-      res.json(updatedTest);
+      return res.json(updatedTest);
     } else {
       // Создаем новый результат
       const [testResult] = await knex('test_results')
@@ -487,11 +665,11 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
         })
         .returning('*');
       
-      res.status(201).json(testResult);
+      return res.status(201).json(testResult);
     }
   } catch (error) {
     console.error('Error creating test result:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -499,7 +677,7 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
 router.delete('/test-results/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     
     // Получаем результат теста
     const testResult = await knex('test_results')
@@ -529,17 +707,17 @@ router.delete('/test-results/:id', authenticateToken, async (req: AuthRequest, r
       .where('id', id)
       .delete();
     
-    res.json({ success: true, message: 'Test result deleted' });
+    return res.json({ success: true, message: 'Test result deleted' });
   } catch (error) {
     console.error('Error deleting test result:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Получить матрицу компетенций пользователя
 router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -563,10 +741,10 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
       )
       .orderBy('competencies.name');
     
-    res.json(matrix);
+    return res.json(matrix);
   } catch (error) {
     console.error('Error fetching competence matrix:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -604,10 +782,10 @@ router.get('/competence-matrix/all', authenticateToken, async (req: AuthRequest,
       .orderBy('users.last_name', 'users.first_name')
       .orderBy('competencies.name');
     
-    res.json(matrix);
+    return res.json(matrix);
   } catch (error) {
     console.error('Error fetching all users competence matrix:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -622,7 +800,7 @@ router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, re
     }
     
     // Используем переданный user_id или текущего пользователя
-    const targetUserId = user_id || req.user?.id;
+    const targetUserId = user_id || req.user?.userId;
     
     const [matrix] = await knex('competence_matrix')
       .insert({
@@ -637,10 +815,10 @@ router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, re
       .merge()
       .returning('*');
     
-    res.status(201).json(matrix);
+    return res.status(201).json(matrix);
   } catch (error) {
     console.error('Error updating competence matrix:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -680,10 +858,10 @@ router.get('/training-schedule', authenticateToken, async (req: AuthRequest, res
       plan.test_results = testResults;
     }
     
-    res.json(schedule);
+    return res.json(schedule);
   } catch (error) {
     console.error('Error fetching training schedule:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

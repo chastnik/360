@@ -2,6 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 
+interface Competency {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 interface Course {
   id: number;
   name: string;
@@ -9,37 +15,79 @@ interface Course {
   hours: number;
   target_level: 'junior' | 'middle' | 'senior';
   is_active: boolean;
+  competency?: Competency;
   prerequisites?: Course[];
   corequisites?: Course[];
 }
 
 const CoursesPage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [viewingCourse, setViewingCourse] = useState<Course | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCompetencyId, setSelectedCompetencyId] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     hours: 0,
     target_level: 'junior' as 'junior' | 'middle' | 'senior',
+    competency_id: '' as string | '',
     prerequisites: [] as number[],
     corequisites: [] as number[]
   });
 
   useEffect(() => {
-    fetchCourses();
+    fetchCompetencies();
+    fetchCourses(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchCourses = async () => {
+  useEffect(() => {
+    // Задержка для поиска, чтобы не делать запрос при каждом изменении
+    const timeoutId = setTimeout(() => {
+      // Не устанавливаем loading при поиске, чтобы не вызывать перезагрузку
+      fetchCourses(false);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, selectedCompetencyId]);
+
+  const fetchCompetencies = async () => {
     try {
-      const response = await api.get('/learning/courses');
+      const response = await api.get('/learning/competencies');
+      setCompetencies(response.data);
+    } catch (error) {
+      console.error('Error fetching competencies:', error);
+    }
+  };
+
+  const fetchCourses = async (showLoading: boolean = true) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      const params = new URLSearchParams();
+      if (selectedCompetencyId && selectedCompetencyId.trim()) {
+        params.append('competency_id', selectedCompetencyId.trim());
+      }
+      if (searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
+      }
+      
+      const url = `/learning/courses${params.toString() ? '?' + params.toString() : ''}`;
+      console.log('Fetching courses with URL:', url);
+      const response = await api.get(url);
       setCourses(response.data);
+      console.log('Fetched courses count:', response.data.length);
     } catch (error) {
       console.error('Error fetching courses:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -47,9 +95,9 @@ const CoursesPage: React.FC = () => {
     e.preventDefault();
     try {
       const response = await api.post('/learning/courses', formData);
-      setCourses([...courses, response.data]);
+      await fetchCourses(true);
       setShowCreateModal(false);
-      setFormData({ name: '', description: '', hours: 0, target_level: 'junior', prerequisites: [], corequisites: [] });
+      setFormData({ name: '', description: '', hours: 0, target_level: 'junior', competency_id: '', prerequisites: [], corequisites: [] });
     } catch (error) {
       console.error('Error creating course:', error);
     }
@@ -59,17 +107,20 @@ const CoursesPage: React.FC = () => {
     e.preventDefault();
     if (!editingCourse) return;
     try {
+      console.log('Updating course with formData:', formData);
       const response = await api.put(`/learning/courses/${editingCourse.id}`, formData);
-      setCourses(courses.map(c => c.id === editingCourse.id ? response.data : c));
+      console.log('Course updated, response:', response.data);
+      await fetchCourses(true);
       setEditingCourse(null);
-      setFormData({ name: '', description: '', hours: 0, target_level: 'junior', prerequisites: [], corequisites: [] });
+      setFormData({ name: '', description: '', hours: 0, target_level: 'junior', competency_id: '', prerequisites: [], corequisites: [] });
     } catch (error) {
       console.error('Error updating course:', error);
+      alert('Ошибка при обновлении курса. Проверьте консоль для подробностей.');
     }
   };
 
   const openCreateModal = () => {
-    setFormData({ name: '', description: '', hours: 0, target_level: 'junior', prerequisites: [], corequisites: [] });
+    setFormData({ name: '', description: '', hours: 0, target_level: 'junior', competency_id: '', prerequisites: [], corequisites: [] });
     setShowCreateModal(true);
   };
 
@@ -84,6 +135,7 @@ const CoursesPage: React.FC = () => {
         description: fullCourse.description,
         hours: fullCourse.hours,
         target_level: fullCourse.target_level,
+        competency_id: fullCourse.competency ? fullCourse.competency.id : '',
         prerequisites: fullCourse.prerequisites ? fullCourse.prerequisites.map((p: Course) => p.id) : [],
         corequisites: fullCourse.corequisites ? fullCourse.corequisites.map((c: Course) => c.id) : []
       });
@@ -96,6 +148,7 @@ const CoursesPage: React.FC = () => {
         description: course.description,
         hours: course.hours,
         target_level: course.target_level,
+        competency_id: course.competency ? course.competency.id : '',
         prerequisites: [],
         corequisites: []
       });
@@ -159,6 +212,85 @@ const CoursesPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Фильтры и поиск */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div 
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          onKeyDown={(e) => {
+            // Предотвращаем отправку формы при нажатии Enter в любом поле
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              fetchCourses(false);
+            }
+          }}
+        >
+          {/* Поиск */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              🔍 Поиск по курсам
+            </label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                // Предотвращаем отправку формы при нажатии Enter
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  fetchCourses(false);
+                }
+              }}
+              placeholder="Введите название или описание курса..."
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          
+          {/* Фильтр по компетенции */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              🧠 Фильтр по компетенции
+            </label>
+            <select
+              value={selectedCompetencyId}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedCompetencyId(value);
+                // Сразу загружаем курсы при изменении фильтра без показа loading
+                setTimeout(() => {
+                  fetchCourses(false);
+                }, 100);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="">Все компетенции</option>
+              {competencies.map((competency) => (
+                <option key={competency.id} value={competency.id}>
+                  {competency.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        {/* Кнопка сброса фильтров */}
+        {(searchTerm || selectedCompetencyId) && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCompetencyId('');
+              }}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+            >
+              ✕ Сбросить фильтры
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {courses.map((course) => (
           <div
@@ -190,6 +322,19 @@ const CoursesPage: React.FC = () => {
                 {course.is_active ? '✅ Активен' : '❌ Неактивен'}
               </span>
             </div>
+
+            {course.competency && (
+              <div className="mb-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  🧠 Компетенция:
+                </span>
+                <div className="mt-1">
+                  <span className="inline-block bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-400 text-xs px-2 py-1 rounded">
+                    {course.competency.name}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {course.prerequisites && course.prerequisites.length > 0 && (
               <div className="mb-3">
@@ -249,17 +394,34 @@ const CoursesPage: React.FC = () => {
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📚</div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Курсы не найдены
+            {searchTerm || selectedCompetencyId ? 'Курсы не найдены' : 'Курсы не найдены'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Создайте первый курс для начала работы с модулем обучения
+            {searchTerm || selectedCompetencyId 
+              ? 'Попробуйте изменить параметры поиска или фильтрации'
+              : 'Создайте первый курс для начала работы с модулем обучения'
+            }
           </p>
-          <button
-            onClick={openCreateModal}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-          >
-            Создать курс
-          </button>
+          {!searchTerm && !selectedCompetencyId && (
+            <button
+              onClick={openCreateModal}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
+            >
+              Создать курс
+            </button>
+          )}
+          {(searchTerm || selectedCompetencyId) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCompetencyId('');
+              }}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg"
+            >
+              Сбросить фильтры
+            </button>
+          )}
         </div>
       )}
 
@@ -321,6 +483,26 @@ const CoursesPage: React.FC = () => {
                     <option value="middle">🌿 Middle</option>
                     <option value="senior">🌳 Senior</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    🧠 Компетенция
+                  </label>
+                  <select
+                    value={formData.competency_id}
+                    onChange={(e) => setFormData({ ...formData, competency_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Не выбрана</option>
+                    {competencies.map((competency) => (
+                      <option key={competency.id} value={competency.id}>
+                        {competency.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Выберите компетенцию, к которой привязан курс
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -401,7 +583,7 @@ const CoursesPage: React.FC = () => {
                   onClick={() => {
                     setShowCreateModal(false);
                     setEditingCourse(null);
-                    setFormData({ name: '', description: '', hours: 0, target_level: 'junior', prerequisites: [], corequisites: [] });
+                    setFormData({ name: '', description: '', hours: 0, target_level: 'junior', competency_id: '', prerequisites: [], corequisites: [] });
                   }}
                   className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                 >
@@ -458,6 +640,17 @@ const CoursesPage: React.FC = () => {
                   {viewingCourse.is_active ? '✅ Активен' : '❌ Неактивен'}
                 </span>
               </div>
+              {viewingCourse.competency && (
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">🧠 Компетенция</h3>
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg">
+                    <span className="font-medium text-indigo-800 dark:text-indigo-400">{viewingCourse.competency.name}</span>
+                    {viewingCourse.competency.description && (
+                      <p className="text-sm text-indigo-600 dark:text-indigo-300 mt-1">{viewingCourse.competency.description}</p>
+                    )}
+                  </div>
+                </div>
+              )}
               {viewingCourse.prerequisites && viewingCourse.prerequisites.length > 0 && (
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">📋 Требования</h3>
