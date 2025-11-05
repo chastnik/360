@@ -230,7 +230,7 @@ export const ResetPasswordPage: React.FC = () => {
         {/* Дополнительная информация */}
         <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>
-            © 2025 360° Assessment System. Все права защищены.
+           © 2025 БИТ.Цифра. Все права защищены.
           </p>
         </div>
       </div>

@@ -556,9 +556,21 @@ const AdminUsers: React.FC = () => {
               {selectedUser && (
                 <div className="mt-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Загрузить новый аватар</label>
-                  <input type="file" accept="image/*" onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} className="text-sm" />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e)=> setAvatarFile(e.target.files?.[0] || null)} 
+                    className="text-sm" 
+                    disabled={avatarUploading}
+                  />
                   {avatarFile && (
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Выбран файл: {avatarFile.name}</div>
+                  )}
+                  {avatarUploading && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                      Загрузка аватара...
+                    </div>
                   )}
                 </div>
               )}

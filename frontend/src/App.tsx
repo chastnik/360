@@ -13,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MyDashboardPage } from './pages/MyDashboardPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -317,20 +318,7 @@ function App() {
               } />
               
               {/* 404 страница */}
-              <Route path="*" element={
-                <div className="min-h-screen flex items-center justify-center">
-                  <div className="text-center">
-                    <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
-                    <p className="text-xl text-muted-foreground mb-8">Страница не найдена</p>
-                    <button 
-                      onClick={() => window.history.back()}
-                      className="btn btn-primary"
-                    >
-                      Вернуться назад
-                    </button>
-                  </div>
-                </div>
-              } />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </div>
         </AuthProvider>

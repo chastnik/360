@@ -256,7 +256,6 @@ const GrowthPlansPage: React.FC = () => {
       
       newSelections.forEach((selection, id) => {
         if (selection.addedAutomatically) {
-          const course = courses.find(c => c.id === id);
           const isNeededAsPrereq = remainingCourses.some(remainingId => {
             const remainingCourse = courses.find(c => c.id === remainingId);
             return remainingCourse?.prerequisites?.some(p => p.id === id) || 
@@ -334,21 +333,22 @@ const GrowthPlansPage: React.FC = () => {
     }
   };
 
-  const handleAddTestResult = async (formData: any) => {
-    try {
-      await api.post('/learning/test-results', {
-        ...formData,
-        growth_plan_id: selectedPlan?.id,
-        course_id: selectedCourse?.id
-      });
-      setShowTestModal(false);
-      setSelectedPlan(null);
-      setSelectedCourse(null);
-      fetchData();
-    } catch (error) {
-      console.error('Error adding test result:', error);
-    }
-  };
+  // Не используется - закомментировано для будущего использования
+  // const handleAddTestResult = async (formData: any) => {
+  //   try {
+  //     await api.post('/learning/test-results', {
+  //       ...formData,
+  //       growth_plan_id: selectedPlan?.id,
+  //       course_id: selectedCourse?.id
+  //     });
+  //     setShowTestModal(false);
+  //     setSelectedPlan(null);
+  //     setSelectedCourse(null);
+  //     fetchData();
+  //   } catch (error) {
+  //     console.error('Error adding test result:', error);
+  //   }
+  // };
 
   if (loading) {
     return (

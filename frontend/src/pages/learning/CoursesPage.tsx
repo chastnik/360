@@ -94,7 +94,7 @@ const CoursesPage: React.FC = () => {
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await api.post('/learning/courses', formData);
+      await api.post('/learning/courses', formData);
       await fetchCourses(true);
       setShowCreateModal(false);
       setFormData({ name: '', description: '', hours: 0, target_level: 'junior', competency_id: '', prerequisites: [], corequisites: [] });

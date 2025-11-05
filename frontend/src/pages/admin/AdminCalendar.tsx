@@ -1,7 +1,7 @@
 // © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
 interface WorkScheduleDay {
@@ -53,11 +53,7 @@ const AdminCalendar: React.FC = () => {
   });
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  useEffect(() => {
-    loadData();
-  }, [selectedYear]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -92,7 +88,11 @@ const AdminCalendar: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedYear]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSaveSchedule = async () => {
     try {

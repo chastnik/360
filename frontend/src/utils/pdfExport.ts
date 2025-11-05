@@ -89,7 +89,7 @@ export const exportToPDF = async (
       el.style.display = '';
     });
 
-    const imgData = canvas.toDataURL('image/png');
+    // const imgData = canvas.toDataURL('image/png'); // Не используется - заготовка для будущего использования
     
     // Размеры A4 в мм
     const a4Width = 210; // ширина A4
