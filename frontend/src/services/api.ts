@@ -53,10 +53,13 @@ api.interceptors.response.use(
         if (!isLearningRequest && !isOnLoginPage && isProtectedPage) {
           // Очищаем токен перед перенаправлением
           localStorage.removeItem('auth_token');
-          // Используем setTimeout для избежания проблем с навигацией
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 100);
+          
+          // Триггерим событие для уведомления AuthContext о необходимости очистки состояния
+          // Это позволит AuthContext самому обработать редирект через navigate
+          window.dispatchEvent(new CustomEvent('auth:logout'));
+          
+          // Не делаем дополнительный редирект - пусть AuthContext обработает через navigate
+          // Это предотвращает двойной редирект и проблемы с навигацией
         } else if (isLearningRequest) {
           // Для learning запросов не перенаправляем - пусть компоненты обрабатывают ошибку
           console.warn('401 error on learning endpoint:', requestUrl);

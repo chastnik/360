@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 import VacationModal from '../components/VacationModal';
 
 export const ProfilePage: React.FC = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, permissions } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -37,17 +37,39 @@ export const ProfilePage: React.FC = () => {
   const [editingVacation, setEditingVacation] = useState<any | null>(null);
   const [vacationLoading, setVacationLoading] = useState(false);
 
+  // Флаг для предотвращения множественных одновременных загрузок
+  const isLoadingDataRef = useRef(false);
+
   const loadAdditionalData = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
+    
+    // Предотвращаем множественные одновременные загрузки
+    if (isLoadingDataRef.current) {
+      console.log('⚠️ Загрузка данных уже выполняется, пропускаем запрос');
+      return;
+    }
+    
+    isLoadingDataRef.current = true;
 
     try {
       // Сначала загружаем свежие данные пользователя
       const currentUserResponse = await api.get(`/users/${user.id}`);
       const currentUserData = currentUserResponse.data?.success ? currentUserResponse.data.data : currentUserResponse.data;
       
-      // Обновляем пользователя в контексте, если данные изменились
+      // Обновляем форму, но не обновляем пользователя в контексте, чтобы избежать бесконечного цикла
       if (currentUserData) {
-        setUser(currentUserData);
+        // Обновляем пользователя в контексте только если данные действительно изменились
+        const userChanged = 
+          currentUserData.first_name !== user.first_name ||
+          currentUserData.last_name !== user.last_name ||
+          currentUserData.email !== user.email ||
+          currentUserData.position !== user.position ||
+          currentUserData.department !== user.department;
+        
+        if (userChanged) {
+          setUser(currentUserData);
+        }
+        
         setName(`${currentUserData.first_name || ''} ${currentUserData.last_name || ''}`.trim());
         setEmail(currentUserData.email || '');
         setPosition(currentUserData.position || '');
@@ -116,13 +138,18 @@ export const ProfilePage: React.FC = () => {
       await Promise.all(promises);
     } catch (error) {
       console.error('Ошибка загрузки дополнительных данных:', error);
+    } finally {
+      isLoadingDataRef.current = false;
     }
-  }, [user, setUser]);
+  }, [user?.id, setUser]); // Используем только user.id, чтобы избежать бесконечного цикла
 
-  // Загрузка дополнительных данных
+  // Загрузка дополнительных данных (только один раз при монтировании или изменении user.id)
   useEffect(() => {
-    loadAdditionalData();
-  }, [loadAdditionalData]);
+    if (user?.id) {
+      loadAdditionalData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Используем только user.id, loadAdditionalData не включаем в зависимости
 
   // Обновление формы при изменении пользователя
   useEffect(() => {
@@ -214,7 +241,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6">
       {/* Заголовок */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Настройки профиля</h1>
@@ -507,28 +534,65 @@ export const ProfilePage: React.FC = () => {
           setEditingVacation(null);
         }}
         onSave={async (vacationData) => {
+          // Предотвращаем множественные запросы
+          if (vacationLoading) {
+            console.log('⚠️ Сохранение уже выполняется, игнорируем повторный запрос');
+            return;
+          }
+
           try {
             setVacationLoading(true);
             console.log('💾 Сохранение отпуска:', vacationData);
-            // Убеждаемся, что user_id присутствует в данных
-            const dataToSend = {
-              ...vacationData,
-              user_id: vacationData.user_id || user?.id
-            };
             if (editingVacation) {
-              await api.put(`/vacations/${editingVacation.id}`, dataToSend);
+              // При редактировании не отправляем user_id и status (если у пользователя нет прав)
+              const canUpdateOthers = permissions?.includes('action:vacations:update') || false;
+              const dataToSend: any = {
+                start_date: vacationData.start_date,
+                end_date: vacationData.end_date,
+                type: vacationData.type,
+                comment: vacationData.comment
+              };
+              // Только пользователи с правами могут менять статус
+              if (canUpdateOthers && vacationData.status) {
+                dataToSend.status = vacationData.status;
+              }
+              const response = await api.put(`/vacations/${editingVacation.id}`, dataToSend);
+              // Используем обновленный отпуск из ответа вместо повторного запроса
+              if (response.data?.success && response.data?.data) {
+                setVacations(prev => {
+                  const updated = prev.map(v => v.id === editingVacation.id ? response.data.data : v);
+                  return updated;
+                });
+              } else {
+                // Перезагружаем отпуска только если не получили обновленные данные
+                const vacationsResponse = await api.get(`/vacations?user_id=${user?.id}`);
+                const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+                setVacations(Array.isArray(vacationsData) ? vacationsData : []);
+              }
             } else {
+              // При создании убеждаемся, что user_id присутствует в данных
+              const dataToSend = {
+                ...vacationData,
+                user_id: vacationData.user_id || user?.id
+              };
               await api.post('/vacations', dataToSend);
+              // Перезагружаем отпуска после создания
+              const vacationsResponse = await api.get(`/vacations?user_id=${user?.id}`);
+              const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
+              setVacations(Array.isArray(vacationsData) ? vacationsData : []);
             }
-            // Перезагружаем отпуска
-            const vacationsResponse = await api.get(`/vacations?user_id=${user?.id}`);
-            const vacationsData = vacationsResponse.data?.success ? vacationsResponse.data.data : vacationsResponse.data;
-            setVacations(Array.isArray(vacationsData) ? vacationsData : []);
             setShowVacationModal(false);
             setEditingVacation(null);
           } catch (error: any) {
             console.error('Ошибка сохранения отпуска:', error);
-            alert(error.response?.data?.error || 'Ошибка сохранения отпуска');
+            console.error('Детали ошибки:', {
+              status: error.response?.status,
+              data: error.response?.data,
+              message: error.message,
+              stack: error.stack
+            });
+            const errorMessage = error.response?.data?.error || error.message || 'Ошибка сохранения отпуска';
+            alert(errorMessage);
             throw error;
           } finally {
             setVacationLoading(false);

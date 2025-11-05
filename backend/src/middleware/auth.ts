@@ -53,11 +53,17 @@ export const authenticateToken = async (
       return;
     }
 
+    // Загружаем permissions для пользователя
+    const userPermissions = user.role_id 
+      ? await db('role_permissions').where('role_id', user.role_id).pluck('permission')
+      : [];
+
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
       role: user.role,
-      roleId: (user as any).role_id || null
+      roleId: (user as any).role_id || null,
+      permissions: userPermissions
     };
     next();
   } catch (error) {

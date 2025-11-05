@@ -32,6 +32,9 @@ const ALL_PERMISSIONS = [
   'action:users:create',
   'action:users:update',
   'action:users:deactivate',
+  'action:vacations:create',
+  'action:vacations:update',
+  'action:vacations:delete',
 ];
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -55,6 +58,9 @@ const PERMISSION_LABELS: Record<string, string> = {
   'action:users:create': 'Создание пользователей',
   'action:users:update': 'Редактирование пользователей',
   'action:users:deactivate': 'Деактивация пользователей',
+  'action:vacations:create': 'Создание отпусков для других пользователей',
+  'action:vacations:update': 'Редактирование отпусков других пользователей',
+  'action:vacations:delete': 'Удаление отпусков других пользователей',
 };
 
 const AdminRoles: React.FC = () => {
@@ -64,10 +70,12 @@ const AdminRoles: React.FC = () => {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [form, setForm] = useState({ key: '', name: '', description: '' });
   const [formError, setFormError] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editMode, setEditMode] = useState<'info' | 'permissions'>('info');
   const [editForm, setEditForm] = useState({ name: '', description: '' });
   const [editError, setEditError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -77,6 +85,18 @@ const AdminRoles: React.FC = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showAddModal) {
+        closeAddModal();
+      }
+    };
+    if (showAddModal) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [showAddModal]);
 
   const openRole = async (role: Role) => {
     setSelectedRole(role);
@@ -115,6 +135,37 @@ const AdminRoles: React.FC = () => {
     setPermissions(prev => prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]);
   };
 
+  const handleAddRole = async () => {
+    setFormError(null);
+    if (!form.key || !form.name) { 
+      setFormError('Укажите key и name'); 
+      return; 
+    }
+    setCreating(true);
+    const res = await rolesAPI.create({ key: form.key, name: form.name, description: form.description });
+    setCreating(false);
+    if (res.success) { 
+      setForm({ key: '', name: '', description: '' }); 
+      setFormError(null);
+      setShowAddModal(false);
+      await load(); 
+    } else {
+      setFormError(res.error || 'Ошибка при создании роли');
+    }
+  };
+
+  const openAddModal = () => {
+    setForm({ key: '', name: '', description: '' });
+    setFormError(null);
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setForm({ key: '', name: '', description: '' });
+    setFormError(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -127,48 +178,9 @@ const AdminRoles: React.FC = () => {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">Справочник ролей</h2>
             <button
-              onClick={async () => {
-                setFormError(null);
-                if (!form.key || !form.name) { 
-                  setFormError('Укажите key и name'); 
-                  return; 
-                }
-                const res = await rolesAPI.create({ key: form.key, name: form.name, description: form.description });
-                if (res.success) { 
-                  setForm({ key: '', name: '', description: '' }); 
-                  setFormError(null);
-                  load(); 
-                } else {
-                  setFormError(res.error || 'Ошибка при создании роли');
-                }
-              }}
+              onClick={openAddModal}
               className="px-3 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded"
             >Добавить</button>
-          </div>
-          {formError && (
-            <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-600 dark:text-red-400">
-              {formError}
-            </div>
-          )}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <input 
-              value={form.key} 
-              onChange={e=>{setForm({...form, key: e.target.value}); setFormError(null);}} 
-              placeholder="key (латиница)" 
-              className={`px-2 py-1 border rounded dark:bg-gray-700 dark:text-white ${!form.key && formError ? 'border-red-500 dark:border-red-500' : ''}`} 
-            />
-            <input 
-              value={form.name} 
-              onChange={e=>{setForm({...form, name: e.target.value}); setFormError(null);}} 
-              placeholder="Название" 
-              className={`px-2 py-1 border rounded dark:bg-gray-700 dark:text-white ${!form.name && formError ? 'border-red-500 dark:border-red-500' : ''}`} 
-            />
-            <input 
-              value={form.description} 
-              onChange={e=>setForm({...form, description: e.target.value})} 
-              placeholder="Описание" 
-              className="px-2 py-1 border rounded dark:bg-gray-700 dark:text-white" 
-            />
           </div>
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {roles.map(r => (
@@ -308,6 +320,86 @@ const AdminRoles: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Модальное окно добавления роли */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closeAddModal}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Добавить новую роль</h2>
+              <button
+                onClick={closeAddModal}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {formError && (
+              <div className="mb-4 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-600 dark:text-red-400">
+                {formError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Key (технический ключ) *
+                </label>
+                <input 
+                  type="text"
+                  value={form.key} 
+                  onChange={e=>{setForm({...form, key: e.target.value}); setFormError(null);}} 
+                  placeholder="key (латиница)" 
+                  className={`w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 ${!form.key && formError ? 'border-red-500 dark:border-red-500' : ''}`} 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Название *
+                </label>
+                <input 
+                  type="text"
+                  value={form.name} 
+                  onChange={e=>{setForm({...form, name: e.target.value}); setFormError(null);}} 
+                  placeholder="Название роли" 
+                  className={`w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 ${!form.name && formError ? 'border-red-500 dark:border-red-500' : ''}`} 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Описание
+                </label>
+                <textarea 
+                  value={form.description} 
+                  onChange={e=>setForm({...form, description: e.target.value})} 
+                  placeholder="Описание роли" 
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600" 
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={closeAddModal}
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleAddRole}
+                disabled={creating}
+                className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded"
+              >
+                {creating ? 'Создание...' : 'Добавить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -159,7 +159,7 @@ export const EmployeeAnalyticsPage: React.FC = () => {
   
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Аналитика сотрудника</h1>
         {data?.cycle && (
@@ -227,14 +227,14 @@ export const EmployeeAnalyticsPage: React.FC = () => {
           <div className="markdown-body leading-7 text-gray-800 dark:text-gray-100">
             <ReactMarkdown
               components={{
-                h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white" {...props} />,
-                h2: ({node, ...props}) => <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white" {...props} />,
-                h3: ({node, ...props}) => <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white" {...props} />,
+                h1: ({node, children, ...props}) => <h1 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white" {...props}>{children}</h1>,
+                h2: ({node, children, ...props}) => <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white" {...props}>{children}</h2>,
+                h3: ({node, children, ...props}) => <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white" {...props}>{children}</h3>,
                 p: ({node, ...props}) => <p className="mb-3 whitespace-pre-line text-gray-800 dark:text-gray-100" {...props} />,
                 ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
                 ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
                 li: ({node, ...props}) => <li className="mb-1 text-gray-800 dark:text-gray-100" {...props} />,
-                a: ({node, ...props}) => <a className="underline text-blue-600 dark:text-blue-400" target="_blank" rel="noreferrer" {...props} />,
+                a: ({node, children, ...props}) => <a className="underline text-blue-600 dark:text-blue-400" target="_blank" rel="noreferrer" {...props}>{children}</a>,
                 strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
                 code: ({node, inline, ...props}: any) => inline
                   ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />

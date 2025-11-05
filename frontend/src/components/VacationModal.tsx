@@ -42,7 +42,7 @@ const VacationModal: React.FC<VacationModalProps> = ({
   users,
   preselectedUserId
 }) => {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<{
     user_id: string;
@@ -60,7 +60,8 @@ const VacationModal: React.FC<VacationModalProps> = ({
     status: 'pending'
   });
 
-  const canEdit = user?.role === 'admin' || user?.role === 'hr';
+  const canCreateForOthers = permissions.includes('action:vacations:create');
+  const canUpdateOthers = permissions.includes('action:vacations:update');
 
   // Функция для преобразования даты в формат YYYY-MM-DD
   const formatDateForInput = (dateString: string) => {
@@ -80,10 +81,10 @@ const VacationModal: React.FC<VacationModalProps> = ({
         status: vacation.status
       });
     } else {
-      // Если передан preselectedUserId, используем его (для админов/HR при редактировании пользователя)
+      // Если передан preselectedUserId, используем его (для пользователей с правами при редактировании)
       // Для обычных пользователей всегда используем их ID
-      // Для админов/HR без preselectedUserId - пустая строка, чтобы они могли выбрать пользователя
-      const defaultUserId = preselectedUserId || (!canEdit ? (user?.id || '') : '');
+      // Для пользователей с правами без preselectedUserId - пустая строка, чтобы они могли выбрать пользователя
+      const defaultUserId = preselectedUserId || (!canCreateForOthers ? (user?.id || '') : '');
       setFormData({
         user_id: defaultUserId,
         start_date: '',
@@ -93,11 +94,17 @@ const VacationModal: React.FC<VacationModalProps> = ({
         status: 'pending'
       });
     }
-    console.log('📋 FormData обновлен:', { vacation, canEdit, userId: user?.id, preselectedUserId });
-  }, [vacation, canEdit, user?.id, preselectedUserId]);
+    console.log('📋 FormData обновлен:', { vacation, canCreateForOthers, userId: user?.id, preselectedUserId });
+  }, [vacation, canCreateForOthers, user?.id, preselectedUserId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Предотвращаем множественные отправки
+    if (loading) {
+      console.log('⚠️ Сохранение уже выполняется, игнорируем повторную отправку');
+      return;
+    }
     
     if (!formData.start_date || !formData.end_date) {
       alert('Пожалуйста, укажите даты начала и окончания');
@@ -109,13 +116,13 @@ const VacationModal: React.FC<VacationModalProps> = ({
       return;
     }
 
-    if (canEdit && !formData.user_id) {
+    if (canCreateForOthers && !formData.user_id) {
       alert('Пожалуйста, выберите сотрудника');
       return;
     }
     
     // Для обычных пользователей убеждаемся, что user_id установлен
-    if (!canEdit && !formData.user_id && user?.id) {
+    if (!canCreateForOthers && !formData.user_id && user?.id) {
       formData.user_id = user.id;
     }
 
@@ -123,13 +130,16 @@ const VacationModal: React.FC<VacationModalProps> = ({
       setLoading(true);
       console.log('📤 Отправка данных отпуска:', formData);
       await onSave(formData);
-      onClose();
+      // Закрываем модальное окно только после успешного сохранения
+      // Не закрываем здесь, так как onSave может обработать это сам
     } catch (error: any) {
       console.error('❌ Ошибка сохранения отпуска:', error);
       // Показываем ошибку пользователю, если она не была обработана в onSave
       if (error.response?.data?.error) {
         alert(error.response.data.error);
       }
+      // Не закрываем модальное окно при ошибке, чтобы пользователь мог исправить данные
+      throw error; // Пробрасываем ошибку дальше
     } finally {
       setLoading(false);
     }
@@ -168,8 +178,8 @@ const VacationModal: React.FC<VacationModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          {/* Выбор сотрудника (только для админов и HR, если не передан preselectedUserId) */}
-          {canEdit && !preselectedUserId && (
+          {/* Выбор сотрудника (только для пользователей с правами на создание отпусков, если не передан preselectedUserId) */}
+          {canCreateForOthers && !preselectedUserId && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Сотрудник *
@@ -191,7 +201,7 @@ const VacationModal: React.FC<VacationModalProps> = ({
           )}
           
           {/* Показываем имя пользователя, если он предустановлен */}
-          {canEdit && preselectedUserId && (
+          {canCreateForOthers && preselectedUserId && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Сотрудник
@@ -272,8 +282,8 @@ const VacationModal: React.FC<VacationModalProps> = ({
             </select>
           </div>
 
-          {/* Статус (только для админов и HR при редактировании) */}
-          {canEdit && vacation && (
+          {/* Статус (только для пользователей с правами на обновление отпусков при редактировании) */}
+          {canUpdateOthers && vacation && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Статус

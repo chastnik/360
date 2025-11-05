@@ -79,7 +79,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setIsLoading(false);
     }
-  }, [loadUser]);
+
+    // Слушаем событие принудительного выхода (например, при 401 ошибке)
+    const handleLogout = () => {
+      setUser(null);
+      setToken(null);
+      setPermissions([]);
+      localStorage.removeItem('auth_token');
+      if (window.location.pathname !== '/login') {
+        navigate('/login', { replace: true });
+      }
+    };
+
+    window.addEventListener('auth:logout', handleLogout);
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+    };
+  }, [loadUser, navigate]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -116,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }).catch((err) => {
             // Не критично, если не удалось - используем данные из логина
             console.warn('Не удалось загрузить полные данные пользователя:', err);
+            // Не очищаем токен и не перенаправляем - используем данные из ответа логина
           });
         } else {
           // Если данных пользователя нет в ответе, пытаемся загрузить их
@@ -131,12 +148,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
               throw new Error(userResponse.error || 'Не удалось загрузить данные пользователя');
             }
-          } catch (userError) {
+          } catch (userError: any) {
             console.error('Ошибка загрузки пользователя после логина:', userError);
-            // Очищаем токен, если не удалось загрузить пользователя
-            setToken(null);
-            localStorage.removeItem('auth_token');
-            throw new Error('Не удалось загрузить данные пользователя');
+            // Если это 401 ошибка, не очищаем токен - возможно, это временная проблема
+            // Просто логируем ошибку и продолжаем с данными из ответа логина
+            if (userError?.response?.status === 401) {
+              console.warn('401 ошибка при загрузке пользователя после логина - используем данные из ответа логина');
+            } else {
+              // Для других ошибок очищаем токен
+              setToken(null);
+              localStorage.removeItem('auth_token');
+              throw new Error('Не удалось загрузить данные пользователя');
+            }
           }
         }
         

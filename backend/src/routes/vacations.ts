@@ -3,7 +3,6 @@
 // Автор: Стас Чашин @chastnik
 import { Router } from 'express';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
-import { requirePermission } from '../middleware/permissions';
 import db from '../database/connection';
 
 const router = Router();
@@ -25,10 +24,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
       .leftJoin('departments as d', 'u.department_id', 'd.id')
       .where('u.is_active', true);
 
-    // Права доступа: админы и HR видят все, остальные только свои
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
-      query = query.where('v.user_id', req.user?.id);
-    }
+    // Все могут просматривать все отпуска (без ограничений на просмотр)
 
     // Применяем фильтры
     if (user_id) {
@@ -100,10 +96,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Отпуск не найден' });
     }
 
-    // Проверяем права доступа
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && vacation.user_id !== req.user?.id) {
-      return res.status(403).json({ error: 'Нет прав для просмотра этого отпуска' });
-    }
+    // Все могут просматривать любой отпуск (без ограничений на просмотр)
     
     res.json({
       success: true,
@@ -120,11 +113,12 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { user_id, start_date, end_date, type, comment } = req.body;
     
-    console.log('📝 Создание отпуска:', { user_id, start_date, end_date, type, comment, userRole: req.user?.role, userId: req.user?.id });
+    console.log('📝 Создание отпуска:', { user_id, start_date, end_date, type, comment, userRole: req.user?.role, userId: req.user?.userId });
     
-    // Проверяем права: админы и HR могут создавать для любого пользователя
-    const targetUserId = (req.user?.role === 'admin' || req.user?.role === 'hr') ? 
-      (user_id || req.user?.id) : req.user?.id;
+    // Проверяем права: пользователи с правом на создание отпусков могут создавать для любого пользователя
+    const hasCreatePermission = req.user?.permissions?.includes('action:vacations:create');
+    const targetUserId = hasCreatePermission ? 
+      (user_id || req.user?.userId) : req.user?.userId;
     
     if (!targetUserId) {
       console.error('❌ Ошибка: не указан user_id');
@@ -184,9 +178,9 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       days_count: workingDays,
       type: type || 'vacation',
       comment: comment || null,
-      status: (req.user?.role === 'admin' || req.user?.role === 'hr') ? 'approved' : 'pending',
-      approved_by: (req.user?.role === 'admin' || req.user?.role === 'hr') ? req.user?.id : null,
-      approved_at: (req.user?.role === 'admin' || req.user?.role === 'hr') ? new Date() : null
+      status: hasCreatePermission ? 'approved' : 'pending',
+      approved_by: hasCreatePermission ? req.user?.userId : null,
+      approved_at: hasCreatePermission ? new Date() : null
     };
     
     console.log('💾 Данные для вставки:', insertData);
@@ -233,8 +227,11 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Проверяем права доступа
-    const canEdit = req.user?.role === 'admin' || req.user?.role === 'hr' || 
-                   (existingVacation.user_id === req.user?.id && existingVacation.status === 'pending');
+    const hasUpdatePermission = req.user?.permissions?.includes('action:vacations:update');
+    const isOwnVacation = existingVacation.user_id === req.user?.userId;
+    // Пользователь может редактировать свой отпуск независимо от статуса
+    // Или пользователь с правом update может редактировать любой отпуск
+    const canEdit = hasUpdatePermission || isOwnVacation;
     
     if (!canEdit) {
       return res.status(403).json({ error: 'Нет прав для редактирования этого отпуска' });
@@ -242,7 +239,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
     const updateData: any = {};
     
-    // Обновляем даты, если они изменились
+    // Обновляем даты, если они указаны
     if (start_date && end_date) {
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
@@ -251,68 +248,112 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         return res.status(400).json({ error: 'Дата окончания должна быть больше или равна дате начала' });
       }
 
-      // Пересчитываем рабочие дни
-      let workingDays = 0;
-      const currentDate = new Date(startDate);
-      while (currentDate <= endDate) {
-        const dayOfWeek = currentDate.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          workingDays++;
+      // Нормализуем даты для сравнения (убираем время, оставляем только дату)
+      const existingStartDate = new Date(existingVacation.start_date).toISOString().split('T')[0];
+      const existingEndDate = new Date(existingVacation.end_date).toISOString().split('T')[0];
+      const newStartDate = new Date(start_date).toISOString().split('T')[0];
+      const newEndDate = new Date(end_date).toISOString().split('T')[0];
+      
+      const datesChanged = existingStartDate !== newStartDate || existingEndDate !== newEndDate;
+      
+      // Пересчитываем рабочие дни только если даты изменились
+      if (datesChanged) {
+        // Пересчитываем рабочие дни
+        let workingDays = 0;
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const dayOfWeek = currentDate.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            workingDays++;
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
         }
-        currentDate.setDate(currentDate.getDate() + 1);
+
+        // Проверяем пересечения с другими отпусками (исключая текущий)
+        const overlapping = await db('vacations')
+          .where('user_id', existingVacation.user_id)
+          .where('id', '!=', id)
+          .where('status', '!=', 'rejected')
+          .where(function() {
+            this.whereBetween('start_date', [start_date, end_date])
+              .orWhereBetween('end_date', [start_date, end_date])
+              .orWhere(function() {
+                this.where('start_date', '<=', start_date)
+                  .andWhere('end_date', '>=', end_date);
+              });
+          });
+
+        if (overlapping.length > 0) {
+          console.log('⚠️ Найдены пересекающиеся отпуска при обновлении:', overlapping);
+          console.log('📅 Новые даты:', { start_date, end_date });
+          console.log('📅 Текущий отпуск:', { id, start_date: existingVacation.start_date, end_date: existingVacation.end_date });
+          return res.status(400).json({ error: 'На выбранные даты уже запланирован отпуск' });
+        }
+
+        updateData.start_date = start_date;
+        updateData.end_date = end_date;
+        updateData.days_count = workingDays;
       }
-
-      // Проверяем пересечения с другими отпусками (исключая текущий)
-      const overlapping = await db('vacations')
-        .where('user_id', existingVacation.user_id)
-        .where('id', '!=', id)
-        .where('status', '!=', 'rejected')
-        .where(function() {
-          this.whereBetween('start_date', [start_date, end_date])
-            .orWhereBetween('end_date', [start_date, end_date])
-            .orWhere(function() {
-              this.where('start_date', '<=', start_date)
-                .andWhere('end_date', '>=', end_date);
-            });
-        });
-
-      if (overlapping.length > 0) {
-        console.log('⚠️ Найдены пересекающиеся отпуска при обновлении:', overlapping);
-        return res.status(400).json({ error: 'На выбранные даты уже запланирован отпуск' });
-      }
-
-      updateData.start_date = start_date;
-      updateData.end_date = end_date;
-      updateData.days_count = workingDays;
     }
     
     if (type) updateData.type = type;
     if (comment !== undefined) updateData.comment = comment;
     
-    // Только админы и HR могут менять статус
-    if (status && (req.user?.role === 'admin' || req.user?.role === 'hr')) {
+    // Только пользователи с правом на обновление отпусков могут менять статус
+    // Обычные пользователи не могут менять статус своего отпуска
+    if (status && hasUpdatePermission) {
       updateData.status = status;
       if (status === 'approved') {
-        updateData.approved_by = req.user?.id;
+        updateData.approved_by = req.user?.userId;
         updateData.approved_at = new Date();
       } else if (status === 'rejected') {
-        updateData.approved_by = req.user?.id;
+        updateData.approved_by = req.user?.userId;
         updateData.approved_at = new Date();
       }
+    } else if (status && isOwnVacation) {
+      // Если пользователь пытается изменить статус своего отпуска без прав - игнорируем это
+      // Не добавляем статус в updateData
     }
 
-    const [updatedVacation] = await db('vacations')
+    // Проверяем, что есть что обновлять
+    if (Object.keys(updateData).length === 0) {
+      // Если ничего не изменилось, просто возвращаем существующий отпуск
+      return res.json({
+        success: true,
+        data: existingVacation
+      });
+    }
+
+    updateData.updated_at = new Date();
+
+    const updated = await db('vacations')
       .where('id', id)
       .update(updateData)
       .returning('*');
+
+    if (!updated || updated.length === 0) {
+      console.error('⚠️ Отпуск не был обновлен:', { id, updateData });
+      return res.status(404).json({ error: 'Отпуск не найден или не был обновлен' });
+    }
+
+    const updatedVacation = updated[0];
 
     res.json({
       success: true,
       data: updatedVacation
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Ошибка обновления отпуска:', error);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    console.error('Детали ошибки:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body,
+      params: req.params
+    });
+    res.status(500).json({ 
+      error: error.message || 'Внутренняя ошибка сервера',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -330,8 +371,11 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Проверяем права доступа
-    const canDelete = req.user?.role === 'admin' || req.user?.role === 'hr' || 
-                     (vacation.user_id === req.user?.id && vacation.status === 'pending');
+    const hasDeletePermission = req.user?.permissions?.includes('action:vacations:delete');
+    const isOwnVacation = vacation.user_id === req.user?.userId;
+    // Пользователь может удалять свой отпуск независимо от статуса
+    // Или пользователь с правом delete может удалять любой отпуск
+    const canDelete = hasDeletePermission || isOwnVacation;
     
     if (!canDelete) {
       return res.status(403).json({ error: 'Нет прав для удаления этого отпуска' });
@@ -361,10 +405,7 @@ router.get('/stats/summary', authenticateToken, async (req: AuthRequest, res) =>
       .where('u.is_active', true)
       .whereRaw('EXTRACT(YEAR FROM v.start_date) = ?', [year]);
 
-    // Права доступа
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
-      baseQuery = baseQuery.where('v.user_id', req.user?.id);
-    }
+    // Все могут просматривать статистику всех отпусков (без ограничений на просмотр)
 
     const [totalStats, statusStats, typeStats] = await Promise.all([
       // Общая статистика

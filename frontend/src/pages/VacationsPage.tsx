@@ -1,6 +1,6 @@
 
 // Автор: Стас Чашин @chastnik
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import VacationModal from '../components/VacationModal';
@@ -39,7 +39,8 @@ interface Department {
 }
 
 const VacationsPage: React.FC = () => {
-  const { user } = useAuth();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { user, permissions } = useAuth(); // user используется в обработчиках onClick/onDoubleClick (строки 617, 621)
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -55,9 +56,21 @@ const VacationsPage: React.FC = () => {
   // Модальное окно для добавления/редактирования отпуска
   const [showModal, setShowModal] = useState(false);
   const [editingVacation, setEditingVacation] = useState<Vacation | null>(null);
+  
+  // Tooltip для отпусков
+  const [tooltip, setTooltip] = useState<{
+    show: boolean;
+    text: string;
+    x: number;
+    y: number;
+  }>({ show: false, text: '', x: 0, y: 0 });
+
+  // Ref для контейнера прокрутки
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Проверка прав доступа
-  const canEdit = user?.role === 'admin' || user?.role === 'hr';
+  const canUpdateOthers = permissions.includes('action:vacations:update');
+  const canDeleteOthers = permissions.includes('action:vacations:delete');
 
   // Загрузка пользователей и отделов (один раз)
   useEffect(() => {
@@ -169,6 +182,51 @@ const VacationsPage: React.FC = () => {
     }));
   }, [selectedYear]);
 
+  // Принудительно пересчитываем размеры контейнера после загрузки данных
+  useEffect(() => {
+    if (!loading && scrollContainerRef.current && months.length > 0) {
+      // Используем ResizeObserver для отслеживания изменений размера
+      const container = scrollContainerRef.current;
+      
+      // Принудительно триггерим пересчет через несколько способов
+      const triggerRecalc = () => {
+        if (container) {
+          // Способ 1: изменение scrollLeft
+          const currentScroll = container.scrollLeft;
+          container.scrollLeft = currentScroll + 1;
+          container.scrollLeft = currentScroll;
+          
+          // Способ 2: триггерим resize событие
+          window.dispatchEvent(new Event('resize'));
+          
+          // Способ 3: принудительно пересчитываем стили
+          const computedStyle = window.getComputedStyle(container);
+          const width = computedStyle.width;
+          container.style.width = width;
+        }
+      };
+      
+      // Небольшая задержка для гарантии, что DOM обновился
+      const timeoutId1 = setTimeout(triggerRecalc, 50);
+      const timeoutId2 = setTimeout(triggerRecalc, 200);
+      
+      // Используем ResizeObserver
+      const resizeObserver = new ResizeObserver(() => {
+        triggerRecalc();
+      });
+      
+      if (container) {
+        resizeObserver.observe(container);
+      }
+      
+      return () => {
+        clearTimeout(timeoutId1);
+        clearTimeout(timeoutId2);
+        resizeObserver.disconnect();
+      };
+    }
+  }, [loading, vacations, users, months.length]);
+
   const getVacationTypeColor = (type: string) => {
     switch (type) {
       case 'vacation': return 'bg-blue-500';
@@ -194,7 +252,39 @@ const VacationsPage: React.FC = () => {
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
+    return `${day}.${month}.${year}`;
+  };
+
+  const handleVacationMouseEnter = (e: React.MouseEvent, vacation: Vacation) => {
+    const tooltipText = `${getVacationTypeLabel(vacation.type)}\nС ${formatDate(vacation.start_date)} по ${formatDate(vacation.end_date)}\n(${vacation.days_count} ${vacation.days_count === 1 ? 'день' : vacation.days_count < 5 ? 'дня' : 'дней'})`;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const tooltipX = rect.left + rect.width / 2;
+    const tooltipY = rect.top - 10;
+    
+    setTooltip({
+      show: true,
+      text: tooltipText,
+      x: tooltipX,
+      y: tooltipY
+    });
+  };
+
+  const handleVacationMouseLeave = () => {
+    setTooltip({ show: false, text: '', x: 0, y: 0 });
+  };
+
+  const handleVacationMouseMove = (e: React.MouseEvent) => {
+    if (tooltip.show) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const tooltipX = rect.left + rect.width / 2;
+      const tooltipY = rect.top - 10;
+      
+      setTooltip(prev => ({
+        ...prev,
+        x: tooltipX,
+        y: tooltipY
+      }));
+    }
   };
 
   const handleAddVacation = () => {
@@ -270,14 +360,12 @@ const VacationsPage: React.FC = () => {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           Календарь отпусков
         </h2>
-        {canEdit && (
-          <button
-            onClick={handleAddVacation}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium"
-          >
-            + Добавить отпуск
-          </button>
-        )}
+        <button
+          onClick={handleAddVacation}
+          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium"
+        >
+          + Добавить отпуск
+        </button>
       </div>
 
       {/* Фильтры */}
@@ -396,7 +484,7 @@ const VacationsPage: React.FC = () => {
       </div>
 
       {/* Календарь Гант */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         {loading && (
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -404,8 +492,24 @@ const VacationsPage: React.FC = () => {
           </div>
         )}
         {!loading && (
-        <div className="overflow-x-auto">
-          <div className="min-w-max">
+        <div 
+          ref={scrollContainerRef}
+          className="w-full" 
+          style={{ 
+            overflowX: 'auto',
+            overflowY: 'visible',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'thin',
+            scrollbarGutter: 'stable'
+          }}
+        >
+          <div 
+            style={{ 
+              minWidth: `${192 + (months.length * 128)}px`,
+              width: `${192 + (months.length * 128)}px`,
+              display: 'block'
+            }}
+          >
             {/* Заголовки месяцев */}
             <div className="flex border-b-2 border-gray-300 dark:border-gray-600">
               <div className="w-48 flex-shrink-0 p-3 bg-gray-50 dark:bg-gray-700 font-medium text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700">
@@ -506,9 +610,17 @@ const VacationsPage: React.FC = () => {
                               width: `${widthPercent}%`,
                               minWidth: '20px'
                             }}
-                            title={`${getVacationTypeLabel(vacation.type)}: ${formatDate(vacation.start_date)} - ${formatDate(vacation.end_date)} (${vacation.days_count} дн.)`}
-                            onClick={() => canEdit && handleEditVacation(vacation)}
-                            onDoubleClick={() => canEdit && handleDeleteVacation(vacation.id)}
+                            onMouseEnter={(e) => handleVacationMouseEnter(e, vacation)}
+                            onMouseLeave={handleVacationMouseLeave}
+                            onMouseMove={handleVacationMouseMove}
+                            onClick={() => {
+                              const canEdit = canUpdateOthers || vacation.user_id === user?.id;
+                              if (canEdit) handleEditVacation(vacation);
+                            }}
+                            onDoubleClick={() => {
+                              const canDelete = canDeleteOthers || (vacation.user_id === user?.id && vacation.status === 'pending');
+                              if (canDelete) handleDeleteVacation(vacation.id);
+                            }}
                           >
                             {vacation.days_count > 3 && (
                               <span className="text-xs font-medium">{vacation.days_count}д</span>
@@ -576,6 +688,21 @@ const VacationsPage: React.FC = () => {
         vacation={editingVacation}
         users={users}
       />
+
+      {/* Tooltip для отпусков */}
+      {tooltip.show && (
+        <div
+          className="fixed z-50 px-3 py-2 bg-gray-900 dark:bg-gray-800 text-white text-sm rounded-lg shadow-lg pointer-events-none whitespace-pre-line max-w-xs"
+          style={{
+            left: `${tooltip.x}px`,
+            top: `${tooltip.y}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <div className="text-center">{tooltip.text}</div>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-800"></div>
+        </div>
+      )}
     </div>
   );
 };
