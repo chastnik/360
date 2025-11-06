@@ -123,6 +123,25 @@ export const CyclesPage: React.FC = () => {
     }
   };
 
+  const handleCompleteCycle = async (cycleId: number) => {
+    if (!window.confirm('Вы уверены, что хотите завершить цикл тестирования досрочно? Не все респонденты могли дать оценку.')) {
+      return;
+    }
+
+    try {
+      await api.post(`/cycles/${cycleId}/complete`);
+      loadCycles();
+      setError(null); // Очистить ошибку при успехе
+      if (selectedCycle && selectedCycle.id === cycleId) {
+        loadCycleDetails(cycleId);
+      }
+    } catch (error: any) {
+      console.error('Ошибка при завершении цикла:', error);
+      const errorMessage = error.response?.data?.error || 'Не удалось завершить цикл';
+      setError(errorMessage);
+    }
+  };
+
   const handleAddParticipant = async (userId: number) => {
     if (!selectedCycle) return;
     
@@ -307,6 +326,14 @@ export const CyclesPage: React.FC = () => {
                     </button>
                   </>
                 )}
+                {canManageCycles && cycle.status === 'active' && (
+                  <button
+                    onClick={() => handleCompleteCycle(cycle.id)}
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    Завершить цикл
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -485,12 +512,22 @@ export const CyclesPage: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 {selectedCycle.name}
               </h3>
-              <button
-                onClick={() => setSelectedCycle(null)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {canManageCycles && selectedCycle.status === 'active' && (
+                  <button
+                    onClick={() => handleCompleteCycle(selectedCycle.id)}
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-sm"
+                  >
+                    Завершить цикл
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedCycle(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             
             <div className="mb-6">

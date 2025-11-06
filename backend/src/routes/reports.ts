@@ -468,13 +468,24 @@ router.get('/my-dashboard', authenticateToken, async (req: any, res: any): Promi
     );
 
     // 2. Области для развития (категории с низкими оценками)
-    const latestParticipant = await knex('assessment_participants')
-      .where('user_id', userId)
+    // Находим последний завершенный цикл, где есть ответы
+    // Сначала находим всех участников с ответами
+    const participantsWithResponses = await knex('assessment_participants')
+      .where('assessment_participants.user_id', userId)
       .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
       .where('assessment_cycles.status', 'completed')
+      .whereExists(function() {
+        this.select('*')
+          .from('assessment_respondents')
+          .join('assessment_responses', 'assessment_respondents.id', 'assessment_responses.respondent_id')
+          .whereRaw('assessment_respondents.participant_id = assessment_participants.id');
+      })
+      .select('assessment_participants.id as participant_id', 'assessment_cycles.end_date')
       .orderBy('assessment_cycles.end_date', 'desc')
-      .select('assessment_participants.id as participant_id')
-      .first();
+      .limit(1);
+
+    // Берем первый участник из списка (последний цикл с ответами)
+    const latestParticipant = participantsWithResponses.length > 0 ? participantsWithResponses[0] : null;
 
     let improvementAreas: any[] = [];
     if (latestParticipant) {
@@ -578,7 +589,7 @@ router.get('/my-dashboard', authenticateToken, async (req: any, res: any): Promi
       }
     }
 
-    // 7. Средние оценки по категориям для последнего завершенного цикла
+    // 7. Средние оценки по категориям для последнего завершенного цикла с ответами
     let categoryData: any[] = [];
     if (latestParticipant) {
       const categoryScores = await knex('assessment_responses')

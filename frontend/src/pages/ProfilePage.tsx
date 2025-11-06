@@ -539,7 +539,9 @@ export const ProfilePage: React.FC = () => {
                   {cycle.status && (
                     <div className="text-center">
                       <div className="text-primary-600 dark:text-primary-400 font-semibold mb-1">
-                        {cycle.overall_average ? cycle.overall_average.toFixed(2) : '-'}
+                        {cycle.overall_average !== null && cycle.overall_average !== undefined 
+                          ? cycle.overall_average.toFixed(2) 
+                          : '-'}
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400">Балл</p>
                     </div>
@@ -553,12 +555,14 @@ export const ProfilePage: React.FC = () => {
                     {cycle.status === 'completed' || cycle.status === 'closed' ? '✓ Завершен' : cycle.status}
                   </span>
 
-                  <Link
-                    to={`/cycles`}
-                    className="btn btn-outline btn-sm"
-                  >
-                    Просмотр отчета
-                  </Link>
+                  {permissions?.includes('ui:view:cycles') && (
+                    <Link
+                      to={`/cycles`}
+                      className="btn btn-outline btn-sm"
+                    >
+                      Просмотр отчета
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}

@@ -43,7 +43,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
         .orderBy('created_at', 'desc');
     }
 
-    // Получить количество участников для каждого цикла
+    // Получить количество участников и средний балл для каждого цикла
     const cyclesWithParticipantsCount = await Promise.all(
       cycles.map(async (cycle) => {
         const participantsCount = await db('assessment_participants')
@@ -51,9 +51,35 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
           .count('id as count')
           .first();
 
+        let overall_average = null;
+        
+        // Если запрашиваются циклы пользователя (?my=true), рассчитываем средний балл
+        if (myOnly && userIdStr) {
+          // Находим participant_id для этого пользователя в этом цикле
+          const participant = await db('assessment_participants')
+            .where('cycle_id', cycle.id)
+            .where('user_id', userIdStr)
+            .select('id')
+            .first();
+
+          if (participant) {
+            // Рассчитываем средний балл по всем ответам для этого участника
+            const avgResult = await db('assessment_responses')
+              .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+              .where('assessment_respondents.participant_id', participant.id)
+              .avg('assessment_responses.rating_value as avg_score')
+              .first();
+
+            if (avgResult && avgResult.avg_score !== null) {
+              overall_average = Math.round(Number(avgResult.avg_score || 0) * 100) / 100;
+            }
+          }
+        }
+
         return {
           ...cycle,
-          participants_count: Number(participantsCount?.count || 0)
+          participants_count: Number(participantsCount?.count || 0),
+          ...(overall_average !== null && { overall_average })
         };
       })
     );
@@ -684,6 +710,84 @@ router.post('/:id/start', authenticateToken, async (req: AuthRequest, res): Prom
     res.json({ message: 'Цикл оценки успешно запущен' });
   } catch (error) {
     console.error('Ошибка запуска цикла оценки:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+// Завершить цикл оценки досрочно
+router.post('/:id/complete', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+
+    // Проверить права доступа
+    if (user?.role !== 'admin' && user?.role !== 'hr' && user?.role !== 'manager') {
+      res.status(403).json({ error: 'Недостаточно прав доступа' });
+      return;
+    }
+
+    const cycle = await db('assessment_cycles')
+      .where('id', id)
+      .first();
+
+    if (!cycle) {
+      res.status(404).json({ error: 'Цикл оценки не найден' });
+      return;
+    }
+
+    if (cycle.status !== 'active') {
+      res.status(400).json({ error: 'Можно завершить только активный цикл' });
+      return;
+    }
+
+    // Завершить цикл в транзакции
+    await db.transaction(async (trx) => {
+      // Обновить статус цикла
+      await trx('assessment_cycles')
+        .where('id', id)
+        .update({
+          status: 'completed',
+          end_date: trx.raw('NOW()')
+        });
+
+      // Обновить статус всех участников на 'completed'
+      await trx('assessment_participants')
+        .where('cycle_id', id)
+        .update({ status: 'completed' });
+
+      // Обновить статус всех респондентов на 'completed' (даже если они не завершили оценку)
+      await trx('assessment_respondents')
+        .whereIn('participant_id', 
+          trx('assessment_participants')
+            .where('cycle_id', id)
+            .select('id')
+        )
+        .update({ status: 'completed' });
+    });
+
+    // Отправить уведомление администратору о завершении цикла
+    try {
+      const adminUser = await db('users')
+        .where('role', 'admin')
+        .whereNotNull('mattermost_username')
+        .first();
+
+      if (adminUser) {
+        await mattermostService.notifyCycleComplete(
+          adminUser.mattermost_username,
+          cycle.name,
+          id.toString()
+        );
+        console.log(`Уведомление о завершении цикла отправлено администратору ${adminUser.mattermost_username}`);
+      }
+    } catch (error) {
+      console.error('Ошибка отправки уведомления о завершении цикла:', error);
+      // Не останавливаем выполнение, так как цикл уже завершен
+    }
+
+    res.json({ message: 'Цикл оценки успешно завершен' });
+  } catch (error) {
+    console.error('Ошибка завершения цикла оценки:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
