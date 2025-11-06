@@ -11,11 +11,37 @@ import mattermostService from '../services/mattermost';
 const router = Router();
 
 // Получить все циклы оценки
-router.get('/', authenticateToken, async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const cycles = await db('assessment_cycles')
-      .select('id', 'name', 'description', 'status', 'start_date', 'end_date', 'created_at')
-      .orderBy('created_at', 'desc');
+    const userId = req.user?.userId;
+    const userIdStr = userId ? String(userId) : null;
+    
+    // Если передан параметр ?my=true, возвращаем только циклы, где пользователь был участником
+    const myOnly = req.query.my === 'true';
+    
+    let cycles;
+    if (myOnly && userIdStr) {
+      // Получаем только циклы, где пользователь был участником
+      cycles = await db('assessment_cycles')
+        .join('assessment_participants', 'assessment_cycles.id', 'assessment_participants.cycle_id')
+        .where('assessment_participants.user_id', userIdStr)
+        .select(
+          'assessment_cycles.id',
+          'assessment_cycles.name',
+          'assessment_cycles.description',
+          'assessment_cycles.status',
+          'assessment_cycles.start_date',
+          'assessment_cycles.end_date',
+          'assessment_cycles.created_at'
+        )
+        .distinct()
+        .orderBy('assessment_cycles.created_at', 'desc');
+    } else {
+      // Получаем все циклы
+      cycles = await db('assessment_cycles')
+        .select('id', 'name', 'description', 'status', 'start_date', 'end_date', 'created_at')
+        .orderBy('created_at', 'desc');
+    }
 
     // Получить количество участников для каждого цикла
     const cyclesWithParticipantsCount = await Promise.all(

@@ -113,11 +113,11 @@ export const ProfilePage: React.FC = () => {
         setDepartment(null);
       }
 
-      // Загрузка истории циклов
+      // Загрузка истории циклов (только те, где пользователь был участником)
       try {
-        const cyclesResponse = await api.get('/cycles');
+        const cyclesResponse = await api.get('/cycles?my=true');
         const cycles = cyclesResponse.data?.success ? cyclesResponse.data.data : cyclesResponse.data || [];
-        // Фильтруем завершенные циклы, в которых участвовал пользователь
+        // Фильтруем только завершенные циклы, в которых участвовал пользователь
         const completedCycles = Array.isArray(cycles) ? cycles.filter((cycle: any) => 
           cycle.status === 'completed' || cycle.status === 'closed'
         ).slice(0, 10) : [];
