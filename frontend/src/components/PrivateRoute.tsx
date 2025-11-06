@@ -3,6 +3,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { ForbiddenPage } from '../pages/ForbiddenPage';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -35,15 +36,7 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
   if (requiredRole && user?.role !== requiredRole) {
     // Для админских страниц показываем 403
     if (requiredRole === 'admin') {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-6xl font-bold text-red-500 mb-4">403</h1>
-            <p className="text-xl text-gray-600 mb-8">Доступ запрещен</p>
-            <p className="text-gray-500">У вас нет прав для просмотра этой страницы</p>
-          </div>
-        </div>
-      );
+      return <ForbiddenPage />;
     }
     
     // Для других ролей перенаправляем на мой дашборд
@@ -63,16 +56,7 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
     
     const has = Array.isArray(permissions) && permissions.includes(requiredPermission);
     if (!has) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-6xl font-bold text-red-500 mb-4">403</h1>
-            <p className="text-xl text-gray-600 mb-8">Доступ запрещен</p>
-            <p className="text-gray-500">У вас нет прав для просмотра этой страницы</p>
-            <p className="text-sm text-gray-400 mt-2">Требуемое право: {requiredPermission}</p>
-          </div>
-        </div>
-      );
+      return <ForbiddenPage />;
     }
   }
 

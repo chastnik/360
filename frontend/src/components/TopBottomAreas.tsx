@@ -24,11 +24,6 @@ export const TopBottomAreas: React.FC<TopBottomAreasProps> = ({
 }) => {
   const { isDark } = useTheme();
 
-  const combinedData = [
-    ...topAreas.map((area, idx) => ({ ...area, rank: idx + 1, type: 'top' })),
-    ...bottomAreas.map((area, idx) => ({ ...area, rank: idx + 1, type: 'bottom' }))
-  ];
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Лучшие области */}

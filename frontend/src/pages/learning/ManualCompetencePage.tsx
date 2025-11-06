@@ -1,6 +1,6 @@
 // © 2025 Бит.Цифра - Стас Чашин
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
 interface Competency {
@@ -57,35 +57,12 @@ const ManualCompetencePage: React.FC = () => {
     fetchData();
   }, []);
 
-  useEffect(() => {
-    if (selectedUserId) {
-      loadExistingCompetences();
-    } else {
+  const loadExistingCompetences = useCallback(async () => {
+    if (!selectedUserId) {
       setExistingCompetences([]);
+      return;
     }
-  }, [selectedUserId]);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [usersResponse, competenciesResponse] = await Promise.all([
-        api.get('/learning/users').catch(() => ({ data: [] })),
-        api.get('/learning/competencies').catch(() => ({ data: [] }))
-      ]);
-
-      const usersData = Array.isArray(usersResponse.data) ? usersResponse.data : [];
-      const competenciesData = Array.isArray(competenciesResponse.data) ? competenciesResponse.data : [];
-
-      setUsers(usersData);
-      setCompetencies(competenciesData);
-    } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadExistingCompetences = async () => {
     try {
       const response = await api.get('/learning/competence-matrix/all').catch(() => ({ data: [] }));
       const allCompetences = Array.isArray(response.data) ? response.data : [];
@@ -111,6 +88,30 @@ const ManualCompetencePage: React.FC = () => {
       setExistingCompetences(userCompetences);
     } catch (error) {
       console.error('Ошибка загрузки существующих компетенций:', error);
+    }
+  }, [selectedUserId]);
+
+  useEffect(() => {
+    loadExistingCompetences();
+  }, [loadExistingCompetences]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [usersResponse, competenciesResponse] = await Promise.all([
+        api.get('/learning/users').catch(() => ({ data: [] })),
+        api.get('/learning/competencies').catch(() => ({ data: [] }))
+      ]);
+
+      const usersData = Array.isArray(usersResponse.data) ? usersResponse.data : [];
+      const competenciesData = Array.isArray(competenciesResponse.data) ? competenciesResponse.data : [];
+
+      setUsers(usersData);
+      setCompetencies(competenciesData);
+    } catch (error) {
+      console.error('Ошибка загрузки данных:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
