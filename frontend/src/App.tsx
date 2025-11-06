@@ -32,6 +32,7 @@ import SchedulePage from './pages/learning/SchedulePage';
 import GrowthPlansPage from './pages/learning/GrowthPlansPage';
 import TestingPage from './pages/learning/TestingPage';
 import CompetenceMatrixPage from './pages/learning/CompetenceMatrixPage';
+import ManualCompetencePage from './pages/learning/ManualCompetencePage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -201,6 +202,14 @@ function App() {
                 <PrivateRoute requiredPermission="ui:view:learning">
                   <Layout>
                     <CompetenceMatrixPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/learning/manual-competence" element={
+                <PrivateRoute requiredPermission="ui:view:learning">
+                  <Layout>
+                    <ManualCompetencePage />
                   </Layout>
                 </PrivateRoute>
               } />

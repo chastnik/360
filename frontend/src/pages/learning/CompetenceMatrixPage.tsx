@@ -16,6 +16,7 @@ interface CompetenceMatrixEntry {
   score: number;
   assessment_date: string;
   notes?: string;
+  source?: 'training' | 'manual';
 }
 
 interface Competency {
@@ -93,7 +94,8 @@ const CompetenceMatrixPage: React.FC = () => {
           level: item.level,
           score: item.score || 0,
           assessment_date: item.assessment_date,
-          notes: item.notes
+          notes: item.notes,
+          source: item.source || 'training'
         });
       });
 
@@ -142,7 +144,8 @@ const CompetenceMatrixPage: React.FC = () => {
                     level: course.target_level as 'junior' | 'middle' | 'senior',
                     score: 75,
                     assessment_date: testResult.test_date,
-                    notes: `Получено через успешное прохождение теста по курсу "${course.name}"`
+                    notes: `Получено через успешное прохождение теста по курсу "${course.name}"`,
+                    source: 'training'
                   });
                 }
               }
@@ -491,6 +494,18 @@ const CompetenceMatrixPage: React.FC = () => {
                                 <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                   {new Date(entry.assessment_date).toLocaleDateString('ru-RU')}
                                 </span>
+                                {entry.source && (
+                                  <span 
+                                    className={`text-xs mt-1 px-2 py-0.5 rounded ${
+                                      entry.source === 'manual' 
+                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400' 
+                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                                    }`}
+                                    title={entry.source === 'manual' ? 'Указано вручную' : 'Получено через обучение'}
+                                  >
+                                    {entry.source === 'manual' ? '✏️ Вручную' : '📚 Обучение'}
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span className="text-gray-300 dark:text-gray-600">—</span>

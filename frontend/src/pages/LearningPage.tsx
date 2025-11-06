@@ -90,6 +90,13 @@ const LearningPage: React.FC = () => {
       color: 'bg-yellow-500 hover:bg-yellow-600'
     },
     {
+      title: 'Указание компетенций',
+      description: 'Указание уровня компетенций сотрудников вручную',
+      icon: '✏️',
+      href: '/learning/manual-competence',
+      color: 'bg-orange-500 hover:bg-orange-600'
+    },
+    {
       title: 'Матрица компетенций',
       description: 'Оценка компетенций сотрудников',
       icon: '🧠',

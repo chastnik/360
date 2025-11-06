@@ -734,6 +734,7 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
         'competence_matrix.score',
         'competence_matrix.assessment_date',
         'competence_matrix.notes',
+        'competence_matrix.source',
         'competence_matrix.created_at',
         'competence_matrix.updated_at',
         'competencies.name as competency_name',
@@ -768,6 +769,7 @@ router.get('/competence-matrix/all', authenticateToken, async (req: AuthRequest,
         'competence_matrix.score',
         'competence_matrix.assessment_date',
         'competence_matrix.notes',
+        'competence_matrix.source',
         'competence_matrix.created_at',
         'competence_matrix.updated_at',
         'competencies.name as competency_name',
@@ -792,7 +794,7 @@ router.get('/competence-matrix/all', authenticateToken, async (req: AuthRequest,
 // Обновить матрицу компетенций
 router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { competency_id, user_id, level, score, assessment_date, notes } = req.body;
+    const { competency_id, user_id, level, score, assessment_date, notes, source } = req.body;
     
     // Проверяем права доступа
     if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
@@ -802,15 +804,21 @@ router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, re
     // Используем переданный user_id или текущего пользователя
     const targetUserId = user_id || req.user?.userId;
     
+    // Определяем source: если не указан, то 'manual' (так как это ручное указание)
+    const competenceSource = source || 'manual';
+    
+    const insertData: any = {
+      user_id: targetUserId,
+      competency_id,
+      level,
+      score,
+      assessment_date,
+      notes,
+      source: competenceSource
+    };
+    
     const [matrix] = await knex('competence_matrix')
-      .insert({
-        user_id: targetUserId,
-        competency_id,
-        level,
-        score,
-        assessment_date,
-        notes
-      })
+      .insert(insertData)
       .onConflict(['user_id', 'competency_id'])
       .merge()
       .returning('*');
@@ -818,6 +826,37 @@ router.post('/competence-matrix', authenticateToken, async (req: AuthRequest, re
     return res.status(201).json(matrix);
   } catch (error) {
     console.error('Error updating competence matrix:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Удалить компетенцию из матрицы
+router.delete('/competence-matrix/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Проверяем права доступа
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Проверяем, существует ли запись
+    const existingEntry = await knex('competence_matrix')
+      .where('id', id)
+      .first();
+    
+    if (!existingEntry) {
+      return res.status(404).json({ error: 'Competence entry not found' });
+    }
+    
+    // Удаляем запись
+    await knex('competence_matrix')
+      .where('id', id)
+      .delete();
+    
+    return res.json({ success: true, message: 'Competence entry deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting competence matrix entry:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
