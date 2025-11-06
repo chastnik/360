@@ -20,6 +20,7 @@ export const AdminMattermost: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [loadingAvatars, setLoadingAvatars] = useState(false);
   const [cycles, setCycles] = useState<any[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<number | null>(null);
   const [sendingNotification, setSendingNotification] = useState(false);
@@ -154,6 +155,49 @@ export const AdminMattermost: React.FC = () => {
     }
   };
 
+  const handleLoadAvatars = async () => {
+    try {
+      setLoadingAvatars(true);
+      setError(null);
+      setSuccessMessage(null);
+      
+      // Увеличиваем таймаут для массовой загрузки
+      const response = await api.post('/mattermost/sync-avatars', {}, {
+        timeout: 300000 // 5 минут
+      });
+      
+      if (response.data?.success) {
+        const stats = response.data.stats;
+        setSuccessMessage(
+          `Загрузка аватаров завершена. Успешно: ${stats.success}, Пропущено: ${stats.skipped}, Ошибок: ${stats.failed}`
+        );
+        // Обновляем данные после успешной загрузки
+        setTimeout(() => {
+          loadData();
+        }, 1000);
+      } else {
+        setError(response.data?.error || response.data?.message || 'Ошибка загрузки аватаров');
+      }
+    } catch (error: any) {
+      console.error('Ошибка загрузки аватаров:', error);
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Ошибка загрузки аватаров';
+      setError(errorMessage);
+      
+      // Если есть частичные результаты, показываем их
+      if (error.response?.data?.stats) {
+        const stats = error.response.data.stats;
+        setSuccessMessage(
+          `Частично завершено. Успешно: ${stats.success}, Пропущено: ${stats.skipped}, Ошибок: ${stats.failed}`
+        );
+      }
+    } finally {
+      setLoadingAvatars(false);
+    }
+  };
+
   // Очистка сообщений через 5 секунд
   useEffect(() => {
     if (successMessage || error) {
@@ -267,23 +311,33 @@ export const AdminMattermost: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 space-y-2">
-              <button
-                onClick={() => handleSyncUsers('all')}
-                disabled={syncing}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed mr-3"
-              >
-                {syncing ? 'Синхронизация...' : 'Синхронизировать всех пользователей'}
-              </button>
-              <button
-                onClick={() => handleSyncUsers('team')}
-                disabled={syncing}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {syncing ? 'Синхронизация...' : 'Только члены команды'}
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => handleSyncUsers('all')}
+                  disabled={syncing}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {syncing ? 'Синхронизация...' : 'Синхронизировать всех пользователей'}
+                </button>
+                <button
+                  onClick={() => handleSyncUsers('team')}
+                  disabled={syncing}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {syncing ? 'Синхронизация...' : 'Только члены команды'}
+                </button>
+                <button
+                  onClick={handleLoadAvatars}
+                  disabled={loadingAvatars || syncing}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loadingAvatars ? 'Загрузка аватаров...' : 'Загрузить аватары'}
+                </button>
+              </div>
               <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 <p><strong>Все пользователи:</strong> Синхронизирует всех активных пользователей Mattermost (рекомендуется)</p>
                 <p><strong>Только члены команды:</strong> Синхронизирует только пользователей, состоящих в указанной команде</p>
+                <p><strong>Загрузить аватары:</strong> Загружает фото профиля из Mattermost для всех пользователей с настроенной интеграцией</p>
               </div>
             </div>
           </div>

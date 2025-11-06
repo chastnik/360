@@ -562,6 +562,33 @@ class MattermostService {
       return false;
     }
   }
+
+  /**
+   * Получить изображение профиля пользователя из Mattermost
+   */
+  async getUserProfileImage(userId: string): Promise<{ data: Buffer; contentType: string } | null> {
+    try {
+      const response = await this.client.get(`/users/${userId}/image`, {
+        responseType: 'arraybuffer'
+      });
+      
+      // Определить Content-Type из заголовков
+      const contentType = response.headers['content-type'] || 'image/png';
+      
+      return {
+        data: Buffer.from(response.data),
+        contentType
+      };
+    } catch (error: any) {
+      // Если изображение не найдено (404), это нормально - у пользователя может не быть аватара
+      if (error.response?.status === 404) {
+        console.log(`⚠️  Изображение профиля для пользователя ${userId} не найдено в Mattermost`);
+        return null;
+      }
+      console.error(`Ошибка получения изображения профиля пользователя ${userId}:`, error);
+      return null;
+    }
+  }
 }
 
 export default new MattermostService();

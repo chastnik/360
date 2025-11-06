@@ -743,4 +743,172 @@ router.post('/test-direct-channels', authenticateToken, async (req: AuthRequest,
   }
 });
 
+/**
+ * Массовая загрузка аватаров всех пользователей из Mattermost
+ */
+router.post('/sync-avatars', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const user = req.user;
+    
+    // Проверить права доступа
+    if (user?.role !== 'admin') {
+      res.status(403).json({ error: 'Недостаточно прав доступа' });
+      return;
+    }
+
+    // Получить всех пользователей с настроенным Mattermost
+    const users = await knex('users')
+      .whereNotNull('mattermost_user_id')
+      .select('id', 'email', 'mattermost_user_id', 'first_name', 'last_name');
+
+    if (users.length === 0) {
+      res.status(400).json({ error: 'Нет пользователей с настроенным Mattermost' });
+      return;
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
+
+    // Загрузить аватары для каждого пользователя
+    for (const dbUser of users) {
+      try {
+        // Получить изображение профиля из Mattermost
+        const profileImage = await mattermostService.getUserProfileImage(dbUser.mattermost_user_id);
+
+        if (!profileImage) {
+          skippedCount++;
+          console.log(`⚠️  Пропущен пользователь ${dbUser.email} - аватар не найден в Mattermost`);
+          continue;
+        }
+
+        // Проверить, что данные получены
+        if (!profileImage.data || profileImage.data.length === 0) {
+          skippedCount++;
+          console.log(`⚠️  Пропущен пользователь ${dbUser.email} - получены пустые данные`);
+          continue;
+        }
+
+        // Сохранить в базу данных
+        // Убеждаемся, что данные в формате Buffer
+        const bufferData = Buffer.isBuffer(profileImage.data) 
+          ? profileImage.data 
+          : Buffer.from(profileImage.data);
+        
+        await knex('users')
+          .where('id', dbUser.id)
+          .update({
+            avatar_data: bufferData,
+            avatar_mime: profileImage.contentType,
+            avatar_updated_at: knex.fn.now()
+          });
+
+        // Проверить, что данные действительно сохранились
+        const savedUser = await knex('users')
+          .where('id', dbUser.id)
+          .select('avatar_data', 'avatar_mime', 'avatar_updated_at')
+          .first();
+
+        // Проверяем, что данные сохранились
+        // В PostgreSQL binary данные могут возвращаться как Buffer или как строка
+        const avatarData = savedUser?.avatar_data;
+        const hasData = avatarData && (
+          (Buffer.isBuffer(avatarData) && avatarData.length > 0) ||
+          (typeof avatarData === 'string' && avatarData.length > 0) ||
+          (avatarData instanceof Uint8Array && avatarData.length > 0)
+        );
+
+        if (hasData) {
+          const dataSize = Buffer.isBuffer(avatarData) 
+            ? avatarData.length 
+            : (typeof avatarData === 'string' ? Buffer.byteLength(avatarData) : avatarData.length);
+          successCount++;
+          console.log(`✅ Аватар загружен для пользователя ${dbUser.email} (размер: ${dataSize} байт, тип: ${savedUser.avatar_mime})`);
+        } else {
+          failedCount++;
+          console.error(`❌ Ошибка: данные не сохранились для пользователя ${dbUser.email}. Тип данных: ${typeof avatarData}, значение: ${avatarData ? 'есть' : 'null'}`);
+        }
+      } catch (error: any) {
+        failedCount++;
+        console.error(`❌ Ошибка загрузки аватара для пользователя ${dbUser.email}:`, error?.message || error);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Загрузка аватаров завершена',
+      stats: {
+        total: users.length,
+        success: successCount,
+        failed: failedCount,
+        skipped: skippedCount
+      }
+    });
+  } catch (error: any) {
+    console.error('Ошибка массовой загрузки аватаров:', error?.message || error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Внутренняя ошибка сервера',
+      message: error?.message || 'Неизвестная ошибка'
+    });
+  }
+});
+
+/**
+ * Синхронизация аватара конкретного пользователя из Mattermost
+ */
+router.post('/sync-avatar/:userId', authenticateToken, async (req: AuthRequest, res): Promise<void> => {
+  try {
+    const user = req.user;
+    const { userId } = req.params;
+    
+    // Проверить права доступа (только для себя или админ)
+    if (user?.role !== 'admin' && user?.userId !== userId) {
+      res.status(403).json({ error: 'Недостаточно прав доступа' });
+      return;
+    }
+
+    // Получить пользователя из базы
+    const dbUser = await knex('users')
+      .where('id', userId)
+      .first();
+
+    if (!dbUser) {
+      res.status(404).json({ error: 'Пользователь не найден' });
+      return;
+    }
+
+    // Проверить наличие mattermost_user_id
+    if (!dbUser.mattermost_user_id) {
+      res.status(400).json({ error: 'У пользователя не настроен Mattermost' });
+      return;
+    }
+
+    // Получить изображение профиля из Mattermost
+    const profileImage = await mattermostService.getUserProfileImage(dbUser.mattermost_user_id);
+
+    if (!profileImage) {
+      res.status(404).json({ error: 'Не удалось получить изображение профиля из Mattermost. Возможно, у пользователя нет аватара в Mattermost.' });
+      return;
+    }
+
+    // Сохранить в базу данных
+    await knex('users')
+      .where('id', userId)
+      .update({
+        avatar_data: profileImage.data,
+        avatar_mime: profileImage.contentType,
+        avatar_updated_at: knex.fn.now()
+      });
+
+    res.json({
+      success: true,
+      message: 'Аватар успешно синхронизирован из Mattermost'
+    });
+  } catch (error) {
+    console.error('Ошибка синхронизации аватара:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 export default router; 

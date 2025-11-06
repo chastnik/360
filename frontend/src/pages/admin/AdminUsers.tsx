@@ -5,6 +5,7 @@ import RoleSelect from './RoleSelect';
 import api from '../../services/api';
 import { User, Department } from '../../types/common';
 import VacationModal from '../../components/VacationModal';
+import Avatar from '../../components/Avatar';
 
 interface UserFormData {
   email: string;
@@ -33,6 +34,7 @@ const AdminUsers: React.FC = () => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Управление отпусками для выбранного пользователя
@@ -144,6 +146,7 @@ const AdminUsers: React.FC = () => {
             await api.post(`/users/${selectedUser.id}/avatar`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
             setSuccessMessage('Пользователь и аватар обновлены');
             setAvatarFile(null);
+            setAvatarVersion(prev => prev + 1);
           } catch (err) {
             console.error('Ошибка загрузки аватара админом', err);
             setError('Пользователь обновлен, но не удалось загрузить аватар');
@@ -338,14 +341,19 @@ const AdminUsers: React.FC = () => {
           {filteredUsers.map((user) => (
             <li key={user.id}>
               <div className="px-4 py-4 sm:px-6">
-                <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
-                          {user.first_name[0]}{user.last_name[0]}
-                        </span>
-                      </div>
+                      <Avatar 
+                        userId={user.id} 
+                        size={40}
+                        version={user.avatar_updated_at || ''}
+                        fallback={
+                          <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                            {user.first_name[0]}{user.last_name[0]}
+                          </span>
+                        }
+                      />
                     </div>
                     <div className="ml-4">
                       <div className="flex items-center">
@@ -549,7 +557,16 @@ const AdminUsers: React.FC = () => {
               {/* Предпросмотр аватара */}
               {selectedUser && (
                 <div className="flex items-center gap-3">
-                  <img src={`/api/users/${selectedUser.id}/avatar`} onError={(e:any)=>{e.currentTarget.style.display='none';}} alt="avatar" className="w-10 h-10 rounded-full object-cover" />
+                  <Avatar 
+                    userId={selectedUser.id} 
+                    size={40}
+                    version={avatarVersion || selectedUser.avatar_updated_at || ''}
+                    fallback={
+                      <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                        {selectedUser.first_name[0]}{selectedUser.last_name[0]}
+                      </span>
+                    }
+                  />
                   <span className="text-xs text-gray-500 dark:text-gray-400">Текущий аватар</span>
                 </div>
               )}

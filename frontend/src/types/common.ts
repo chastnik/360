@@ -58,9 +58,11 @@ export interface User {
   department_id?: string; // Новое поле - FK к departments
   manager_id?: string;
   mattermost_username?: string;
+  mattermost_user_id?: string;
   // Дополнительно: для генерации ссылок на ЛС
   // В .env фронтенда должен быть REACT_APP_MATTERMOST_URL
   avatar_url?: string;
+  avatar_updated_at?: string;
   is_manager: boolean;
   is_active: boolean;
   created_at: string;
