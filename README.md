@@ -12,9 +12,9 @@
 - **Многоуровневая аналитика**: Индивидуальные, командные и межотдельские отчеты
 
 ### Управление персоналом
-- **Система ролей**: Admin, HR, Manager, User с гранулярными правами
+- **Система ролей**: Admin, HR, Manager, User с гранулярными правами через role_permissions
 - **Управление отделами**: Иерархическая структура с руководителями
-- **Профили сотрудников**: Полные профили с интеграцией Mattermost
+- **Профили сотрудников**: Полные профили с интеграцией Mattermost и аватарами
 - **Управление отпусками**: Пользователи могут указывать свои отпуска, админы/HR управляют отпусками сотрудников
 - **Календарь и расписание**: Настройка рабочего расписания и праздников для расчета ПИР
 
@@ -34,9 +34,11 @@
 - **Гибкая конфигурация**: Настройка вопросов, категорий, параметров
 - **Система настроек**: Централизованное управление конфигурацией
 - **Мониторинг системы**: Отслеживание производительности и ошибок
-- **Безопасность**: JWT аутентификация, защита данных, аудит действий
+- **Безопасность**: JWT аутентификация, защита данных, rate limiting, Helmet, CORS
 - **Календарь**: Управление рабочим расписанием и праздниками
 - **Планы индивидуального роста (ПИР)**: Автоматический расчет даты завершения с учетом календаря и отпусков
+- **Управление компетенциями**: Система компетенций с матрицей уровней
+- **Курсы обучения**: Управление курсами с зависимостями и целевыми уровнями
 
 ## 🛠 Технологии
 
@@ -46,9 +48,13 @@
 - **PostgreSQL** - основная база данных с UUID
 - **Redis** - кэширование и сессии (опционально)
 - **Knex.js** - ORM, миграции и query builder
-- **JWT** - статeless аутентификация
+- **JWT** - stateless аутентификация
 - **Bcrypt** - хэширование паролей
 - **node-cron** - планировщик задач
+- **Helmet** - защита HTTP заголовков
+- **express-rate-limit** - ограничение частоты запросов
+- **Joi** - валидация входных данных
+- **Morgan** - логирование HTTP запросов
 
 ### Frontend
 - **React** + **TypeScript** - основной UI фреймворк
@@ -57,14 +63,16 @@
 - **Recharts** - графики и диаграммы
 - **Tailwind CSS** - utility-first стилизация
 - **React Context** - управление состоянием
+- **html2canvas** + **jspdf** - экспорт в PDF
 
 ### Интеграции
 - **Mattermost API** - корпоративный мессенджер
 - **LLM Services** - обработка естественного языка
 - **Docker** - контейнеризация (опционально)
+- **Nginx** - reverse proxy и статические файлы
 
 ### DevOps
-- **ESLint** + **Prettier** - качество кода
+- **ESLint** + **TypeScript ESLint** - качество кода
 - **Git** - система контроля версий
 - **Shell Scripts** - автоматизация развертывания
 
@@ -75,18 +83,21 @@
 ```mermaid
 graph TD
   subgraph "Клиентская часть"
-    A[Web Browser] --> B[React Frontend<br/>:3000]
+    A[Web Browser] --> B[React Frontend<br/>:3000 / :80]
     B1[Admin Panel] --> B
     B2[User Dashboard] --> B
     B3[Assessment Form] --> B
   end
   
   subgraph "Серверная часть"
-    B -->|HTTP/REST API| C[Express Backend<br/>:3001]
-    C --> C1[Authentication<br/>Middleware]
-    C --> C2[Role-based<br/>Authorization]
-    C --> C3[API Routes]
-    C --> C4[Business Logic<br/>Services]
+    B -->|HTTP/REST API| C[Express Backend<br/>:5000]
+    C --> C1[Helmet<br/>Security Headers]
+    C --> C2[CORS<br/>Cross-Origin]
+    C --> C3[Rate Limiting<br/>DDoS Protection]
+    C --> C4[Authentication<br/>JWT Middleware]
+    C --> C5[Role-based<br/>Authorization]
+    C --> C6[API Routes]
+    C --> C7[Business Logic<br/>Services]
   end
   
   subgraph "Хранилище данных"
@@ -110,6 +121,8 @@ graph TD
     L[System Settings] --> C
     M[Role Management] --> C
     N[Department Management] --> C
+    O[Competencies] --> C
+    P[Training Courses] --> C
   end
 ```
 
@@ -126,12 +139,19 @@ erDiagram
     string middle_name
     string position
     uuid department_id FK
+    uuid role_id FK
     uuid manager_id FK
     string mattermost_username
     string mattermost_user_id
+    string avatar_url
+    binary avatar_data
+    string avatar_mime
+    timestamp avatar_updated_at
     enum role
     boolean is_manager
     boolean is_active
+    string reset_token
+    timestamp reset_token_expiry
     timestamp last_login
     timestamp created_at
     timestamp updated_at
@@ -184,6 +204,7 @@ erDiagram
     uuid cycle_id FK
     uuid user_id FK
     enum status
+    boolean completed_notification_sent
     timestamp invitation_sent_at
     timestamp respondents_selected_at
     timestamp completed_at
@@ -291,6 +312,28 @@ erDiagram
     timestamp updated_at
   }
   
+  COMPETENCIES {
+    uuid id PK
+    string name
+    text description
+    boolean is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  
+  COMPETENCE_MATRIX {
+    integer id PK
+    uuid user_id FK
+    uuid competency_id FK
+    enum level
+    integer score
+    date assessment_date
+    string source
+    text notes
+    timestamp created_at
+    timestamp updated_at
+  }
+  
   TRAINING_COURSES {
     integer id PK
     string name UK
@@ -298,7 +341,24 @@ erDiagram
     integer hours
     boolean is_active
     enum target_level
+    uuid competency_id FK
     integer system_id
+    timestamp created_at
+    timestamp updated_at
+  }
+  
+  COURSE_PREREQUISITES {
+    integer id PK
+    integer course_id FK
+    integer prerequisite_id FK
+    timestamp created_at
+    timestamp updated_at
+  }
+  
+  COURSE_COREQUISITES {
+    integer id PK
+    integer course_id FK
+    integer corequisite_id FK
     timestamp created_at
     timestamp updated_at
   }
@@ -321,21 +381,33 @@ erDiagram
     timestamp created_at
     timestamp updated_at
   }
+  
+  TEST_RESULTS {
+    integer id PK
+    integer growth_plan_id FK
+    integer course_id FK
+    enum status
+    date test_date
+    text notes
+    timestamp created_at
+    timestamp updated_at
+  }
 
   %% Relationships
   USERS ||--o{ USERS : "manager_id"
   USERS }o--|| DEPARTMENTS : "department_id"
+  USERS }o--|| ROLES : "role_id"
   USERS ||--o{ ASSESSMENT_CYCLES : "created_by"
   USERS ||--o{ ASSESSMENT_PARTICIPANTS : "user_id"
   USERS ||--o{ ASSESSMENT_RESPONDENTS : "respondent_user_id"
   USERS ||--o{ VACATIONS : "user_id"
   USERS ||--o{ VACATIONS : "approved_by"
   USERS ||--o{ GROWTH_PLANS : "user_id"
+  USERS ||--o{ COMPETENCE_MATRIX : "user_id"
   
   DEPARTMENTS ||--o{ USERS : "head_id"
   
   ROLES ||--o{ ROLE_PERMISSIONS : "role_id"
-  USERS }o--|| ROLES : "role_id"
   
   ASSESSMENT_CYCLES ||--o{ ASSESSMENT_PARTICIPANTS : "cycle_id"
   ASSESSMENT_PARTICIPANTS ||--o{ ASSESSMENT_RESPONDENTS : "participant_id"
@@ -344,8 +416,16 @@ erDiagram
   QUESTIONS ||--o{ ASSESSMENT_RESPONSES : "question_id"
   ASSESSMENT_RESPONDENTS ||--o{ ASSESSMENT_RESPONSES : "respondent_id"
   
+  COMPETENCIES ||--o{ COMPETENCE_MATRIX : "competency_id"
+  COMPETENCIES ||--o{ TRAINING_COURSES : "competency_id"
+  
+  TRAINING_COURSES ||--o{ COURSE_PREREQUISITES : "course_id"
+  TRAINING_COURSES ||--o{ COURSE_COREQUISITES : "course_id"
+  
   GROWTH_PLANS ||--o{ GROWTH_PLAN_COURSES : "growth_plan_id"
+  GROWTH_PLANS ||--o{ TEST_RESULTS : "growth_plan_id"
   TRAINING_COURSES ||--o{ GROWTH_PLAN_COURSES : "course_id"
+  TRAINING_COURSES ||--o{ TEST_RESULTS : "course_id"
 ```
 
 ### Расчет планов индивидуального роста (ПИР)
@@ -393,12 +473,16 @@ sequenceDiagram
 
   U->>FE: Вводит email/пароль
   FE->>BE: POST /api/auth/login {email, password}
-  BE->>DB: Проверка пользователя и hash пароля
+  BE->>DB: Проверка пользователя и hash пароля (bcrypt)
   DB-->>BE: OK
-  BE-->>FE: 200 {token}
+  BE->>DB: Загрузка permissions из role_permissions
+  DB-->>BE: Permissions
+  BE-->>FE: 200 {token, user, permissions}
   FE->>FE: Сохраняет JWT в localStorage
   U->>FE: Переходит на защищённые страницы
   FE->>BE: GET /api/* c Authorization: Bearer <token>
+  BE->>BE: JWT verify + проверка пользователя в БД
+  BE->>BE: Проверка permissions
   BE-->>FE: 200 данные или 401/403
 ```
 
@@ -433,17 +517,19 @@ flowchart TD
     D1 --> D2{Все респонденты<br/>ответили?}
     D2 -->|Нет| D1
     D2 -->|Да| D3[Участник помечается<br/>как завершен]
+    D3 --> D4[Отправка уведомления<br/>о готовности отчета]
   end
   
   subgraph "Этап 5: Результаты"
-    D3 --> E1[Генерация отчетов<br/>и аналитики]
-    E1 --> E2[Уведомления о<br/>готовности результатов]
-    E2 --> E3[Доступ к детальным<br/>отчетам и дашбордам]
+    D4 --> E1[Генерация отчетов<br/>и аналитики]
+    E1 --> E2[LLM-анализ текстовых<br/>ответов]
+    E2 --> E3[AI рекомендации<br/>с учетом курсов]
+    E3 --> E4[Доступ к детальным<br/>отчетам и дашбордам]
   end
   
   style A4 fill:#e1f5fe
   style C4 fill:#f1f8e9
-  style E3 fill:#fff3e0
+  style E4 fill:#fff3e0
 ```
 
 ### Система ролей и разрешений
@@ -466,25 +552,31 @@ graph TB
     P6[Доступ ко всем отчетам]
     P7[Управление категориями и вопросами]
     P8[Интеграция с Mattermost]
+    P9[Управление календарем]
+    P10[Управление отпусками]
+    P11[Управление компетенциями]
+    P12[Управление курсами]
   end
   
   subgraph "Разрешения HR"
-    P9[Просмотр пользователей]
-    P10[Создание циклов оценки]
-    P11[Просмотр отчетов отделов]
-    P12[Управление участниками]
+    P13[Просмотр пользователей]
+    P14[Создание циклов оценки]
+    P15[Просмотр отчетов отделов]
+    P16[Управление участниками]
+    P17[Управление отпусками сотрудников]
   end
   
   subgraph "Разрешения Manager"
-    P13[Просмотр своей команды]
-    P14[Участие в оценке]
-    P15[Просмотр отчетов подчиненных]
+    P18[Просмотр своей команды]
+    P19[Участие в оценке]
+    P20[Просмотр отчетов подчиненных]
   end
   
   subgraph "Разрешения User"
-    P16[Участие в оценке]
-    P17[Просмотр своих результатов]
-    P18[Заполнение форм оценки]
+    P21[Участие в оценке]
+    P22[Просмотр своих результатов]
+    P23[Заполнение форм оценки]
+    P24[Управление своими отпусками]
   end
   
   R1 --> P1
@@ -495,19 +587,25 @@ graph TB
   R1 --> P6
   R1 --> P7
   R1 --> P8
+  R1 --> P9
+  R1 --> P10
+  R1 --> P11
+  R1 --> P12
   
-  R2 --> P9
-  R2 --> P10
-  R2 --> P11
-  R2 --> P12
+  R2 --> P13
+  R2 --> P14
+  R2 --> P15
+  R2 --> P16
+  R2 --> P17
   
-  R3 --> P13
-  R3 --> P14
-  R3 --> P15
+  R3 --> P18
+  R3 --> P19
+  R3 --> P20
   
-  R4 --> P16
-  R4 --> P17
-  R4 --> P18
+  R4 --> P21
+  R4 --> P22
+  R4 --> P23
+  R4 --> P24
   
   style R1 fill:#ffebee
   style R2 fill:#e8f5e8
@@ -524,7 +622,10 @@ flowchart LR
   FE -->|/api/reports/user/:userId/analytics?cycleId=| BE
   FE -->|POST /api/reports/compare-items| BE
   FE -->|/api/reports/departments/compare| BE
+  FE -->|POST /api/reports/user/:userId/recommendations| BE
   BE --> DB[(PostgreSQL)]
+  BE --> LLM[LLM Service]
+  LLM --> BE
   BE --> FE
   FE --> Charts[Recharts: Bar, Radar, Trend, Distribution]
 ```
@@ -539,6 +640,8 @@ graph TD
     F2 --> F4[reports]
     F2 --> F5[admin]
     F3 --> F6[survey_token]
+    F2 --> F7[learning]
+    F2 --> F8[calendar]
   end
   
   subgraph API_Endpoints
@@ -547,6 +650,7 @@ graph TD
       A2[POST /api/auth/register]
       A3[POST /api/auth/forgot-password]
       A4[POST /api/auth/reset-password]
+      A5[POST /api/auth/change-password]
     end
     
     subgraph User_Management
@@ -554,6 +658,7 @@ graph TD
       U2[POST /api/users]
       U3[PUT /api/users/:id]
       U4[DELETE /api/users/:id]
+      U5[PUT /api/users/password]
     end
     
     subgraph Assessment_Cycles
@@ -561,6 +666,7 @@ graph TD
       C2[POST /api/cycles]
       C3[PUT /api/cycles/:id]
       C4[POST /api/cycles/:id/start]
+      C5[POST /api/cycles/:id/participants]
     end
     
     subgraph Assessments
@@ -575,6 +681,7 @@ graph TD
       R3[GET /api/reports/user/:id/analytics]
       R4[POST /api/reports/compare-items]
       R5[GET /api/reports/departments/compare]
+      R6[POST /api/reports/user/:userId/recommendations]
     end
     
     subgraph Admin_Endpoints
@@ -602,14 +709,26 @@ graph TD
       VAC4[DELETE /api/vacations/:id]
       VAC5[GET /api/vacations/stats/summary]
     end
+    
+    subgraph Learning_Endpoints
+      L1[GET /api/learning/users]
+      L2[GET /api/learning/competencies]
+      L3[GET /api/learning/courses]
+      L4[GET /api/learning/growth-plans]
+      L5[POST /api/learning/growth-plans]
+      L6[PUT /api/learning/growth-plans/:id]
+      L7[DELETE /api/learning/growth-plans/:id]
+    end
   end
   
   subgraph Middleware_Stack
-    M1[CORS]
-    M2[Body Parser]
-    M3[Authentication]
-    M4[Role Authorization]
-    M5[Rate Limiting]
+    M1[Helmet<br/>Security Headers]
+    M2[CORS<br/>Cross-Origin]
+    M3[Body Parser<br/>JSON/URL-encoded]
+    M4[Rate Limiting<br/>1000 req/min]
+    M5[Authentication<br/>JWT Verify]
+    M6[Role Authorization<br/>requireRole]
+    M7[Permission Check<br/>requirePermission]
   end
   
   F1 --> A1
@@ -618,12 +737,16 @@ graph TD
   F4 --> R2
   F5 --> AD1
   F6 --> AS3
+  F7 --> L4
+  F8 --> CAL1
   
   A1 --> M1
   M1 --> M2
   M2 --> M3
   M3 --> M4
   M4 --> M5
+  M5 --> M6
+  M6 --> M7
 ```
 
 ### Интеграция с Mattermost
@@ -673,7 +796,6 @@ sequenceDiagram
     MM->>Subject: Ваш отчет готов
     MM->>Admin: Отчеты по циклу готовы
   end
-  
 ```
 
 ## 📦 Установка и запуск
@@ -682,6 +804,7 @@ sequenceDiagram
 
 - Node.js >= 16.0.0
 - PostgreSQL >= 12
+- Redis (опционально)
 - npm или yarn
 
 ### Быстрый старт
@@ -704,8 +827,8 @@ cp env.example .env
 ```
 
 Система будет доступна по адресам:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
+- **Frontend**: http://localhost:3000 (dev) или http://localhost:80 (production)
+- **Backend API**: http://localhost:5000/api
 
 ### Альтернативные способы запуска
 
@@ -735,25 +858,40 @@ cd frontend && npm start
 ```env
 # База данных
 DB_HOST=localhost
-DB_NAME=360
-DB_USER=360
-DB_PASSWORD=your_password
+DB_NAME=assessment360
+DB_USER=assessment_user
+DB_PASSWORD=your_secure_db_password_here
 DB_PORT=5432
 
 # Порты
-PORT=3001
-FRONTEND_PORT=3000
+PORT=5000
+FRONTEND_PORT=80
+BACKEND_PORT=5000
 
 # JWT
-JWT_SECRET=your-secret-key
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-minimum-32-characters
 
 # Frontend
-REACT_APP_API_URL=http://localhost:3001/api
+REACT_APP_API_URL=http://localhost:5000/api
+FRONTEND_URL=http://localhost
+
+# Redis
+REDIS_PASSWORD=your_redis_password_here
+REDIS_PORT=6379
 
 # Mattermost интеграция
 MATTERMOST_URL=https://your-mattermost-server.com
-MATTERMOST_TOKEN=your-token
-MATTERMOST_TEAM_ID=your-team-id
+MATTERMOST_TOKEN=your-mattermost-personal-access-token
+MATTERMOST_TEAM_ID=your-team-id-here
+MATTERMOST_BOT_USERNAME=360-assessment-bot
+
+# Конфигурация для production
+NODE_ENV=production
+
+# Конфигурация безопасности
+CORS_ORIGIN=http://localhost:3000,https://your-domain.com
+RATE_LIMIT_WINDOW=900000
+RATE_LIMIT_MAX=100
 ```
 
 ## 🗄 База данных
@@ -762,15 +900,16 @@ MATTERMOST_TEAM_ID=your-team-id
 
 1. Создайте базу данных:
 ```sql
-CREATE DATABASE "360";
-CREATE USER "360" WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE "360" TO "360";
+CREATE DATABASE assessment360;
+CREATE USER assessment_user WITH PASSWORD 'your_secure_db_password_here';
+GRANT ALL PRIVILEGES ON DATABASE assessment360 TO assessment_user;
 ```
 
 2. Запустите миграции:
 ```bash
-npm run db:migrate
-npm run db:seed
+cd backend
+npm run migrate
+npm run seed
 ```
 
 ## 🔧 Разработка
@@ -783,14 +922,21 @@ npm run db:seed
 │   ├── src/
 │   │   ├── routes/   # API маршруты
 │   │   ├── services/ # Бизнес-логика
-│   │   ├── database/ # Миграции и модели
+│   │   ├── middleware/ # Middleware (auth, validation)
+│   │   ├── database/ # Миграции и seeds
 │   │   └── types/    # TypeScript типы
+│   ├── dist/         # Скомпилированный код
+│   └── package.json
 ├── frontend/         # Frontend (React)
 │   └── src/
 │       ├── components/ # React компоненты
 │       ├── pages/     # Страницы приложения
-│       └── services/  # API клиент
-└── docker-compose.yml # Docker конфигурация
+│       ├── services/  # API клиент
+│       ├── contexts/  # React Context
+│       └── utils/     # Утилиты
+├── docker-compose.yml # Docker конфигурация
+├── nginx.conf        # Nginx конфигурация
+└── env.example       # Пример конфигурации
 ```
 
 ### Полезные команды
@@ -803,16 +949,17 @@ npm run install:all
 ./dev.sh
 
 # Сборка проекта
-npm run build
+cd backend && npm run build
+cd frontend && npm run build
 
 # Миграции базы данных
-npm run db:migrate
+cd backend && npm run migrate
 
 # Заполнение тестовыми данными
-npm run db:seed
+cd backend && npm run seed
 
 # Линтинг
-npm run lint
+cd backend && npm run lint
 ```
 
 ## 🔌 API Документация
@@ -824,18 +971,26 @@ npm run lint
 - `POST /api/auth/register` - Регистрация нового пользователя
 - `POST /api/auth/forgot-password` - Восстановление пароля
 - `POST /api/auth/reset-password` - Сброс пароля по токену
+- `POST /api/auth/change-password` - Смена пароля (требует аутентификации)
 
 #### Пользователи и роли
 - `GET /api/users` - Список пользователей (с фильтрацией и пагинацией)
-- `POST /api/users` - Создание пользователя
+- `POST /api/users` - Создание пользователя (требует permission: action:users:create)
 - `PUT /api/users/:id` - Обновление данных пользователя
 - `DELETE /api/users/:id` - Деактивация пользователя
+- `PUT /api/users/password` - Смена пароля текущего пользователя
 - `GET /api/roles` - Управление ролями и разрешениями
+- `POST /api/roles` - Создание роли
+- `PUT /api/roles/:id` - Обновление роли
+- `DELETE /api/roles/:id` - Удаление роли
+- `POST /api/roles/:id/permissions` - Добавление разрешения к роли
+- `DELETE /api/roles/:id/permissions/:permission` - Удаление разрешения из роли
 
 #### Отделы
 - `GET /api/departments` - Список отделов
 - `POST /api/departments` - Создание отдела
 - `PUT /api/departments/:id` - Обновление отдела
+- `DELETE /api/departments/:id` - Удаление отдела
 
 #### Циклы оценки
 - `GET /api/cycles` - Все циклы оценки
@@ -860,8 +1015,15 @@ npm run lint
 #### Администрирование
 - `GET /api/admin/dashboard` - Административная панель
 - `GET /api/categories` - Управление категориями вопросов
+- `POST /api/categories` - Создание категории
+- `PUT /api/categories/:id` - Обновление категории
+- `DELETE /api/categories/:id` - Удаление категории
 - `GET /api/questions` - Управление вопросами
+- `POST /api/questions` - Создание вопроса
+- `PUT /api/questions/:id` - Обновление вопроса
+- `DELETE /api/questions/:id` - Удаление вопроса
 - `GET /api/settings` - Системные настройки
+- `PUT /api/settings/:key` - Обновление настройки
 - `POST /api/mattermost/webhook` - Webhook для интеграции с Mattermost
 
 #### Календарь и расписание
@@ -880,13 +1042,22 @@ npm run lint
 - `DELETE /api/vacations/:id` - Удалить отпуск
 - `GET /api/vacations/stats/summary?year=YYYY` - Статистика отпусков
 
+#### Обучение и ПИР
+- `GET /api/learning/users` - Получить список пользователей для ПИР
+- `GET /api/learning/competencies` - Получить список компетенций
+- `GET /api/learning/courses` - Получить список курсов обучения
+- `GET /api/learning/growth-plans` - Получить планы индивидуального роста
+- `POST /api/learning/growth-plans` - Создать план индивидуального роста
+- `PUT /api/learning/growth-plans/:id` - Обновить план индивидуального роста
+- `DELETE /api/learning/growth-plans/:id` - Удалить план индивидуального роста
+
 ### Примеры запросов
 
 ```javascript
 // Аутентификация
 POST /api/auth/login
 {
-  "username": "admin",
+  "email": "user@example.com",
   "password": "password"
 }
 
@@ -895,7 +1066,10 @@ POST /api/cycles
 {
   "name": "Q1 2024 Assessment",
   "start_date": "2024-01-01",
-  "end_date": "2024-03-31"
+  "end_date": "2024-03-31",
+  "respondent_count": 5,
+  "allow_self_assessment": true,
+  "include_manager_assessment": true
 }
 
 // Аналитика цикла
@@ -918,6 +1092,12 @@ POST /api/reports/compare-items
 
 // Сравнение отделов
 GET /api/reports/departments/compare?cycleId=...&departmentIds=dep1,dep2
+
+// AI рекомендации с учетом курсов
+POST /api/reports/user/:userId/recommendations
+{
+  "cycleId": "..."
+}
 
 // Управление календарем
 GET /api/calendar/work-schedule
@@ -950,12 +1130,37 @@ POST /api/vacations
   "comment": "Ежегодный отпуск"
 }
 
-// AI рекомендации с учетом курсов
-POST /api/reports/user/:userId/recommendations
+// Создание ПИР
+POST /api/learning/growth-plans
 {
-  "cycleId": "..."
+  "user_id": "...",
+  "start_date": "2025-01-01",
+  "study_load_percent": 20,
+  "courses": [1, 2, 3]
 }
 ```
+
+## 🔒 Безопасность
+
+Система использует следующие механизмы безопасности:
+
+### Аутентификация и авторизация
+- **JWT токены** с сроком действия 24 часа
+- **Bcrypt** для хеширования паролей (10 раундов)
+- **Система ролей** с гранулярными правами через `role_permissions`
+- **Middleware** для проверки прав доступа
+
+### Защита данных
+- **Helmet** для установки защитных HTTP заголовков
+- **CORS** с настройкой разрешенных источников
+- **Rate Limiting** (1000 запросов в минуту с одного IP)
+- **Валидация входных данных** через Joi
+- **Параметризованные SQL запросы** через Knex для защиты от SQL-инъекций
+
+### Безопасное хранение
+- Секреты хранятся в переменных окружения (`.env`)
+- Пароли никогда не хранятся в открытом виде
+- JWT секрет хранится отдельно от кода
 
 ## 🤖 Интеграция с Mattermost
 
@@ -963,13 +1168,20 @@ POST /api/reports/user/:userId/recommendations
 
 - Автоматических уведомлений о новых оценках
 - Напоминаний о незавершенных оценках
+- Интерактивного выбора респондентов через бота
 - Публикации результатов (с настройкой приватности)
 
 ### Настройка бота
 
 1. Создайте бота в Mattermost
 2. Получите токен доступа
-3. Добавьте настройки в `.env` файл
+3. Добавьте настройки в `.env` файл:
+```env
+MATTERMOST_URL=https://your-mattermost-server.com
+MATTERMOST_TOKEN=your-mattermost-personal-access-token
+MATTERMOST_TEAM_ID=your-team-id-here
+MATTERMOST_BOT_USERNAME=360-assessment-bot
+```
 4. Настройте команды в административной панели
 
 ## 📊 Мониторинг
@@ -982,6 +1194,7 @@ POST /api/reports/user/:userId/recommendations
 
 # Просмотр логов
 tail -f backend/logs/application.log
+tail -f backend/dev.log
 ```
 
 ## 🚀 Деплой
@@ -994,13 +1207,17 @@ docker-compose -f docker-compose.yml up -d
 
 # Просмотр логов
 docker-compose logs -f
+
+# Остановка
+docker-compose down
 ```
 
 ### Ручной деплой
 
 ```bash
 # Сборка
-npm run build
+cd backend && npm run build
+cd frontend && npm run build
 
 # Запуск в продакшн режиме
 NODE_ENV=production npm start
@@ -1035,6 +1252,12 @@ NODE_ENV=production npm start
 - [x] LLM-рекомендации с учетом курсов обучения
 - [x] AI рекомендации для сотрудников
 - [x] Интеграция отпусков в расчет ПИР
+- [x] Система ролей с гранулярными правами
+- [x] Управление компетенциями
+- [x] Управление курсами обучения с зависимостями
+- [x] Матрица компетенций
+- [x] Аватары пользователей
+- [x] Восстановление пароля
 
 ### 🚧 В разработке
 - [ ] Мобильное приложение
@@ -1050,6 +1273,7 @@ NODE_ENV=production npm start
 - `/profile` — личный профиль пользователя с возможностью редактирования и управления отпусками
 - `/assessments` — доступные оценки для заполнения
 - `/cycles` — просмотр циклов оценки (участник/респондент)
+- `/learning` — планы индивидуального роста (ПИР)
 
 ### Отчетность и аналитика  
 - `/reports` — центр аналитики с множественными вкладками:
@@ -1069,6 +1293,7 @@ NODE_ENV=production npm start
 - `/admin/mattermost` — настройки интеграции с Mattermost
 - `/admin/settings` — системные настройки и конфигурация
 - `/admin/calendar` — управление рабочим расписанием и праздниками
+- `/admin/learning` — управление компетенциями и курсами обучения
 
 ### Специальные страницы
 - `/survey/:token` — публичная форма для заполнения оценки
