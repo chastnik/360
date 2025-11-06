@@ -1,10 +1,16 @@
+# Cursor
 .cursorignore
+
 # Зависимости
 node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
+lerna-debug.log*
+
+# package-lock.json - НЕ игнорируем, он нужен для стабильности зависимостей
+# package-lock.json
 
 # Переменные окружения
 .env
@@ -12,45 +18,70 @@ package-lock.json
 .env.development.local
 .env.test.local
 .env.production.local
+.env.test
+*.env
 
 # Логи
-logs
+logs/
 *.log
+**/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+backend.log
+dev.log
+frontend/dev.log
+backend/dev.log
 
 # Временные файлы
 *.tmp
 *.temp
 .cache/
 .parcel-cache/
+tmp/
+temp/
 
 # Сборка
 build/
 dist/
 out/
+**/build/
+**/dist/
+**/out/
 
 # Frontend (React)
 # Сборка React
-/frontend/build
+/frontend/build/
 /frontend/.eslintcache
+/frontend/coverage/
 
 # Backend (Node.js)
 # Скомпилированные файлы TypeScript
 /backend/dist/
 /backend/build/
+/backend/coverage/
+
+# Временные скрипты
+tmp-*.js
+**/tmp-*.js
+
+# Дубликаты файлов
+**/package 2.json
+**/package-lock 2.json
 
 # База данных
 *.sqlite
 *.sqlite3
 *.db
 database.sqlite
+*.sql
 
 # Uploads и загруженные файлы
 uploads/
+**/uploads/
 /backend/uploads/
+/frontend/uploads/
 
 # Логи приложения
 /backend/logs/
@@ -62,6 +93,9 @@ uploads/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
 
 # Системные файлы
 .DS_Store
@@ -71,6 +105,7 @@ uploads/
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # Временные файлы операционной системы
 *.pid
@@ -80,6 +115,7 @@ Thumbs.db
 # Coverage directory используемый инструментами вроде istanbul
 coverage/
 *.lcov
+**/coverage/
 
 # nyc test coverage
 .nyc_output
@@ -92,12 +128,14 @@ typings/
 
 # TypeScript cache
 *.tsbuildinfo
+**/*.tsbuildinfo
 
 # Optional npm cache directory
 .npm
 
 # Optional eslint cache
 .eslintcache
+**/.eslintcache
 
 # Optional REPL history
 .node_repl_history
@@ -107,9 +145,6 @@ typings/
 
 # Yarn Integrity file
 .yarn-integrity
-
-# dotenv environment variables file
-.env.test
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -130,22 +165,21 @@ public
 .out
 .storybook-out
 
-# Temporary folders
-tmp/
-temp/
-
 # Docker
 Dockerfile.dev
 docker-compose.dev.yml
+docker-compose.override.yml
 
 # Backup files
 *.bak
 *.backup
+*.old
 
 # SSL certificates
 *.pem
 *.key
 *.crt
+*.csr
 
 # Monitoring и метрики
 .pm2/
@@ -162,6 +196,22 @@ config/local.js
 config/local.json
 
 # Sentry
-.sentryclircbackend/node_modules/
-frontend/node_modules/
-backend/dist/
+.sentryclirc
+
+# OS generated files
+Icon?
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
