@@ -6,7 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 interface Question {
-  id: number;
+  id: string; // UUID
   text: string;
   category_id: number;
   category_name: string;
@@ -38,8 +38,11 @@ interface AssessmentInfo {
 }
 
 export const SurveyPage: React.FC = () => {
-  const { respondentId } = useParams<{ respondentId: string }>();
+  const { respondentId, token } = useParams<{ respondentId?: string; token?: string }>();
   const navigate = useNavigate();
+  
+  // Используем respondentId или token (для обратной совместимости)
+  const actualRespondentId = respondentId || token;
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [assessmentInfo, setAssessmentInfo] = useState<AssessmentInfo | null>(null);
@@ -51,14 +54,44 @@ export const SurveyPage: React.FC = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const loadSurveyData = useCallback(async () => {
+    if (!actualRespondentId) {
+      setError('ID респондента не указан');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log(`[SurveyPage] Загружаем данные для respondentId: ${actualRespondentId}`);
+      
       const [questionsResponse, progressResponse] = await Promise.all([
-        api.get(`/assessments/${respondentId}/questions`),
-        api.get(`/assessments/${respondentId}/progress`)
+        api.get(`/assessments/${actualRespondentId}/questions`),
+        api.get(`/assessments/${actualRespondentId}/progress`)
       ]);
 
-      setQuestions(questionsResponse.data);
+      // Проверяем, что данные получены корректно
+      if (!questionsResponse.data || !Array.isArray(questionsResponse.data)) {
+        throw new Error('Некорректный формат данных вопросов');
+      }
+
+      if (!progressResponse.data || !progressResponse.data.progress) {
+        throw new Error('Некорректный формат данных прогресса');
+      }
+
+      // Проверяем, что у всех вопросов есть id
+      const questionsWithIds = questionsResponse.data.map((q: any, index: number) => {
+        if (!q.id) {
+          console.error(`Вопрос ${index} не имеет id:`, q);
+          throw new Error(`Вопрос ${index} не имеет id`);
+        }
+        return q;
+      });
+
+      console.log(`[SurveyPage] Загружено ${questionsWithIds.length} вопросов, первый вопрос:`, questionsWithIds[0]);
+
+      setQuestions(questionsWithIds);
       setProgress(progressResponse.data.progress);
       setAssessmentInfo(progressResponse.data.respondent);
       
@@ -66,27 +99,55 @@ export const SurveyPage: React.FC = () => {
       if (questionsResponse.data.length > 0) {
         setCurrentCategoryId(questionsResponse.data[0].category_id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при загрузке данных опроса:', error);
-      setError('Не удалось загрузить данные опроса');
+      const errorMessage = error.response?.data?.error || error.message || 'Не удалось загрузить данные опроса';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [respondentId]);
+  }, [actualRespondentId]);
 
   useEffect(() => {
-    if (respondentId) {
+    if (actualRespondentId) {
       loadSurveyData();
+    } else {
+      setError('ID респондента не указан');
+      setLoading(false);
     }
-  }, [respondentId, loadSurveyData]);
+  }, [actualRespondentId, loadSurveyData]);
 
-  const handleScoreChange = async (questionId: number, score: number) => {
+  const handleScoreChange = async (questionId: string, score: number) => {
+    if (!questionId) {
+      console.error('handleScoreChange: questionId не определен', { questionId, score });
+      setError('ID вопроса не указан');
+      return;
+    }
+
+    if (!actualRespondentId) {
+      console.error('handleScoreChange: actualRespondentId не определен', { questionId, score });
+      setError('ID респондента не указан');
+      return;
+    }
+
     try {
       setSaving(true);
-      await api.post(`/assessments/${respondentId}/responses`, {
+      setError(null);
+      
+      const requestData = {
         question_id: questionId,
         score: score
+      };
+      
+      console.log(`[SurveyPage] Сохраняем ответ:`, {
+        questionId,
+        score,
+        respondentId: actualRespondentId,
+        requestData,
+        questionIdType: typeof questionId
       });
+      
+      await api.post(`/assessments/${actualRespondentId}/responses`, requestData);
 
       // Обновить локальное состояние
       setQuestions(prev => 
@@ -107,7 +168,7 @@ export const SurveyPage: React.FC = () => {
 
   const loadProgress = async () => {
     try {
-      const response = await api.get(`/assessments/${respondentId}/progress`);
+      const response = await api.get(`/assessments/${actualRespondentId}/progress`);
       setProgress(response.data.progress);
     } catch (error) {
       console.error('Ошибка при загрузке прогресса:', error);
@@ -117,7 +178,7 @@ export const SurveyPage: React.FC = () => {
   const handleComplete = async () => {
     try {
       setSaving(true);
-      await api.post(`/assessments/${respondentId}/complete`);
+      await api.post(`/assessments/${actualRespondentId}/complete`);
       navigate('/assessments', { 
         state: { message: 'Опрос успешно завершен!' } 
       });

@@ -25,6 +25,7 @@ interface Participant {
   email: string;
   status: 'pending' | 'in_progress' | 'completed';
   respondents?: Respondent[];
+  respondentsCount?: number;
 }
 
 interface Respondent {
@@ -510,9 +511,14 @@ export const CyclesPage: React.FC = () => {
                 {selectedCycle.participants?.map(participant => (
                   <div key={participant.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex justify-between items-center">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {`${participant.first_name || ''} ${participant.last_name || ''}`.trim() || 'Без имени'}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {`${participant.first_name || ''} ${participant.last_name || ''}`.trim() || 'Без имени'}
+                          </div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            (Респондентов: {participant.respondentsCount ?? participant.respondents?.length ?? 0})
+                          </span>
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {participant.email}

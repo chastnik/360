@@ -52,14 +52,19 @@ router.get('/participants-pending-respondents', authenticateToken, async (req: A
       return;
     }
 
-    // Получаем всех участников пользователя со статусом 'invited' в активных циклах
+    // Приводим userId к строке для корректного сравнения
+    const userIdStr = String(userId);
+
+    // Получаем всех участников пользователя в активных циклах
+    // Исключаем только завершенные статусы ('completed')
     const participants = await db('assessment_participants')
       .join('assessment_cycles', 'assessment_participants.cycle_id', 'assessment_cycles.id')
-      .where('assessment_participants.user_id', userId)
-      .where('assessment_participants.status', 'invited')
+      .where('assessment_participants.user_id', userIdStr)
       .where('assessment_cycles.status', 'active')
+      .whereNot('assessment_participants.status', 'completed')
       .select(
         'assessment_participants.id as participant_id',
+        'assessment_participants.status as participant_status',
         'assessment_cycles.id as cycle_id',
         'assessment_cycles.name as cycle_name',
         'assessment_cycles.description as cycle_description'
@@ -209,10 +214,14 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
       );
 
     // Группировать респондентов по участникам
-    const participantsWithRespondents = participants.map(participant => ({
-      ...participant,
-      respondents: respondents.filter(r => r.participant_id === participant.id)
-    }));
+    const participantsWithRespondents = participants.map(participant => {
+      const participantRespondents = respondents.filter(r => r.participant_id === participant.id);
+      return {
+        ...participant,
+        respondents: participantRespondents,
+        respondentsCount: participantRespondents.length
+      };
+    });
 
     res.json({
       ...cycle,
@@ -375,6 +384,12 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       return;
     }
 
+    // Валидация входных данных
+    if (!respondentIds || !Array.isArray(respondentIds) || respondentIds.length === 0) {
+      res.status(400).json({ error: 'Необходимо указать массив ID респондентов' });
+      return;
+    }
+
     // Получить информацию об участнике для проверки прав
     const participant = await db('assessment_participants')
       .where('id', participantId)
@@ -387,7 +402,8 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
     }
 
     // Проверить права доступа: только сам участник может добавлять респондентов для себя
-    if (user.userId !== participant.user_id) {
+    // Приводим к строкам для корректного сравнения
+    if (String(user.userId) !== String(participant.user_id)) {
       res.status(403).json({ error: 'Доступ запрещен. Вы можете добавлять респондентов только для своего участия в цикле.' });
       return;
     }
@@ -412,18 +428,24 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       .where('id', participant.user_id)
       .first();
 
-    // Создаем список респондентов, включая руководителя (если есть)
-    const allRespondentIds = [...respondentIds];
+    // Приводим все ID к строкам для корректного сравнения
+    const normalizedRespondentIds = respondentIds.map((id: any) => String(id));
     
-    if (participantUser?.manager_id && !allRespondentIds.includes(participantUser.manager_id)) {
-      // Проверяем, что руководитель активен
-      const manager = await db('users')
-        .where('id', participantUser.manager_id)
-        .where('is_active', true)
-        .first();
-      
-      if (manager) {
-        allRespondentIds.push(participantUser.manager_id);
+    // Создаем список респондентов, включая руководителя (если есть)
+    const allRespondentIds = [...normalizedRespondentIds];
+    
+    if (participantUser?.manager_id) {
+      const managerIdStr = String(participantUser.manager_id);
+      if (!allRespondentIds.includes(managerIdStr)) {
+        // Проверяем, что руководитель активен
+        const manager = await db('users')
+          .where('id', participantUser.manager_id)
+          .where('is_active', true)
+          .first();
+        
+        if (manager) {
+          allRespondentIds.push(managerIdStr);
+        }
       }
     }
 
@@ -438,19 +460,22 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
     }
 
     // Добавить респондентов (включая руководителя)
+    const participantUserIdStr = String(participant.user_id);
+    const managerIdStr = participantUser?.manager_id ? String(participantUser.manager_id) : null;
+    
     const respondentData = allRespondentIds.map((respondentId: string) => {
       // Определяем тип респондента
       let respondentType = 'peer'; // по умолчанию коллега
       
-      if (respondentId === participant.user_id) {
+      if (respondentId === participantUserIdStr) {
         respondentType = 'self';
-      } else if (respondentId === participantUser?.manager_id) {
+      } else if (managerIdStr && respondentId === managerIdStr) {
         respondentType = 'manager';
       }
       
       return {
         participant_id: participantId,
-        respondent_user_id: respondentId, // исправляем поле на правильное
+        respondent_user_id: respondentId,
         respondent_type: respondentType,
         status: 'invited'
       };
@@ -461,19 +486,52 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       .onConflict(['participant_id', 'respondent_user_id'])
       .merge();
 
+    // Получить информацию о только что добавленных респондентах для отправки уведомлений
+    // Отправляем уведомления только респондентам со статусом 'invited'
+    const newlyAddedRespondents = await db('assessment_respondents')
+      .join('users as respondent_users', 'assessment_respondents.respondent_user_id', 'respondent_users.id')
+      .join('assessment_participants', 'assessment_respondents.participant_id', 'assessment_participants.id')
+      .join('users as participant_users', 'assessment_participants.user_id', 'participant_users.id')
+      .where('assessment_respondents.participant_id', participantId)
+      .whereIn('assessment_respondents.respondent_user_id', allRespondentIds)
+      .where('assessment_respondents.status', 'invited')
+      .whereNotNull('respondent_users.mattermost_username')
+      .select(
+        'assessment_respondents.id as respondent_id',
+        'respondent_users.mattermost_username as respondent_username',
+        'respondent_users.first_name as respondent_first_name',
+        'respondent_users.last_name as respondent_last_name',
+        'participant_users.first_name as participant_first_name',
+        'participant_users.last_name as participant_last_name'
+      );
+
+    // Отправить уведомления респондентам
+    for (const respondent of newlyAddedRespondents) {
+      const participantName = `${respondent.participant_first_name} ${respondent.participant_last_name}`;
+      mattermostService.notifyRespondentAssessment(
+        respondent.respondent_username,
+        participantName,
+        cycle.name,
+        respondent.respondent_id.toString()
+      ).catch(error => {
+        console.error(`Ошибка отправки уведомления респонденту ${respondent.respondent_username}:`, error);
+      });
+    }
+
     // Формируем сообщение с информацией о добавленных респондентах
     let message = 'Респонденты успешно добавлены';
-    if (participantUser?.manager_id && allRespondentIds.includes(participantUser.manager_id)) {
-      const manager = existingUsers.find(u => u.id === participantUser.manager_id);
+    if (managerIdStr && allRespondentIds.includes(managerIdStr)) {
+      const manager = existingUsers.find(u => String(u.id) === managerIdStr);
       if (manager) {
         message += `. Руководитель ${manager.first_name} ${manager.last_name} добавлен автоматически`;
       }
     }
     
     res.json({ 
+      success: true,
       message,
       totalRespondents: allRespondentIds.length,
-      managerAdded: participantUser?.manager_id && allRespondentIds.includes(participantUser.manager_id)
+      managerAdded: managerIdStr ? allRespondentIds.includes(managerIdStr) : false
     });
   } catch (error) {
     console.error('Ошибка добавления респондентов:', error);

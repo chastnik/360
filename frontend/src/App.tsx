@@ -57,10 +57,19 @@ function App() {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/survey/:token" element={<SurveyPage />} />
-              <Route path="/report/:token" element={<ReportViewPage />} />
               
               {/* Приватные маршруты */}
+              <Route path="/survey/:respondentId" element={
+                <PrivateRoute>
+                  <Layout>
+                    <SurveyPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+              
+              {/* Публичные маршруты (для внешних ссылок) */}
+              <Route path="/survey/:token" element={<SurveyPage />} />
+              <Route path="/report/:token" element={<ReportViewPage />} />
               <Route path="/assessments/select-respondents/:participantId" element={
                 <PrivateRoute>
                   <Layout>
@@ -109,7 +118,7 @@ function App() {
               } />
               
               <Route path="/assessments" element={
-                <PrivateRoute requiredPermission="ui:view:assessments">
+                <PrivateRoute>
                   <Layout>
                     <AssessmentsPage />
                   </Layout>

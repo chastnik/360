@@ -515,18 +515,109 @@ router.post('/search-respondents', authenticateToken, async (req: AuthRequest, r
       return;
     }
 
-    const users = await mattermostService.searchUsers(query.trim());
+    const mattermostUsers = await mattermostService.searchUsers(query.trim());
+    
+    // Для каждого пользователя из Mattermost найти или создать пользователя в нашей базе
+    const resultUsers = await Promise.all(
+      mattermostUsers.map(async (mmUser) => {
+        // Ищем пользователя в нашей базе по email или Mattermost ID
+        let dbUser = await knex('users')
+          .where('email', mmUser.email.toLowerCase())
+          .orWhere('mattermost_user_id', mmUser.id)
+          .first();
+
+        // Если пользователь не найден, создаем его
+        if (!dbUser) {
+          // Проверяем, есть ли уже пользователь с таким email
+          const existingUser = await knex('users')
+            .where('email', mmUser.email.toLowerCase())
+            .first();
+
+          if (!existingUser) {
+            // Создаем нового пользователя с временным паролем
+            const tempPassword = generatePassword(12);
+            const passwordHash = await bcrypt.hash(tempPassword, 10);
+            
+            const [newUser] = await knex('users')
+              .insert({
+                email: mmUser.email.toLowerCase(),
+                first_name: mmUser.first_name || '',
+                last_name: mmUser.last_name || '',
+                mattermost_username: mmUser.username || null,
+                mattermost_user_id: mmUser.id || null,
+                role: 'user',
+                is_active: true,
+                password_hash: passwordHash
+              })
+              .returning('*');
+            
+            dbUser = newUser;
+            
+            // Отправляем уведомление в Mattermost с временным паролем
+            if (mmUser.username) {
+              try {
+                await mattermostService.sendNotification({
+                  recipientUsername: mmUser.username,
+                  title: '🔑 Доступ к системе 360° оценки',
+                  message: `Для вас создан аккаунт в системе 360° оценки.\n\n**Данные для входа:**\nЛогин: ${mmUser.email}\nПароль: \`${tempPassword}\`\n\nРекомендуем сменить пароль после первого входа в систему.`,
+                  actionUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+                  actionText: 'Войти в систему'
+                });
+              } catch (error) {
+                console.error(`Ошибка отправки уведомления пользователю ${mmUser.username}:`, error);
+              }
+            }
+          } else {
+            // Обновляем существующего пользователя с Mattermost данными
+            await knex('users')
+              .where('id', existingUser.id)
+              .update({
+                mattermost_username: mmUser.username || existingUser.mattermost_username,
+                mattermost_user_id: mmUser.id || existingUser.mattermost_user_id,
+                first_name: mmUser.first_name || existingUser.first_name,
+                last_name: mmUser.last_name || existingUser.last_name
+              });
+            
+            dbUser = await knex('users')
+              .where('id', existingUser.id)
+              .first();
+          }
+        } else {
+          // Обновляем Mattermost данные существующего пользователя
+          await knex('users')
+            .where('id', dbUser.id)
+            .update({
+              mattermost_username: mmUser.username || dbUser.mattermost_username,
+              mattermost_user_id: mmUser.id || dbUser.mattermost_user_id,
+              first_name: mmUser.first_name || dbUser.first_name,
+              last_name: mmUser.last_name || dbUser.last_name
+            });
+          
+          dbUser = await knex('users')
+            .where('id', dbUser.id)
+            .first();
+        }
+
+        // Возвращаем пользователя с UUID из нашей базы
+        return {
+          id: dbUser.id, // UUID из нашей базы
+          username: mmUser.username,
+          email: mmUser.email,
+          first_name: dbUser.first_name || mmUser.first_name,
+          last_name: dbUser.last_name || mmUser.last_name,
+          position: mmUser.position || dbUser.position || null
+        };
+      })
+    );
+
+    // Удаляем дубликаты по ID
+    const uniqueUsers = resultUsers.filter((user, index, self) => 
+      index === self.findIndex(u => u.id === user.id)
+    );
     
     res.json({
       success: true,
-      data: users.map(user => ({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        position: user.position
-      }))
+      data: uniqueUsers
     });
   } catch (error) {
     console.error('Ошибка поиска респондентов:', error);

@@ -77,12 +77,19 @@ export const AssessmentsPage: React.FC = () => {
   };
 
   const isExpired = (endDate: string) => {
-    return new Date(endDate) < new Date();
+    // Сравниваем только даты (без времени), чтобы опрос был доступен до конца дня окончания включительно
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999); // Устанавливаем конец дня для даты окончания
+    const now = new Date();
+    return end < now;
   };
 
   const getDaysRemaining = (endDate: string) => {
+    // Сравниваем только даты (без времени), чтобы опрос был доступен до конца дня окончания включительно
     const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999); // Устанавливаем конец дня для даты окончания
     const now = new Date();
+    now.setHours(0, 0, 0, 0); // Устанавливаем начало дня для текущей даты
     const diffTime = end.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
