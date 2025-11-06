@@ -429,6 +429,25 @@ class MattermostService {
   }
 
   /**
+   * Отправить уведомление участнику о завершении цикла оценки
+   */
+  async notifyParticipantCycleComplete(
+    participantUsername: string, 
+    cycleTitle: string
+  ): Promise<boolean> {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const actionUrl = `${frontendUrl}/my-dashboard`;
+    
+    return this.sendNotification({
+      recipientUsername: participantUsername,
+      title: '🎉 Цикл оценки завершен',
+      message: `Цикл оценки "${cycleTitle}" был успешно завершен. Вы можете просмотреть результаты в своем дашборде.`,
+      actionUrl: actionUrl,
+      actionText: 'Мой дашборд'
+    });
+  }
+
+  /**
    * Массовая отправка уведомлений
    */
   async sendBulkNotifications(notifications: MattermostNotification[]): Promise<{success: number, failed: number}> {

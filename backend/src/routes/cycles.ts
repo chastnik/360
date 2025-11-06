@@ -785,6 +785,44 @@ router.post('/:id/complete', authenticateToken, async (req: AuthRequest, res): P
       // Не останавливаем выполнение, так как цикл уже завершен
     }
 
+    // Отправить уведомления участникам оценки (не респондентам) о завершении цикла
+    try {
+      const participants = await db('assessment_participants')
+        .join('users', 'assessment_participants.user_id', 'users.id')
+        .where('assessment_participants.cycle_id', id)
+        .whereNotNull('users.mattermost_username')
+        .select('users.mattermost_username', 'users.first_name', 'users.last_name');
+
+      let notifiedCount = 0;
+      let failedCount = 0;
+
+      for (const participant of participants) {
+        try {
+          const success = await mattermostService.notifyParticipantCycleComplete(
+            participant.mattermost_username,
+            cycle.name
+          );
+          
+          if (success) {
+            notifiedCount++;
+            console.log(`Уведомление о завершении цикла отправлено участнику ${participant.mattermost_username}`);
+          } else {
+            failedCount++;
+          }
+        } catch (error) {
+          console.error(`Ошибка отправки уведомления участнику ${participant.mattermost_username}:`, error);
+          failedCount++;
+        }
+      }
+
+      if (participants.length > 0) {
+        console.log(`Уведомления участникам о завершении цикла: отправлено ${notifiedCount}, ошибок ${failedCount}`);
+      }
+    } catch (error) {
+      console.error('Ошибка отправки уведомлений участникам о завершении цикла:', error);
+      // Не останавливаем выполнение, так как цикл уже завершен
+    }
+
     res.json({ message: 'Цикл оценки успешно завершен' });
   } catch (error) {
     console.error('Ошибка завершения цикла оценки:', error);
