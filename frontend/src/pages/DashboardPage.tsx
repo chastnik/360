@@ -2,7 +2,11 @@
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CategoryBarChart, CategoryRadarChart, OverallScoreDisplay, TrendChart } from '../components/ReportCharts';
+import { CategoryBarChart, CategoryRadarChart, OverallScoreDisplay, TrendChart, HeatmapGrid } from '../components/ReportCharts';
+import { MLAnalysis } from '../components/MLAnalysis';
+import { ActivityFeed } from '../components/ActivityFeed';
+import { TopBottomAreas } from '../components/TopBottomAreas';
+import { TooltipTitle } from '../components/TooltipTitle';
 import api from '../services/api';
 
 interface Summary {
@@ -32,6 +36,10 @@ export const DashboardPage: React.FC = () => {
   const [categoryData, setCategoryData] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<Array<{ date: string; score: number }>>([]);
   const [recentCycles, setRecentCycles] = useState<Cycle[]>([]);
+  const [mlAnalysis, setMlAnalysis] = useState<any>(null);
+  const [insights, setInsights] = useState<any>(null);
+  const [topBottomAreas, setTopBottomAreas] = useState<any>(null);
+  const [heatmapData, setHeatmapData] = useState<any>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -145,6 +153,95 @@ export const DashboardPage: React.FC = () => {
           { date: 'Май', score: Math.min(5, base + 0.1) },
           { date: 'Июн', score: Math.min(5, base + 0.2) }
         ]);
+
+        // Загружаем ML-анализ, insights и топ-области параллельно
+        const [mlRes, insightsRes, topBottomRes] = await Promise.all([
+          api.get('/reports/ml-analysis').catch((error) => {
+            console.warn('Ошибка загрузки ML-анализа:', error);
+            return { data: { turnoverPredictions: [], leaders: [] } };
+          }),
+          api.get('/reports/insights').catch((error) => {
+            console.warn('Ошибка загрузки insights:', error);
+            return { data: { insights: [], activities: [] } };
+          }),
+          api.get('/reports/top-bottom-areas').catch((error) => {
+            console.warn('Ошибка загрузки топ-областей:', error);
+            return { data: { topAreas: [], bottomAreas: [] } };
+          })
+        ]);
+
+        // Убеждаемся, что данные правильно структурированы
+        const mlData = mlRes?.data || {};
+        setMlAnalysis({
+          turnoverPredictions: Array.isArray(mlData.turnoverPredictions) ? mlData.turnoverPredictions : [],
+          leaders: Array.isArray(mlData.leaders) ? mlData.leaders : []
+        });
+        
+        const insightsData = insightsRes?.data || {};
+        setInsights({
+          insights: Array.isArray(insightsData.insights) ? insightsData.insights : [],
+          activities: Array.isArray(insightsData.activities) ? insightsData.activities : []
+        });
+
+        // Формируем данные для heatmap (категории × циклы)
+        if (Array.isArray(cycles) && cycles.length > 0) {
+          const heatmapRows: string[] = [];
+          const heatmapColumns: string[] = [];
+          const heatmapValues: Record<string, Record<string, number>> = {};
+
+          // Получаем категории из categoryData
+          categoryDataList.forEach(cat => {
+            if (!heatmapRows.includes(cat.name)) {
+              heatmapRows.push(cat.name);
+              heatmapValues[cat.name] = {};
+            }
+          });
+
+          // Получаем последние 5 циклов для колонок
+          const recentCyclesForHeatmap = cycles
+            .filter((c: any) => c.status === 'completed' || c.status === 'active')
+            .sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+            .slice(0, 5);
+
+          recentCyclesForHeatmap.forEach((cycle: any) => {
+            heatmapColumns.push(cycle.name);
+          });
+
+          // Заполняем значения heatmap
+          if (heatmapRows.length > 0 && heatmapColumns.length > 0) {
+            try {
+              const heatmapPromises = recentCyclesForHeatmap.map((cycle: any) =>
+                api.get(`/reports/cycle/${cycle.id}/analytics`).catch(() => null)
+              );
+              const heatmapResults = await Promise.all(heatmapPromises);
+
+              heatmapResults.forEach((result: any, idx) => {
+                if (result?.data?.avgScores && Array.isArray(result.data.avgScores)) {
+                  const cycleName = recentCyclesForHeatmap[idx].name;
+                  result.data.avgScores.forEach((item: any) => {
+                    const categoryName = item.category || item.category_name || '';
+                    const avgScore = Number(item.avgScore || item.avg_score || 0);
+                    if (categoryName && heatmapValues[categoryName]) {
+                      heatmapValues[categoryName][cycleName] = avgScore;
+                    }
+                  });
+                }
+              });
+            } catch (error) {
+              console.error('Ошибка получения данных для heatmap:', error);
+            }
+          }
+
+          if (heatmapRows.length > 0 && heatmapColumns.length > 0) {
+            setHeatmapData({
+              rows: heatmapRows,
+              columns: heatmapColumns,
+              values: heatmapValues
+            });
+          }
+        }
+
+        setTopBottomAreas(topBottomRes.data);
         setError(null);
       } catch (e) {
         console.error(e);
@@ -184,19 +281,35 @@ export const DashboardPage: React.FC = () => {
       {/* Карточки показателей */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Активных циклов</div>
+          <TooltipTitle
+            title="Активных циклов"
+            description="Количество циклов оценки со статусом 'активен'. Активный цикл означает, что участники могут проходить оценку в данный момент. Рассчитывается как количество циклов со статусом 'active'."
+            className="text-sm mb-2"
+          />
           <div className="text-3xl font-bold text-gray-900 dark:text-white">{summary?.cyclesActive ?? 0}</div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Всего циклов</div>
+          <TooltipTitle
+            title="Всего циклов"
+            description="Общее количество циклов оценки в системе, включая все статусы (черновик, активен, завершен, отменен). Рассчитывается как общее количество записей в таблице assessment_cycles."
+            className="text-sm mb-2"
+          />
           <div className="text-3xl font-bold text-gray-900 dark:text-white">{summary?.cyclesTotal ?? 0}</div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Всего ответов</div>
+          <TooltipTitle
+            title="Всего ответов"
+            description="Общее количество ответов на вопросы оценки во всех циклах. Каждый ответ представляет собой оценку (от 1 до 5) на конкретный вопрос от конкретного респондента. Рассчитывается как количество записей в таблице assessment_responses."
+            className="text-sm mb-2"
+          />
           <div className="text-3xl font-bold text-gray-900 dark:text-white">{summary?.responsesTotal ?? 0}</div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Средний балл</div>
+          <TooltipTitle
+            title="Средний балл"
+            description="Средний балл по всем ответам во всех циклах оценки. Рассчитывается как среднее арифметическое всех оценок (rating_value) в таблице assessment_responses. Диапазон значений: от 1 до 5."
+            className="text-sm mb-2"
+          />
           <div className="text-3xl font-bold text-gray-900 dark:text-white">{(summary?.overallAverage ?? 0).toFixed(2)}</div>
         </div>
       </div>
@@ -212,9 +325,61 @@ export const DashboardPage: React.FC = () => {
         <CategoryRadarChart data={categoryData} title="Профиль компетенций (срез)" />
       </div>
 
+      {/* ML-анализ */}
+      {mlAnalysis && (
+        <div>
+          <MLAnalysis
+            turnoverData={mlAnalysis.turnoverPredictions || []}
+            leaders={mlAnalysis.leaders || []}
+            loading={false}
+          />
+        </div>
+      )}
+
+      {/* Топ-5 лучших и худших областей */}
+      {topBottomAreas && (
+        <div>
+          <TopBottomAreas
+            topAreas={topBottomAreas.topAreas || []}
+            bottomAreas={topBottomAreas.bottomAreas || []}
+          />
+        </div>
+      )}
+
+      {/* Интерактивная heatmap */}
+      {heatmapData && heatmapData.rows.length > 0 && heatmapData.columns.length > 0 && (
+        <div>
+          <HeatmapGrid
+            rows={heatmapData.rows}
+            columns={heatmapData.columns}
+            values={heatmapData.values}
+            title="Тепловая карта компетенций по циклам"
+            filterable={true}
+            onCellClick={(row, col, value) => {
+              console.log(`Клик по ячейке: ${row} × ${col} = ${value}`);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Лента активности и Insights */}
+      {insights && (
+        <div>
+          <ActivityFeed
+            activities={insights.activities || []}
+            insights={insights.insights || []}
+            loading={false}
+          />
+        </div>
+      )}
+
       {/* Таблица Recent Feedback Cycles */}
       <div className="card p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Последние циклы оценки</h2>
+        <TooltipTitle
+          title="Последние циклы оценки"
+          description="Таблица показывает последние 10 циклов оценки, отсортированные по дате создания. Для каждого цикла отображается статус, даты начала и окончания, прогресс выполнения и действия. Прогресс рассчитывается на основе текущей даты относительно дат начала и окончания цикла."
+          className="text-xl font-semibold mb-6"
+        />
 
         {recentCycles.length > 0 ? (
           <div className="overflow-x-auto">

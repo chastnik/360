@@ -24,6 +24,7 @@ import {
   Area
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
+import { TooltipTitle } from './TooltipTitle';
 
 interface CategoryAverage {
   id: number;
@@ -51,7 +52,10 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({ data, title 
   if (!data || data.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+        <TooltipTitle
+          title={title}
+          description="Столбчатая диаграмма показывает средние оценки по каждой категории компетенций. Данные агрегируются из всех завершенных и активных циклов оценки. Для каждой категории рассчитывается среднее арифметическое всех оценок по вопросам этой категории. Диапазон значений: от 0 до 5."
+        />
         <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
           Нет данных для отображения
         </div>
@@ -61,7 +65,10 @@ export const CategoryBarChart: React.FC<CategoryBarChartProps> = ({ data, title 
   
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <TooltipTitle
+        title={title}
+        description="Столбчатая диаграмма показывает средние оценки по каждой категории компетенций. Данные агрегируются из всех завершенных и активных циклов оценки. Для каждой категории рассчитывается среднее арифметическое всех оценок по вопросам этой категории. Диапазон значений: от 0 до 5."
+      />
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
@@ -112,7 +119,10 @@ export const CategoryRadarChart: React.FC<RadarChartProps> = ({ data, title }) =
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <TooltipTitle
+        title={title}
+        description="Радарная диаграмма (паутинка) показывает профиль компетенций по всем категориям. Каждая ось представляет одну категорию, а значение на оси - среднюю оценку по этой категории. Позволяет визуально оценить сильные и слабые стороны. Данные агрегируются из всех завершенных и активных циклов оценки."
+      />
       <ResponsiveContainer width="100%" height={300}>
         <RadarChart data={radarData}>
           <PolarGrid stroke={isDark ? '#374151' : '#e5e7eb'} />
@@ -331,7 +341,10 @@ export const OverallScoreDisplay: React.FC<OverallScoreProps> = ({ score, title,
 
   return (
     <div className={containerClass}>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <TooltipTitle
+        title={title}
+        description="Отображает общий средний балл по всей системе. Рассчитывается как среднее арифметическое всех оценок (rating_value) из всех ответов во всех циклах оценки. Диапазон значений: от 1 до 5. Цветовая индикация: зеленый (≥4.5), синий (≥3.5), желтый (≥2.5), красный (<2.5)."
+      />
       <div className={innerClass}>
         <div className={`${scoreTextClass} font-bold mb-2 ${getScoreColor(score)}`}>
           {score.toFixed(1)}
@@ -357,7 +370,10 @@ export const TrendChart: React.FC<TrendChartProps> = ({ data, title }) => {
   const { isDark } = useTheme();
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <TooltipTitle
+        title={title}
+        description="График показывает динамику изменения общего среднего балла по месяцам. Данные рассчитываются на основе среднего балла по всем циклам оценки. Позволяет отслеживать тренды и изменения в оценках с течением времени. Используется упрощенная модель для демонстрации тренда."
+      />
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
@@ -421,44 +437,156 @@ interface HeatmapGridProps {
   columns: string[];
   values: Record<string, Record<string, number>>; // values[row][col] = score 0..5
   title: string;
+  onCellClick?: (row: string, col: string, value: number) => void;
+  filterable?: boolean;
 }
 
-// Простейшая тепловая карта на основе таблицы, шкала 1..5 от красного к зеленому
-export const HeatmapGrid: React.FC<HeatmapGridProps> = ({ rows, columns, values, title }) => {
-  const getBgColor = (score?: number) => {
+// Интерактивная тепловая карта на основе таблицы, шкала 1..5 от красного к зеленому
+export const HeatmapGrid: React.FC<HeatmapGridProps> = ({ rows, columns, values, title, onCellClick, filterable = false }) => {
+  const [hoveredCell, setHoveredCell] = useState<{ row: string; col: string } | null>(null);
+  const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [selectedCol, setSelectedCol] = useState<string | null>(null);
+  const [filterMin, setFilterMin] = useState<number>(0);
+  const [filterMax, setFilterMax] = useState<number>(5);
+
+  const getBgColor = (score?: number, isHovered = false, isSelected = false) => {
     const s = typeof score === 'number' ? Math.max(0, Math.min(5, score)) : 0;
     const t = s / 5; // 0..1
-    const r = t < 0.5 ? 255 : Math.round(255 * (1 - (t - 0.5) * 2));
-    const g = t < 0.5 ? Math.round(255 * (t * 2)) : 255;
-    const b = 80;
+    let r = t < 0.5 ? 255 : Math.round(255 * (1 - (t - 0.5) * 2));
+    let g = t < 0.5 ? Math.round(255 * (t * 2)) : 255;
+    let b = 80;
+    
+    if (isHovered) {
+      r = Math.min(255, r + 30);
+      g = Math.min(255, g + 30);
+      b = Math.min(255, b + 30);
+    }
+    
+    if (isSelected) {
+      r = Math.min(255, r + 50);
+      g = Math.min(255, g + 50);
+      b = Math.min(255, b + 50);
+    }
+    
     return `rgb(${r}, ${g}, ${b})`;
   };
 
+  const filteredRows = filterable
+    ? rows.filter(row => {
+        const rowValues = Object.values(values[row] || {});
+        const maxValue = rowValues.length > 0 ? Math.max(...rowValues) : 0;
+        const minValue = rowValues.length > 0 ? Math.min(...rowValues) : 0;
+        return minValue >= filterMin && maxValue <= filterMax;
+      })
+    : rows;
+
+  const filteredColumns = filterable
+    ? columns.filter(col => {
+        const colValues = Object.values(
+          Object.keys(values).reduce((acc, row) => {
+            if (values[row]?.[col] !== undefined) {
+              acc[row] = values[row][col];
+            }
+            return acc;
+          }, {} as Record<string, number>)
+        );
+        const maxValue = colValues.length > 0 ? Math.max(...colValues) : 0;
+        const minValue = colValues.length > 0 ? Math.min(...colValues) : 0;
+        return minValue >= filterMin && maxValue <= filterMax;
+      })
+    : columns;
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <TooltipTitle
+          title={title}
+          description="Тепловая карта (heatmap) показывает средние оценки по категориям компетенций для разных циклов оценки. Каждая ячейка представляет среднюю оценку по конкретной категории в конкретном цикле. Цвет ячейки зависит от значения оценки: от красного (низкие оценки) до зеленого (высокие оценки). Позволяет сравнивать компетенции между циклами и выявлять тренды."
+        />
+        {filterable && (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600 dark:text-gray-400">Фильтр:</label>
+            <input
+              type="number"
+              min="0"
+              max="5"
+              step="0.1"
+              value={filterMin}
+              onChange={(e) => setFilterMin(Number(e.target.value))}
+              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <span className="text-xs text-gray-600 dark:text-gray-400">-</span>
+            <input
+              type="number"
+              min="0"
+              max="5"
+              step="0.1"
+              value={filterMax}
+              onChange={(e) => setFilterMax(Number(e.target.value))}
+              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+        )}
+      </div>
       <div className="overflow-auto">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 bg-white dark:bg-gray-800 z-10 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 px-2 py-1 border-b border-gray-200 dark:border-gray-700">Компетенция</th>
-              {columns.map((col) => (
-                <th key={col} className="text-xs font-semibold text-gray-500 dark:text-gray-300 px-2 py-1 border-b border-gray-200 dark:border-gray-700 text-center whitespace-nowrap">{col}</th>
+              <th className="sticky left-0 bg-white dark:bg-gray-800 z-10 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 px-2 py-1 border-b border-gray-200 dark:border-gray-700">
+                Компетенция
+              </th>
+              {filteredColumns.map((col) => (
+                <th
+                  key={col}
+                  className={`text-xs font-semibold text-gray-500 dark:text-gray-300 px-2 py-1 border-b border-gray-200 dark:border-gray-700 text-center whitespace-nowrap cursor-pointer transition-colors ${
+                    selectedCol === col ? 'bg-primary-100 dark:bg-primary-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  onClick={() => setSelectedCol(selectedCol === col ? null : col)}
+                  title="Кликните для выделения колонки"
+                >
+                  {col}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row}>
-                <td className="sticky left-0 bg-white dark:bg-gray-800 z-10 text-sm text-gray-900 dark:text-white px-2 py-1 border-b border-gray-100 dark:border-gray-700 whitespace-nowrap">{row}</td>
-                {columns.map((col) => {
+            {filteredRows.map((row) => (
+              <tr
+                key={row}
+                className={selectedRow === row ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
+              >
+                <td
+                  className={`sticky left-0 bg-white dark:bg-gray-800 z-10 text-sm text-gray-900 dark:text-white px-2 py-1 border-b border-gray-100 dark:border-gray-700 whitespace-nowrap cursor-pointer transition-colors ${
+                    selectedRow === row ? 'bg-primary-100 dark:bg-primary-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  onClick={() => setSelectedRow(selectedRow === row ? null : row)}
+                  title="Кликните для выделения строки"
+                >
+                  {row}
+                </td>
+                {filteredColumns.map((col) => {
                   const v = values[row]?.[col];
+                  const isHovered = hoveredCell?.row === row && hoveredCell?.col === col;
+                  const isSelected = (selectedRow === row || selectedCol === col) && (selectedRow === row || selectedCol === col);
                   return (
-                    <td key={col} className="px-1 py-1 border-b border-gray-100 dark:border-gray-700">
+                    <td
+                      key={col}
+                      className="px-1 py-1 border-b border-gray-100 dark:border-gray-700"
+                    >
                       <div
-                        className="h-8 rounded flex items-center justify-center text-white text-xs font-semibold"
-                        style={{ backgroundColor: getBgColor(v) }}
-                        title={typeof v === 'number' ? v.toFixed(2) : '—'}
+                        className="h-8 rounded flex items-center justify-center text-white text-xs font-semibold cursor-pointer transition-all transform hover:scale-110"
+                        style={{
+                          backgroundColor: getBgColor(v, isHovered, isSelected),
+                          boxShadow: isHovered || isSelected ? '0 0 8px rgba(0,0,0,0.3)' : 'none'
+                        }}
+                        title={`${row} × ${col}: ${typeof v === 'number' ? v.toFixed(2) : '—'}`}
+                        onMouseEnter={() => setHoveredCell({ row, col })}
+                        onMouseLeave={() => setHoveredCell(null)}
+                        onClick={() => {
+                          if (onCellClick && typeof v === 'number') {
+                            onCellClick(row, col, v);
+                          }
+                        }}
                       >
                         {typeof v === 'number' ? v.toFixed(1) : '—'}
                       </div>
@@ -470,7 +598,22 @@ export const HeatmapGrid: React.FC<HeatmapGridProps> = ({ rows, columns, values,
           </tbody>
         </table>
       </div>
-      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">Шкала: 1 (красный) → 5 (зелено-желтый).</div>
+      <div className="flex items-center justify-between mt-2">
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          Шкала: 1 (красный) → 5 (зелено-желтый). Наведите курсор для деталей, кликните для выделения.
+        </div>
+        {(selectedRow || selectedCol) && (
+          <button
+            onClick={() => {
+              setSelectedRow(null);
+              setSelectedCol(null);
+            }}
+            className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            Сбросить выделение
+          </button>
+        )}
+      </div>
     </div>
   );
 };
