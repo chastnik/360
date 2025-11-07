@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
 import api from '../services/api';
+import { BouncingBallsBackground } from './BouncingBallsBackground';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -101,7 +102,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col relative">
+      {/* Bouncing Balls Background */}
+      <BouncingBallsBackground />
+      
       {/* Мобильное меню (overlay) */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -111,7 +115,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             onClick={() => setSidebarOpen(false)} 
           />
           {/* Само меню */}
-          <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 shadow-xl">
+          <div className="fixed inset-y-0 left-0 w-64 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-xl z-50">
             <div className="flex flex-col h-full">
               {/* Заголовок с кнопкой закрытия */}
               <div className="flex items-center justify-between px-4 pt-5 pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -219,9 +223,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Основной layout с боковым меню */}
       <div className="flex flex-1">
         {/* Боковая панель для десктопа */}
-        <div className="hidden lg:flex lg:flex-shrink-0">
+        <div className="hidden lg:flex lg:flex-shrink-0 relative z-10">
           <div className="flex flex-col w-64">
-            <div className="flex flex-col flex-1 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col flex-1 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-r border-gray-200 dark:border-gray-700">
               <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
                 <div className="px-4">
                   <Link 
@@ -288,9 +292,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Основной контент */}
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 relative z-10">
           {/* Верхняя панель с кнопкой меню и информацией пользователя */}
-          <div className="relative z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+          <div className="relative z-20 flex-shrink-0 flex h-16 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-sm border-b border-gray-200 dark:border-gray-700">
             <button
               type="button"
               className="px-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden"
@@ -477,7 +481,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           {/* Контент страницы */}
-          <main className="flex-1 relative overflow-y-auto focus:outline-none">
+          <main className="flex-1 relative overflow-y-auto focus:outline-none z-10">
             <div className="py-6">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {children}
