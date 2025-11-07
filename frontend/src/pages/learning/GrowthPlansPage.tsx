@@ -386,9 +386,27 @@ const GrowthPlansPage: React.FC = () => {
           >
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  План развития #{plan.id}
-                </h3>
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    План развития #{plan.id}
+                  </h3>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(plan.status)}`}>
+                    {getStatusIcon(plan.status)} {plan.status === 'active' ? 'Активен' : 'Завершен'}
+                  </span>
+                  {plan.end_date && (() => {
+                    const endDate = new Date(plan.end_date);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    endDate.setHours(0, 0, 0, 0);
+                    const isOverdue = endDate < today && plan.status === 'active';
+                    return isOverdue ? (
+                      <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>Просрочено!</span>
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
                 <p className="text-gray-600 dark:text-gray-400">
                   Создан {new Date(plan.start_date).toLocaleDateString('ru-RU')}
                 </p>
@@ -399,9 +417,6 @@ const GrowthPlansPage: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center space-x-3">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(plan.status)}`}>
-                  {getStatusIcon(plan.status)} {plan.status === 'active' ? 'Активен' : 'Завершен'}
-                </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   📊 {getProgressPercentage(plan)}%
                 </span>
@@ -429,6 +444,19 @@ const GrowthPlansPage: React.FC = () => {
                     : 'Не рассчитана'
                   }
                 </div>
+                {plan.end_date && (() => {
+                  const endDate = new Date(plan.end_date);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  endDate.setHours(0, 0, 0, 0);
+                  const isOverdue = endDate < today && plan.status === 'active';
+                  return isOverdue ? (
+                    <div className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <span>⚠️</span>
+                      <span>Просрочено!</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
 

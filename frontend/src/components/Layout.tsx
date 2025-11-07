@@ -46,6 +46,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Дашборд', href: '/dashboard', icon: '📊', perm: 'ui:view:dashboard' },
     { name: 'Мой дашборд', href: '/my-dashboard', icon: '📋' },
+    { name: 'Мой ПИР', href: '/my-growth-plans', icon: '📈' },
     { name: 'Циклы', href: '/cycles', icon: '🔄', perm: 'ui:view:cycles' },
     { name: 'Оценки', href: '/assessments', icon: '📝' },
     { name: 'Отчеты', href: '/reports', icon: '📈', perm: 'ui:view:reports' },

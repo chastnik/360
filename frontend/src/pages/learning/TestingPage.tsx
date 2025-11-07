@@ -321,13 +321,37 @@ const TestingPage: React.FC = () => {
               )}
 
               {test.notes && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-4">
                   <div className="text-sm font-medium text-blue-800 dark:text-blue-400 mb-2">
                     📝 Заметки
                   </div>
                   <div className="text-blue-700 dark:text-blue-300">
                     {test.notes}
                   </div>
+                </div>
+              )}
+
+              {/* Кнопка "Тестировать заново" для непройденных тестов */}
+              {test.status === 'failed' && plan && course && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => {
+                      setSelectedPlan(plan);
+                      setSelectedCourse(course);
+                      setTestFormData({
+                        test_date: new Date().toISOString().split('T')[0],
+                        status: 'passed',
+                        notes: ''
+                      });
+                      setShowTestModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Тестировать заново
+                  </button>
                 </div>
               )}
             </div>
@@ -343,8 +367,9 @@ const TestingPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {plans.map((plan) => 
             plan.courses.map((course) => {
-              const hasTest = plan.test_results.some(t => t.course_id === course.id);
-              if (hasTest) return null;
+              // Курс считается завершенным, если есть хотя бы один успешный результат (passed)
+              const hasPassedTest = plan.test_results.some(t => t.course_id === course.id && t.status === 'passed');
+              if (hasPassedTest) return null;
 
               return (
                 <div

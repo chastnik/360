@@ -16,6 +16,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MyDashboardPage } from './pages/MyDashboardPage';
+import MyGrowthPlansPage from './pages/MyGrowthPlansPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { CyclesPage } from './pages/CyclesPage';
 import { AssessmentsPage } from './pages/AssessmentsPage';
@@ -98,6 +99,14 @@ function App() {
                 <PrivateRoute>
                   <Layout>
                     <MyDashboardPage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+              
+              <Route path="/my-growth-plans" element={
+                <PrivateRoute>
+                  <Layout>
+                    <MyGrowthPlansPage />
                   </Layout>
                 </PrivateRoute>
               } />

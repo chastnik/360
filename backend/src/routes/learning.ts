@@ -437,7 +437,7 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
     
     const plans = await plansQuery.orderBy('gp.created_at', 'desc');
     
-    // Получаем курсы для каждого плана
+    // Получаем курсы для каждого плана и пересчитываем дату завершения
     for (const plan of plans) {
       const courses = await knex('growth_plan_courses as gpc')
         .join('training_courses as tc', 'gpc.course_id', 'tc.id')
@@ -453,6 +453,61 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
         .where('tr.growth_plan_id', plan.id);
       
       plan.test_results = testResults;
+      
+      // Проверяем, все ли курсы пройдены, и обновляем статус ПИРа
+      // Курс считается завершенным, если есть хотя бы один успешный результат (passed)
+      if (plan.status === 'active' && courses.length > 0 && testResults.length > 0) {
+        const passedCourseIds = new Set(testResults
+          .filter((tr: any) => tr.status === 'passed')
+          .map((tr: any) => tr.course_id));
+        
+        const allCoursesPassed = courses.every((course: any) => passedCourseIds.has(course.id));
+        
+        if (allCoursesPassed) {
+          // Все курсы пройдены - обновляем статус на completed
+          await knex('growth_plans')
+            .where('id', plan.id)
+            .update({ status: 'completed' });
+          plan.status = 'completed';
+        }
+      }
+      
+      // Пересчитываем дату завершения для активных планов
+      if (plan.status === 'active' && courses.length > 0 && plan.start_date && plan.study_load_percent) {
+        try {
+          // Получаем общее количество часов курсов
+          const courseHours = await knex('training_courses')
+            .whereIn('id', courses.map((c: any) => c.id))
+            .sum('hours as total_hours')
+            .first();
+          
+          const totalHours = Number(courseHours?.total_hours || 0);
+          
+          if (totalHours > 0) {
+            const startDateObj = new Date(plan.start_date);
+            const recalculatedEndDate = await calculateEndDate(
+              startDateObj,
+              plan.study_load_percent,
+              totalHours,
+              plan.user_id
+            );
+            
+            if (recalculatedEndDate) {
+              const newEndDate = recalculatedEndDate.toISOString().split('T')[0];
+              // Обновляем дату завершения, если она изменилась или не была установлена
+              if (!plan.end_date || plan.end_date !== newEndDate) {
+                await knex('growth_plans')
+                  .where('id', plan.id)
+                  .update({ end_date: newEndDate });
+                plan.end_date = newEndDate;
+              }
+            }
+          }
+        } catch (recalcError) {
+          console.error(`Ошибка пересчета даты завершения для ПИР ${plan.id}:`, recalcError);
+          // Продолжаем работу, даже если пересчет не удался
+        }
+      }
     }
     
     return res.json(plans);
@@ -634,27 +689,9 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
       return res.status(404).json({ error: 'Growth plan not found' });
     }
     
-    // Проверяем, есть ли уже результат теста для этого курса
-    const existingTest = await knex('test_results')
-      .where('growth_plan_id', growth_plan_id)
-      .where('course_id', course_id)
-      .first();
-    
-    if (existingTest) {
-      // Обновляем существующий результат
-      const [updatedTest] = await knex('test_results')
-        .where('id', existingTest.id)
-        .update({
-          status,
-          test_date,
-          notes,
-          updated_at: knex.fn.now()
-        })
-        .returning('*');
-      
-      return res.json(updatedTest);
-    } else {
-      // Создаем новый результат
+    // Всегда создаем новый результат тестирования (для истории)
+    // Старые результаты не удаляются
+    try {
       const [testResult] = await knex('test_results')
         .insert({
           growth_plan_id,
@@ -666,6 +703,34 @@ router.post('/test-results', authenticateToken, async (req: AuthRequest, res) =>
         .returning('*');
       
       return res.status(201).json(testResult);
+    } catch (insertError: any) {
+      // Если ошибка из-за unique constraint, пытаемся удалить его и повторить
+      if (insertError.code === '23505' && insertError.constraint === 'test_results_growth_plan_id_course_id_unique') {
+        try {
+          // Удаляем constraint, если он еще существует
+          await knex.raw(`
+            ALTER TABLE test_results 
+            DROP CONSTRAINT IF EXISTS test_results_growth_plan_id_course_id_unique;
+          `);
+          
+          // Повторяем вставку
+          const [testResult] = await knex('test_results')
+            .insert({
+              growth_plan_id,
+              course_id,
+              status,
+              test_date,
+              notes
+            })
+            .returning('*');
+          
+          return res.status(201).json(testResult);
+        } catch (retryError) {
+          console.error('Error creating test result after removing constraint:', retryError);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+      }
+      throw insertError;
     }
   } catch (error) {
     console.error('Error creating test result:', error);
