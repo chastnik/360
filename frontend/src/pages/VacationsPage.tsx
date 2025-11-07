@@ -67,6 +67,8 @@ const VacationsPage: React.FC = () => {
 
   // Ref для контейнера прокрутки
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Ref для флага пересчета (чтобы избежать проблем с замыканиями)
+  const isRecalculatingRef = useRef<boolean>(false);
 
   // Проверка прав доступа
   const canUpdateOthers = permissions.includes('action:vacations:update');
@@ -185,24 +187,27 @@ const VacationsPage: React.FC = () => {
   // Принудительно пересчитываем размеры контейнера после загрузки данных
   useEffect(() => {
     if (!loading && scrollContainerRef.current && months.length > 0) {
-      // Используем ResizeObserver для отслеживания изменений размера
       const container = scrollContainerRef.current;
       
       // Принудительно триггерим пересчет через несколько способов
       const triggerRecalc = () => {
-        if (container) {
-          // Способ 1: изменение scrollLeft
-          const currentScroll = container.scrollLeft;
-          container.scrollLeft = currentScroll + 1;
-          container.scrollLeft = currentScroll;
+        if (container && !isRecalculatingRef.current) {
+          isRecalculatingRef.current = true;
           
-          // Способ 2: триггерим resize событие
-          window.dispatchEvent(new Event('resize'));
-          
-          // Способ 3: принудительно пересчитываем стили
-          const computedStyle = window.getComputedStyle(container);
-          const width = computedStyle.width;
-          container.style.width = width;
+          // Используем requestAnimationFrame для отложенного выполнения
+          // чтобы избежать циклических вызовов ResizeObserver
+          requestAnimationFrame(() => {
+            if (container) {
+              // Способ 1: изменение scrollLeft (не изменяет размеры)
+              const currentScroll = container.scrollLeft;
+              container.scrollLeft = currentScroll + 1;
+              container.scrollLeft = currentScroll;
+              
+              // Способ 2: триггерим resize событие (не изменяет размеры контейнера)
+              window.dispatchEvent(new Event('resize'));
+            }
+            isRecalculatingRef.current = false;
+          });
         }
       };
       
@@ -210,9 +215,28 @@ const VacationsPage: React.FC = () => {
       const timeoutId1 = setTimeout(triggerRecalc, 50);
       const timeoutId2 = setTimeout(triggerRecalc, 200);
       
-      // Используем ResizeObserver
-      const resizeObserver = new ResizeObserver(() => {
-        triggerRecalc();
+      // Используем ResizeObserver только для отслеживания реальных изменений размера
+      // Не вызываем triggerRecalc внутри callback, чтобы избежать циклов
+      const handleResize = () => {
+        // Используем requestAnimationFrame для отложенного выполнения
+        requestAnimationFrame(() => {
+          if (container && !isRecalculatingRef.current) {
+            const currentScroll = container.scrollLeft;
+            container.scrollLeft = currentScroll + 1;
+            container.scrollLeft = currentScroll;
+          }
+        });
+      };
+      
+      const resizeObserver = new ResizeObserver((entries) => {
+        // Проверяем, что изменение размера действительно произошло
+        for (const entry of entries) {
+          if (entry.target === container) {
+            // Только если размер действительно изменился, триггерим пересчет
+            handleResize();
+            break; // Выходим из цикла после первого совпадения
+          }
+        }
       });
       
       if (container) {
@@ -223,6 +247,7 @@ const VacationsPage: React.FC = () => {
         clearTimeout(timeoutId1);
         clearTimeout(timeoutId2);
         resizeObserver.disconnect();
+        isRecalculatingRef.current = false;
       };
     }
   }, [loading, vacations, users, months.length]);
