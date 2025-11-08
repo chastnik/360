@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import api from '../../services/api';
 
 interface Competency {
@@ -306,9 +308,16 @@ const CoursesPage: React.FC = () => {
               </span>
             </div>
             
-            <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
-              {course.description}
-            </p>
+            <div 
+              className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3 prose prose-sm dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: course.description || '' }}
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden'
+              }}
+            />
             
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -450,12 +459,87 @@ const CoursesPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Описание
                   </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
+                  <div className="bg-white dark:bg-gray-700">
+                    <ReactQuill
+                      value={formData.description || ''}
+                      onChange={(value) => setFormData({ ...formData, description: value })}
+                      theme="snow"
+                      modules={{
+                        toolbar: [
+                          [{ 'header': [1, 2, 3, false] }],
+                          ['bold', 'italic', 'underline', 'strike'],
+                          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                          [{ 'script': 'sub'}, { 'script': 'super' }],
+                          [{ 'indent': '-1'}, { 'indent': '+1' }],
+                          [{ 'color': [] }, { 'background': [] }],
+                          [{ 'align': [] }],
+                          ['link', 'image'],
+                          ['clean']
+                        ]
+                      }}
+                      formats={[
+                        'header', 'bold', 'italic', 'underline', 'strike',
+                        'list', 'bullet', 'script', 'indent',
+                        'color', 'background', 'align',
+                        'link', 'image'
+                      ]}
+                      style={{ minHeight: '200px' }}
+                      className="dark:text-white"
+                    />
+                  </div>
+                  <style>{`
+                    .ql-container {
+                      background-color: white;
+                      color: #1f2937;
+                    }
+                    .dark .ql-container {
+                      background-color: #374151;
+                      color: #f9fafb;
+                    }
+                    .ql-editor {
+                      min-height: 150px;
+                      color: #1f2937;
+                    }
+                    .dark .ql-editor {
+                      color: #f9fafb;
+                    }
+                    .ql-toolbar {
+                      background-color: #f9fafb;
+                      border-top: 1px solid #e5e7eb;
+                      border-left: 1px solid #e5e7eb;
+                      border-right: 1px solid #e5e7eb;
+                    }
+                    .dark .ql-toolbar {
+                      background-color: #4b5563;
+                      border-color: #6b7280;
+                    }
+                    .ql-container {
+                      border-bottom: 1px solid #e5e7eb;
+                      border-left: 1px solid #e5e7eb;
+                      border-right: 1px solid #e5e7eb;
+                    }
+                    .dark .ql-container {
+                      border-color: #6b7280;
+                    }
+                    .ql-snow .ql-stroke {
+                      stroke: #6b7280;
+                    }
+                    .dark .ql-snow .ql-stroke {
+                      stroke: #9ca3af;
+                    }
+                    .ql-snow .ql-fill {
+                      fill: #6b7280;
+                    }
+                    .dark .ql-snow .ql-fill {
+                      fill: #9ca3af;
+                    }
+                    .ql-snow .ql-picker-label {
+                      color: #6b7280;
+                    }
+                    .dark .ql-snow .ql-picker-label {
+                      color: #9ca3af;
+                    }
+                  `}</style>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -624,7 +708,10 @@ const CoursesPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Описание</h3>
-                <p className="text-gray-600 dark:text-gray-400">{viewingCourse.description}</p>
+                <div 
+                  className="text-gray-600 dark:text-gray-400 prose dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: viewingCourse.description || '' }}
+                />
               </div>
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Продолжительность</h3>
