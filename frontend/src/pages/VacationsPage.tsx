@@ -134,7 +134,19 @@ const VacationsPage: React.FC = () => {
         console.log('Загружены отпуска:', vacationsData);
         console.log('Параметры фильтрации:', params.toString());
         
-        setVacations(Array.isArray(vacationsData) ? vacationsData : []);
+        // Пересчитываем календарные дни для каждого отпуска (на случай, если в БД еще старые данные)
+        const vacationsWithCalendarDays = Array.isArray(vacationsData) ? vacationsData.map((vacation: Vacation) => {
+          if (vacation.start_date && vacation.end_date) {
+            const startDate = new Date(vacation.start_date);
+            const endDate = new Date(vacation.end_date);
+            const timeDiff = endDate.getTime() - startDate.getTime();
+            const calendarDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+            return { ...vacation, days_count: calendarDays };
+          }
+          return vacation;
+        }) : [];
+        
+        setVacations(vacationsWithCalendarDays);
         setError(null);
       } catch (err: any) {
         console.error('Ошибка загрузки отпусков:', err);

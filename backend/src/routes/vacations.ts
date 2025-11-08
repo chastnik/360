@@ -115,15 +115,35 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     
     console.log('📝 Создание отпуска:', { user_id, start_date, end_date, type, comment, userRole: req.user?.role, userId: req.user?.userId });
     
-    // Проверяем права: пользователи с правом на создание отпусков могут создавать для любого пользователя
+    // Проверяем права: админы и пользователи с правом на создание отпусков могут создавать для любого пользователя
     const hasCreatePermission = req.user?.permissions?.includes('action:vacations:create');
-    const targetUserId = hasCreatePermission ? 
-      (user_id || req.user?.userId) : req.user?.userId;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'hr';
+    const canCreateForOthers = hasCreatePermission || isAdmin;
+    
+    // Определяем targetUserId: если user_id передан, используем его, иначе используем ID текущего пользователя
+    let targetUserId: string | undefined;
+    if (user_id) {
+      // Если user_id передан, проверяем права
+      if (canCreateForOthers) {
+        targetUserId = user_id;
+      } else {
+        // Обычный пользователь может создавать отпуск только для себя
+        if (user_id !== req.user?.userId) {
+          return res.status(403).json({ error: 'Нет прав для создания отпуска для другого пользователя' });
+        }
+        targetUserId = req.user?.userId;
+      }
+    } else {
+      // Если user_id не передан, создаем отпуск для текущего пользователя
+      targetUserId = req.user?.userId;
+    }
     
     if (!targetUserId) {
       console.error('❌ Ошибка: не указан user_id');
       return res.status(400).json({ error: 'Не указан идентификатор пользователя' });
     }
+    
+    console.log('✅ targetUserId определен:', targetUserId, 'из user_id:', user_id, 'req.user?.userId:', req.user?.userId, 'canCreateForOthers:', canCreateForOthers);
 
     // Валидация данных
     if (!start_date || !end_date) {
@@ -137,36 +157,62 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Дата окончания должна быть больше или равна дате начала' });
     }
 
-    // Вычисляем количество дней (исключая выходные)
+    // Вычисляем количество календарных дней
     const timeDiff = endDate.getTime() - startDate.getTime();
-    const totalDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+    const calendarDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
     
-    // Простой расчет рабочих дней (можно улучшить учетом праздников)
-    let workingDays = 0;
-    const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-      const dayOfWeek = currentDate.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Не воскресенье и не суббота
-        workingDays++;
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
+    // Используем календарные дни вместо рабочих дней
+    const daysCount = calendarDays;
 
-    // Проверяем пересечения с существующими отпусками
-    const overlapping = await db('vacations')
+    // Проверяем пересечения с существующими отпусками ТОЛЬКО для этого пользователя
+    console.log('🔍 Проверка пересечений для пользователя:', targetUserId, 'Даты:', start_date, '-', end_date);
+    
+    // Сначала получаем все отпуска этого пользователя для отладки
+    const allUserVacations = await db('vacations')
       .where('user_id', targetUserId)
       .where('status', '!=', 'rejected')
+      .select('*');
+    
+    console.log('🔍 Все отпуска пользователя', targetUserId, ':', allUserVacations.length, allUserVacations);
+    
+    // Проверяем пересечения
+    const overlapping = await db('vacations')
+      .where('user_id', String(targetUserId)) // Явно приводим к строке для надежности
+      .where('status', '!=', 'rejected')
       .where(function() {
-        this.whereBetween('start_date', [start_date, end_date])
-          .orWhereBetween('end_date', [start_date, end_date])
-          .orWhere(function() {
-            this.where('start_date', '<=', start_date)
-              .andWhere('end_date', '>=', end_date);
-          });
-      });
+        this.where(function() {
+          // Начало нового отпуска попадает в существующий
+          this.where('start_date', '<=', start_date)
+            .where('end_date', '>=', start_date);
+        }).orWhere(function() {
+          // Конец нового отпуска попадает в существующий
+          this.where('start_date', '<=', end_date)
+            .where('end_date', '>=', end_date);
+        }).orWhere(function() {
+          // Новый отпуск полностью содержит существующий
+          this.where('start_date', '>=', start_date)
+            .where('end_date', '<=', end_date);
+        }).orWhere(function() {
+          // Существующий отпуск полностью содержит новый
+          this.where('start_date', '<=', start_date)
+            .where('end_date', '>=', end_date);
+        });
+      })
+      .select('*');
 
+    console.log('🔍 Найдено пересекающихся отпусков:', overlapping.length);
     if (overlapping.length > 0) {
       console.log('⚠️ Найдены пересекающиеся отпуска:', overlapping);
+      // Проверяем, что все найденные отпуска действительно принадлежат этому пользователю
+      const wrongUserIds = overlapping.filter(v => String(v.user_id) !== String(targetUserId));
+      if (wrongUserIds.length > 0) {
+        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Найдены отпуска других пользователей!', wrongUserIds);
+        console.error('❌ Ожидаемый user_id:', targetUserId, 'Тип:', typeof targetUserId);
+        wrongUserIds.forEach(v => {
+          console.error('❌ Найден отпуск с user_id:', v.user_id, 'Тип:', typeof v.user_id);
+        });
+        return res.status(500).json({ error: 'Внутренняя ошибка: найдены отпуска других пользователей' });
+      }
       return res.status(400).json({ error: 'На выбранные даты уже запланирован отпуск' });
     }
 
@@ -175,7 +221,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       user_id: targetUserId,
       start_date,
       end_date,
-      days_count: workingDays,
+      days_count: daysCount,
       type: type || 'vacation',
       comment: comment || null,
       status: hasCreatePermission ? 'approved' : 'pending',
@@ -256,31 +302,36 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       
       const datesChanged = existingStartDate !== newStartDate || existingEndDate !== newEndDate;
       
-      // Пересчитываем рабочие дни только если даты изменились
+      // Пересчитываем календарные дни только если даты изменились
       if (datesChanged) {
-        // Пересчитываем рабочие дни
-        let workingDays = 0;
-        const currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
-          const dayOfWeek = currentDate.getDay();
-          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-            workingDays++;
-          }
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
+        // Пересчитываем календарные дни
+        const timeDiff = endDate.getTime() - startDate.getTime();
+        const calendarDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+        const daysCount = calendarDays;
 
-        // Проверяем пересечения с другими отпусками (исключая текущий)
+        // Проверяем пересечения с другими отпусками ТОЛЬКО для этого пользователя (исключая текущий)
         const overlapping = await db('vacations')
-          .where('user_id', existingVacation.user_id)
+          .where('user_id', existingVacation.user_id) // Важно: проверяем только для конкретного пользователя
           .where('id', '!=', id)
           .where('status', '!=', 'rejected')
           .where(function() {
-            this.whereBetween('start_date', [start_date, end_date])
-              .orWhereBetween('end_date', [start_date, end_date])
-              .orWhere(function() {
-                this.where('start_date', '<=', start_date)
-                  .andWhere('end_date', '>=', end_date);
-              });
+            this.where(function() {
+              // Начало нового отпуска попадает в существующий
+              this.where('start_date', '<=', start_date)
+                .where('end_date', '>=', start_date);
+            }).orWhere(function() {
+              // Конец нового отпуска попадает в существующий
+              this.where('start_date', '<=', end_date)
+                .where('end_date', '>=', end_date);
+            }).orWhere(function() {
+              // Новый отпуск полностью содержит существующий
+              this.where('start_date', '>=', start_date)
+                .where('end_date', '<=', end_date);
+            }).orWhere(function() {
+              // Существующий отпуск полностью содержит новый
+              this.where('start_date', '<=', start_date)
+                .where('end_date', '>=', end_date);
+            });
           });
 
         if (overlapping.length > 0) {
@@ -292,7 +343,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
         updateData.start_date = start_date;
         updateData.end_date = end_date;
-        updateData.days_count = workingDays;
+        updateData.days_count = daysCount;
       }
     }
     

@@ -129,7 +129,17 @@ const VacationModal: React.FC<VacationModalProps> = ({
     try {
       setLoading(true);
       console.log('📤 Отправка данных отпуска:', formData);
-      await onSave(formData);
+      console.log('📤 preselectedUserId:', preselectedUserId);
+      console.log('📤 formData.user_id:', formData.user_id);
+      
+      // Убеждаемся, что user_id установлен (приоритет у preselectedUserId)
+      const dataToSend = {
+        ...formData,
+        user_id: preselectedUserId || formData.user_id
+      };
+      
+      console.log('📤 Финальные данные для отправки:', dataToSend);
+      await onSave(dataToSend);
       // Закрываем модальное окно только после успешного сохранения
       // Не закрываем здесь, так как onSave может обработать это сам
     } catch (error: any) {

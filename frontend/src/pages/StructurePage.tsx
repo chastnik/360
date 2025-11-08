@@ -21,10 +21,20 @@ type User = {
   is_manager?: boolean;
 };
 
+type Vacation = {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  status: 'pending' | 'approved' | 'rejected';
+  type: 'vacation' | 'sick' | 'personal' | 'business';
+};
+
 type TreeNode = User & { children: TreeNode[] };
 
 const StructurePage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [vacations, setVacations] = useState<Vacation[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +47,25 @@ const StructurePage: React.FC = () => {
       try {
         const conf = await getPublicConfig();
         setMmUrl(conf.mattermostUrl);
-        const res = await api.get('/users');
-        const data = res.data?.success ? res.data.data : res.data;
+        
+        // Загружаем пользователей и отпуска параллельно
+        const [usersRes, vacationsRes] = await Promise.all([
+          api.get('/users'),
+          api.get('/vacations?status=approved').catch(() => ({ data: { success: false, data: [] } }))
+        ]);
+        
+        const data = usersRes.data?.success ? usersRes.data.data : usersRes.data;
         const all: User[] = Array.isArray(data) ? data : [];
         // Фильтр: берем только тех, у кого указан руководитель, или кто является руководителем хотя бы одного
         // const hasManager = new Set(all.filter(u => u.manager_id).map(u => String(u.id)));
         const isManager = new Set(all.filter(u => all.some(x => x.manager_id === u.id)).map(u => String(u.id)));
         const filtered = all.filter(u => u.manager_id || isManager.has(String(u.id)));
         setUsers(filtered);
+        
+        // Загружаем отпуска
+        const vacationsData = vacationsRes.data?.success ? vacationsRes.data.data : vacationsRes.data;
+        setVacations(Array.isArray(vacationsData) ? vacationsData : []);
+        
         setError(null);
       } catch (e: any) {
         setError('Не удалось загрузить пользователей');
@@ -112,7 +133,27 @@ const StructurePage: React.FC = () => {
 
   const toggle = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
+  // Проверяем, находится ли пользователь в отпуске в текущий момент
+  const getCurrentVacation = (userId: string): Vacation | null => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return vacations.find(vacation => {
+      if (vacation.user_id !== userId || vacation.status !== 'approved') {
+        return false;
+      }
+      
+      const startDate = new Date(vacation.start_date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(vacation.end_date);
+      endDate.setHours(0, 0, 0, 0);
+      
+      return today >= startDate && today <= endDate;
+    }) || null;
+  };
+
   const Card: React.FC<{ node: TreeNode; level: number }> = ({ node, level }) => {
+    const currentVacation = getCurrentVacation(node.id);
     const isOpen = !!expanded[node.id];
     const hasChildren = node.children && node.children.length > 0;
     return (
@@ -152,6 +193,11 @@ const StructurePage: React.FC = () => {
             )}
             {node.department && (
               <div className="text-xs text-gray-500 dark:text-gray-400">Отдел: {node.department}</div>
+            )}
+            {currentVacation && (
+              <div className="mt-2 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300">
+                🏖️ В отпуске до {new Date(currentVacation.end_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </div>
             )}
           </div>
         </div>
