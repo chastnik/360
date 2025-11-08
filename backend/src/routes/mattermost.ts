@@ -9,12 +9,32 @@ import mattermostService from '../services/mattermost';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
-// Публичная конфигурация (URL Mattermost) — доступна авторизованным пользователям
+// Публичная конфигурация (URL Mattermost и team name) — доступна авторизованным пользователям
 router.get('/public-config', authenticateToken, async (_req: any, res): Promise<void> => {
   try {
-    res.json({ success: true, data: { url: process.env.MATTERMOST_URL || null } });
+    let teamName = process.env.MATTERMOST_TEAM_NAME || 'Бит.Цифра';
+    
+    // Пытаемся получить team name из API Mattermost
+    if (process.env.MATTERMOST_TEAM_ID) {
+      try {
+        const teamInfo = await mattermostService.getTeamInfo(process.env.MATTERMOST_TEAM_ID);
+        if (teamInfo && teamInfo.name) {
+          teamName = teamInfo.name;
+        }
+      } catch (error) {
+        console.log('Не удалось получить team name из API Mattermost, используем значение по умолчанию');
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        url: process.env.MATTERMOST_URL || null,
+        teamName: teamName
+      } 
+    });
   } catch (error) {
-    res.json({ success: true, data: { url: null } });
+    res.json({ success: true, data: { url: null, teamName: 'Бит.Цифра' } });
   }
 });
 

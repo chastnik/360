@@ -41,12 +41,14 @@ const StructurePage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [mmUrl, setMmUrl] = useState<string | null>(null);
+  const [mmTeamName, setMmTeamName] = useState<string>('Бит.Цифра');
 
   useEffect(() => {
     (async () => {
       try {
         const conf = await getPublicConfig();
         setMmUrl(conf.mattermostUrl);
+        setMmTeamName(conf.mattermostTeamName);
         
         // Загружаем пользователей и отпуска параллельно
         const [usersRes, vacationsRes] = await Promise.all([
@@ -185,7 +187,14 @@ const StructurePage: React.FC = () => {
             {node.mattermost_username && (
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 MM: {mmUrl ? (
-                  <a href={`${mmUrl}/direct/@${node.mattermost_username}`} target="_blank" rel="noreferrer" className="underline hover:text-gray-700 dark:hover:text-gray-200">@{node.mattermost_username}</a>
+                  <a 
+                    href={`${mmUrl}/${encodeURIComponent(mmTeamName)}/messages/@${node.mattermost_username}`}
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="underline hover:text-gray-700 dark:hover:text-gray-200"
+                  >
+                    @{node.mattermost_username}
+                  </a>
                 ) : (
                   <span>@{node.mattermost_username}</span>
                 )}

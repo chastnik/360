@@ -603,12 +603,13 @@ export const questionsAPI = {
 export default api; 
 
 // Вспомогательное API для получения публичной конфигурации (в runtime)
-export async function getPublicConfig(): Promise<{ mattermostUrl: string | null }> {
+export async function getPublicConfig(): Promise<{ mattermostUrl: string | null; mattermostTeamName: string }> {
   try {
     const res = await api.get('/mattermost/public-config');
     const url = res.data?.data?.url || null;
-    return { mattermostUrl: url };
+    const teamName = res.data?.data?.teamName || 'Бит.Цифра';
+    return { mattermostUrl: url, mattermostTeamName: teamName };
   } catch {
-    return { mattermostUrl: null };
+    return { mattermostUrl: null, mattermostTeamName: 'Бит.Цифра' };
   }
 }

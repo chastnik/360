@@ -608,6 +608,19 @@ class MattermostService {
       return null;
     }
   }
+
+  /**
+   * Получить информацию о команде по ID
+   */
+  async getTeamInfo(teamId: string): Promise<{ id: string; name: string; display_name: string } | null> {
+    try {
+      const response = await this.client.get(`/teams/${teamId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Ошибка получения информации о команде:', error);
+      return null;
+    }
+  }
 }
 
 export default new MattermostService();
