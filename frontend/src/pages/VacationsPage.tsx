@@ -83,11 +83,27 @@ const VacationsPage: React.FC = () => {
         
         setUsers(Array.isArray(usersData) ? usersData : []);
 
-        // Извлекаем уникальные отделы из пользователей
-        const uniqueDepartments = Array.from(
-          new Set(usersData.filter((u: User) => u.department).map((u: User) => u.department))
-        ).map(dept => ({ id: dept as string, name: dept as string }));
-        setDepartments(uniqueDepartments);
+        // Загружаем отделы из API
+        try {
+          const departmentsRes = await api.get('/departments');
+          const departmentsData = departmentsRes.data?.success ? departmentsRes.data.data : departmentsRes.data;
+          const departmentsList = Array.isArray(departmentsData) ? departmentsData : [];
+          
+          // Преобразуем в нужный формат
+          const formattedDepartments = departmentsList.map((dept: any) => ({
+            id: dept.id || dept.name,
+            name: dept.name
+          }));
+          
+          setDepartments(formattedDepartments);
+        } catch (deptErr: any) {
+          console.error('Ошибка загрузки отделов:', deptErr);
+          // Если не удалось загрузить отделы, извлекаем их из пользователей как fallback
+          const uniqueDepartments = Array.from(
+            new Set(usersData.filter((u: User) => u.department).map((u: User) => u.department))
+          ).map(dept => ({ id: dept as string, name: dept as string }));
+          setDepartments(uniqueDepartments);
+        }
       } catch (err: any) {
         console.error('Ошибка загрузки пользователей:', err);
         setError('Не удалось загрузить пользователей');
@@ -147,7 +163,7 @@ const VacationsPage: React.FC = () => {
     }
     
     // Если выбран отдел
-    if (selectedDepartment && user.department !== selectedDepartment) {
+    if (selectedDepartment && user.department_id !== selectedDepartment && user.department !== selectedDepartment) {
       return false;
     }
     
@@ -443,7 +459,7 @@ const VacationsPage: React.FC = () => {
             >
               <option value="">Все отделы</option>
               {departments.map(dept => (
-                <option key={dept.id} value={dept.name}>
+                <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
               ))}
@@ -572,7 +588,7 @@ const VacationsPage: React.FC = () => {
               }
               
               // Если выбран отдел
-              if (selectedDepartment && user.department !== selectedDepartment) {
+              if (selectedDepartment && user.department_id !== selectedDepartment && user.department !== selectedDepartment) {
                 return false;
               }
               

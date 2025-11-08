@@ -34,26 +34,29 @@ const router = Router();
 
 router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => {
   try {
-    // Проверяем, что пользователь имеет либо право на просмотр админов, либо право на просмотр дашборда
+    // Проверяем права доступа для определения, какие данные показывать
     const roleId = req.user?.roleId;
-    if (!roleId) {
-      return res.status(403).json({ error: 'У пользователя не назначена роль' });
+    let hasAdminPermission = false;
+    let hasDashboardPermission = false;
+    
+    if (roleId) {
+      hasAdminPermission = !!(await db('role_permissions')
+        .where({ role_id: roleId, permission: 'ui:view:admin.users' })
+        .first());
+      
+      hasDashboardPermission = !!(await db('role_permissions')
+        .where({ role_id: roleId, permission: 'ui:view:dashboard' })
+        .first());
     }
     
-    const hasAdminPermission = await db('role_permissions')
-      .where({ role_id: roleId, permission: 'ui:view:admin.users' })
-      .first();
-    
-    const hasDashboardPermission = await db('role_permissions')
-      .where({ role_id: roleId, permission: 'ui:view:dashboard' })
-      .first();
-    
-    if (!hasAdminPermission && !hasDashboardPermission) {
-      return res.status(403).json({ error: 'Недостаточно прав доступа' });
-    }
+    // Все авторизованные пользователи могут видеть список пользователей
+    // Но для обычных пользователей показываем только базовую информацию
+    const selectFields = hasAdminPermission || hasDashboardPermission
+      ? ['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at']
+      : ['id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'avatar_updated_at'];
     
     const users = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at')
+      .select(...selectFields)
       .where('is_active', true)
       .orderBy('last_name', 'first_name');
     

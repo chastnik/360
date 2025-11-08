@@ -51,7 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Оценки', href: '/assessments', icon: '📝' },
     { name: 'Отчеты', href: '/reports', icon: '📈', perm: 'ui:view:reports' },
     { name: 'Обучение', href: '/learning', icon: '🎓', perm: 'ui:view:learning' },
-    { name: 'Сотрудники', href: '/employees', icon: '👥', perm: 'ui:view:dashboard' },
+    { name: 'Сотрудники', href: '/employees', icon: '👥' },
     { name: 'Профиль', href: '/profile', icon: '👤' }
   ];
 

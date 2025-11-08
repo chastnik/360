@@ -152,7 +152,7 @@ function App() {
               } />
 
               <Route path="/employees/*" element={
-                <PrivateRoute requiredPermission="ui:view:dashboard">
+                <PrivateRoute>
                   <Layout>
                     <EmployeesPage />
                   </Layout>

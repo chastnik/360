@@ -10,18 +10,12 @@ const router = express.Router();
 // Получить пользователей для создания планов роста
 router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Только админы и HR могут видеть всех пользователей, остальные только себя
-    let users;
-    if (req.user?.role === 'admin' || req.user?.role === 'hr') {
-      users = await knex('users')
-        .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department')
-        .where('is_active', true)
-        .orderBy('last_name', 'first_name');
-    } else {
-      users = await knex('users')
-        .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department')
-        .where({ id: req.user?.userId, is_active: true });
-    }
+    // Все авторизованные пользователи могут видеть всех активных пользователей
+    // Это нужно для матрицы компетенций и других функций
+    const users = await knex('users')
+      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department')
+      .where('is_active', true)
+      .orderBy('last_name', 'first_name');
     
     return res.json(users);
   } catch (error) {
@@ -33,11 +27,7 @@ router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
 // Получить компетенции для learning модуля
 router.get('/competencies', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Только админы и HR могут работать с компетенциями
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+    // Все авторизованные пользователи могут просматривать компетенции
     const competencies = await knex('competencies')
       .select('*')
       .where('is_active', true)
@@ -426,12 +416,16 @@ router.delete('/courses/:id', authenticateToken, async (req: AuthRequest, res) =
 // Получить планы роста
 router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    // Проверяем, нужны ли все планы (для матрицы компетенций)
+    const allPlans = req.query.all === 'true';
+    
     // Админы и HR видят все планы, обычные пользователи только свои
+    // Но если запрошены все планы (для матрицы компетенций), показываем все
     let plansQuery = knex('growth_plans as gp')
       .join('users as u', 'gp.user_id', 'u.id')
-      .select('gp.*', 'u.first_name', 'u.last_name', 'u.email');
+      .select('gp.*', 'u.first_name', 'u.last_name', 'u.email', 'u.position', 'u.old_department as department');
     
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
+    if (!allPlans && req.user?.role !== 'admin' && req.user?.role !== 'hr') {
       plansQuery = plansQuery.where('gp.user_id', req.user?.userId);
     }
     
@@ -790,6 +784,7 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
     
     const matrix = await knex('competence_matrix')
       .join('competencies', 'competence_matrix.competency_id', 'competencies.id')
+      .join('users', 'competence_matrix.user_id', 'users.id')
       .where('competence_matrix.user_id', userId)
       .select(
         'competence_matrix.id',
@@ -803,7 +798,12 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
         'competence_matrix.created_at',
         'competence_matrix.updated_at',
         'competencies.name as competency_name',
-        'competencies.description as competency_description'
+        'competencies.description as competency_description',
+        'users.first_name',
+        'users.last_name',
+        'users.email',
+        'users.position',
+        'users.old_department as department'
       )
       .orderBy('competencies.name');
     
@@ -817,11 +817,7 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
 // Получить матрицу компетенций всех пользователей
 router.get('/competence-matrix/all', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Проверяем права доступа - только админы и HR могут видеть матрицу всех пользователей
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
+    // Все авторизованные пользователи могут видеть матрицу всех пользователей
     const matrix = await knex('competence_matrix')
       .join('competencies', 'competence_matrix.competency_id', 'competencies.id')
       .join('users', 'competence_matrix.user_id', 'users.id')

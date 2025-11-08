@@ -17,6 +17,8 @@ interface CompetenceMatrixEntry {
   assessment_date: string;
   notes?: string;
   source?: 'training' | 'manual';
+  first_name?: string;
+  last_name?: string;
 }
 
 interface Competency {
@@ -57,8 +59,8 @@ const CompetenceMatrixPage: React.FC = () => {
       const [matrixResponse, competenciesResponse, usersResponse, growthPlansResponse] = await Promise.all([
         api.get('/learning/competence-matrix/all').catch(err => {
           console.error('Matrix API error:', err);
-          // Если нет прав, пробуем получить только свои компетенции
-          return api.get('/learning/competence-matrix').catch(() => ({ data: [] }));
+          // Если ошибка, возвращаем пустой массив (не делаем fallback на свои компетенции)
+          return { data: [] };
         }),
         api.get('/learning/competencies').catch(err => {
           console.error('Competencies API error:', err);
@@ -68,7 +70,7 @@ const CompetenceMatrixPage: React.FC = () => {
           console.error('Users API error:', err);
           return { data: [] };
         }),
-        api.get('/learning/growth-plans').catch(err => {
+        api.get('/learning/growth-plans?all=true').catch(err => {
           console.error('Growth plans API error:', err);
           return { data: [] };
         })
@@ -79,15 +81,18 @@ const CompetenceMatrixPage: React.FC = () => {
       // Обрабатываем данные матрицы
       const matrixItems = Array.isArray(matrixResponse.data) ? matrixResponse.data : [];
       matrixItems.forEach((item: any) => {
+        // Формируем имя пользователя из first_name и last_name, если они есть
+        const userName = item.first_name && item.last_name 
+          ? `${item.last_name} ${item.first_name}` 
+          : item.user_name || item.email || '';
+        
         matrixEntries.push({
           id: item.id,
           competency_id: item.competency_id,
           competency_name: item.competency_name,
           competency_description: item.competency_description || '',
           user_id: item.user_id,
-          user_name: item.first_name && item.last_name 
-            ? `${item.last_name} ${item.first_name}` 
-            : item.email || '',
+          user_name: userName,
           user_email: item.email || '',
           user_position: item.position,
           user_department: item.department,
@@ -95,7 +100,10 @@ const CompetenceMatrixPage: React.FC = () => {
           score: item.score || 0,
           assessment_date: item.assessment_date,
           notes: item.notes,
-          source: item.source || 'training'
+          source: item.source || 'training',
+          // Сохраняем first_name и last_name для правильного отображения
+          first_name: item.first_name,
+          last_name: item.last_name
         });
       });
 
@@ -156,7 +164,8 @@ const CompetenceMatrixPage: React.FC = () => {
 
       setMatrixData(matrixEntries);
       setCompetencies(competenciesList);
-      setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
+      const usersData = Array.isArray(usersResponse.data) ? usersResponse.data : [];
+      setUsers(usersData);
       
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -204,12 +213,16 @@ const CompetenceMatrixPage: React.FC = () => {
   // Получаем уникальный список пользователей из матрицы
   const uniqueUsers = useMemo(() => {
     const userMap = new Map<string, User>();
-    matrixData.forEach(entry => {
+    matrixData.forEach((entry: any) => {
       if (!userMap.has(entry.user_id)) {
+        // Используем first_name и last_name из entry, если они есть, иначе парсим user_name
+        const firstName = entry.first_name || (entry.user_name.split(' ')[1] || '');
+        const lastName = entry.last_name || (entry.user_name.split(' ')[0] || '');
+        
         userMap.set(entry.user_id, {
           id: entry.user_id,
-          first_name: entry.user_name.split(' ')[1] || '',
-          last_name: entry.user_name.split(' ')[0] || '',
+          first_name: firstName,
+          last_name: lastName,
           email: entry.user_email,
           position: entry.user_position,
           department: entry.user_department
@@ -302,6 +315,54 @@ const CompetenceMatrixPage: React.FC = () => {
     );
   };
 
+  // Формируем список компетенций для таблицы
+  // Если выбраны компетенции в фильтре, показываем только их
+  const sortedCompetencies = useMemo(() => {
+    let compsToShow = uniqueCompetencies;
+    
+    // Если выбраны компетенции в фильтре, показываем только их
+    if (selectedCompetencyIds.length > 0) {
+      compsToShow = uniqueCompetencies.filter(comp => selectedCompetencyIds.includes(comp.id));
+    }
+    
+    // Сортируем по названию
+    return compsToShow.sort((a, b) => a.name.localeCompare(b.name));
+  }, [uniqueCompetencies, selectedCompetencyIds]);
+
+  // Формируем список пользователей для таблицы
+  // Показываем только пользователей, у которых есть компетенции в матрице
+  const sortedUsers = useMemo(() => {
+    // Получаем уникальные ID пользователей из матрицы
+    const userIdsWithCompetencies = new Set(matrixData.map(e => e.user_id));
+    
+    // Фильтруем пользователей: показываем только тех, у кого есть компетенции
+    let usersToShow = users.filter(u => userIdsWithCompetencies.has(u.id));
+    
+    // Если выбраны пользователи в фильтре, показываем только их (из тех, у кого есть компетенции)
+    if (selectedUserIds.length > 0) {
+      usersToShow = usersToShow.filter(u => selectedUserIds.includes(u.id));
+    }
+    
+    // Если выбраны компетенции в фильтре, показываем только тех пользователей,
+    // у которых есть хотя бы одна из выбранных компетенций
+    if (selectedCompetencyIds.length > 0) {
+      const userIdsWithSelectedCompetencies = new Set<string>();
+      matrixData.forEach(entry => {
+        if (selectedCompetencyIds.includes(entry.competency_id)) {
+          userIdsWithSelectedCompetencies.add(entry.user_id);
+        }
+      });
+      usersToShow = usersToShow.filter(u => userIdsWithSelectedCompetencies.has(u.id));
+    }
+    
+    // Сортируем по фамилии и имени
+    return usersToShow.sort((a, b) => {
+      const nameA = `${a.last_name} ${a.first_name}`;
+      const nameB = `${b.last_name} ${b.first_name}`;
+      return nameA.localeCompare(nameB);
+    });
+  }, [users, matrixData, selectedUserIds, selectedCompetencyIds]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -309,19 +370,6 @@ const CompetenceMatrixPage: React.FC = () => {
       </div>
     );
   }
-
-  const sortedUsers = Array.from(matrixByUser.keys())
-    .map(userId => uniqueUsers.find(u => u.id === userId))
-    .filter((u): u is User => u !== undefined)
-    .sort((a, b) => {
-      const nameA = `${a.last_name} ${a.first_name}`;
-      const nameB = `${b.last_name} ${b.first_name}`;
-      return nameA.localeCompare(nameB);
-    });
-
-  const sortedCompetencies = uniqueCompetencies.sort((a, b) => 
-    a.name.localeCompare(b.name)
-  );
 
   return (
     <div className="container mx-auto px-4 py-8">

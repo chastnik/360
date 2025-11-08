@@ -29,6 +29,14 @@ const AdminUsers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Фильтры
+  const [selectedManager, setSelectedManager] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [selectedPosition, setSelectedPosition] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [showWithoutPosition, setShowWithoutPosition] = useState(false);
+  const [showWithoutRole, setShowWithoutRole] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -223,14 +231,69 @@ const AdminUsers: React.FC = () => {
     setShowEditForm(true);
   };
 
+  // Получаем уникальные должности и роли для фильтров
+  const uniquePositions = Array.from(new Set(users.map(u => u.position).filter(Boolean))).sort();
+  const uniqueRoles = Array.from(new Set(users.map(u => u.role).filter(Boolean))).sort();
+  
+  // Получаем список руководителей для фильтра
+  const managers = users.filter(user => user.is_manager || users.some(u => u.manager_id === user.id));
+  
   const filteredUsers = Array.isArray(users) ? users
-    .filter(user =>
-      user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.department?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(user => {
+      // Поиск по тексту
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = 
+          user.first_name.toLowerCase().includes(searchLower) ||
+          user.last_name.toLowerCase().includes(searchLower) ||
+          user.email.toLowerCase().includes(searchLower) ||
+          user.position?.toLowerCase().includes(searchLower) ||
+          user.department?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+      
+      // Фильтр по руководителю
+      if (selectedManager && user.manager_id !== selectedManager) {
+        return false;
+      }
+      
+      // Фильтр по отделу
+      if (selectedDepartment) {
+        if (user.department_id !== selectedDepartment && user.department !== selectedDepartment) {
+          return false;
+        }
+      }
+      
+      // Фильтр по должности
+      if (selectedPosition) {
+        if (user.position !== selectedPosition) {
+          return false;
+        }
+      }
+      
+      // Поиск без должности
+      if (showWithoutPosition) {
+        if (user.position && user.position.trim() !== '') {
+          return false;
+        }
+      }
+      
+      // Фильтр по роли
+      if (selectedRole) {
+        if (user.role !== selectedRole) {
+          return false;
+        }
+      }
+      
+      // Поиск без роли
+      if (showWithoutRole) {
+        if (user.role && user.role.trim() !== '') {
+          return false;
+        }
+      }
+      
+      return true;
+    })
     .sort((a, b) => {
       // Сортировка по имени (first_name), затем по фамилии (last_name)
       const firstNameComparison = a.first_name.localeCompare(b.first_name, 'ru');
@@ -312,27 +375,150 @@ const AdminUsers: React.FC = () => {
         </div>
       )}
 
-      {/* Поиск */}
-      <div className="max-w-md">
-        <label htmlFor="search" className="sr-only">
-          Поиск пользователей
-        </label>
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-            </svg>
+      {/* Поиск и фильтры */}
+      <div className="space-y-4">
+        {/* Поиск */}
+        <div className="max-w-md">
+          <label htmlFor="search" className="sr-only">
+            Поиск пользователей
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <input
+              id="search"
+              name="search"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              placeholder="Поиск пользователей..."
+              type="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <input
-            id="search"
-            name="search"
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-            placeholder="Поиск пользователей..."
-            type="search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
         </div>
+
+        {/* Фильтры */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Фильтр по руководителю */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Руководитель
+            </label>
+            <select
+              value={selectedManager}
+              onChange={(e) => setSelectedManager(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+            >
+              <option value="">Все руководители</option>
+              {managers.map(manager => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.last_name} {manager.first_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Фильтр по отделу */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Отдел
+            </label>
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+            >
+              <option value="">Все отделы</option>
+              {departments.filter(dept => dept.is_active).map(dept => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Фильтр по должности */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Должность
+            </label>
+            <div className="space-y-2">
+              <select
+                value={selectedPosition}
+                onChange={(e) => setSelectedPosition(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              >
+                <option value="">Все должности</option>
+                {uniquePositions.map(position => (
+                  <option key={position} value={position}>
+                    {position}
+                  </option>
+                ))}
+              </select>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={showWithoutPosition}
+                  onChange={(e) => setShowWithoutPosition(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Без должности</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Фильтр по роли */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Роль
+            </label>
+            <div className="space-y-2">
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+              >
+                <option value="">Все роли</option>
+                {uniqueRoles.map(role => (
+                  <option key={role} value={role}>
+                    {getRoleText(role)}
+                  </option>
+                ))}
+              </select>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={showWithoutRole}
+                  onChange={(e) => setShowWithoutRole(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Без роли</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Кнопка сброса фильтров */}
+        {(selectedManager || selectedDepartment || selectedPosition || selectedRole || showWithoutPosition || showWithoutRole) && (
+          <div>
+            <button
+              onClick={() => {
+                setSelectedManager('');
+                setSelectedDepartment('');
+                setSelectedPosition('');
+                setSelectedRole('');
+                setShowWithoutPosition(false);
+                setShowWithoutRole(false);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Таблица пользователей */}
