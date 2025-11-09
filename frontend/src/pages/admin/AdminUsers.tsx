@@ -1,6 +1,8 @@
 
 // Автор: Стас Чашин @chastnik
 import React, { useState, useEffect } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import RoleSelect from './RoleSelect';
 import api from '../../services/api';
 import { User, Department } from '../../types/common';
@@ -21,6 +23,7 @@ interface UserFormData {
   mattermost_username: string;
   avatar_url: string;
   is_manager: boolean;
+  resume: string;
 }
 
 const AdminUsers: React.FC = () => {
@@ -63,7 +66,8 @@ const AdminUsers: React.FC = () => {
     manager_id: '',
     mattermost_username: '',
     avatar_url: '',
-    is_manager: false
+    is_manager: false,
+    resume: ''
   });
 
   useEffect(() => {
@@ -117,8 +121,9 @@ const AdminUsers: React.FC = () => {
           department_id: '',
           manager_id: '',
           mattermost_username: '',
-        avatar_url: '',
-          is_manager: false
+          avatar_url: '',
+          is_manager: false,
+          resume: ''
         });
         loadUsers();
       } else {
@@ -215,7 +220,8 @@ const AdminUsers: React.FC = () => {
       manager_id: user.manager_id || '',
       mattermost_username: user.mattermost_username || '',
       avatar_url: (user as any).avatar_url || '',
-      is_manager: user.is_manager || false
+      is_manager: user.is_manager || false,
+      resume: (user as any).resume || ''
     });
     
     // Загружаем отпуска пользователя
@@ -738,6 +744,53 @@ const AdminUsers: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                   placeholder="@username"
                 />
+              </div>
+
+              {/* Поле Резюме */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Резюме
+                </label>
+                <div className="bg-white dark:bg-gray-700">
+                  <ReactQuill
+                    value={formData.resume || ''}
+                    onChange={(value) => setFormData({ ...formData, resume: value })}
+                    theme="snow"
+                    modules={{
+                      toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        [{ 'script': 'sub'}, { 'script': 'super' }],
+                        [{ 'indent': '-1'}, { 'indent': '+1' }],
+                        [{ 'color': [] }, { 'background': [] }],
+                        [{ 'align': [] }],
+                        ['link'],
+                        ['clean']
+                      ]
+                    }}
+                    formats={[
+                      'header', 'bold', 'italic', 'underline', 'strike',
+                      'list', 'bullet', 'script', 'indent',
+                      'color', 'background', 'align',
+                      'link'
+                    ]}
+                    style={{ minHeight: '200px' }}
+                    className="dark:text-white"
+                  />
+                </div>
+                <style>{`
+                  .ql-editor {
+                    min-height: 200px;
+                    color: #1f2937;
+                  }
+                  .dark .ql-editor {
+                    color: #f3f4f6;
+                  }
+                  .ql-container {
+                    font-family: inherit;
+                  }
+                `}</style>
               </div>
 
               {/* Предпросмотр аватара */}

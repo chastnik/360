@@ -51,9 +51,18 @@ router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => 
     
     // Все авторизованные пользователи могут видеть список пользователей
     // Но для обычных пользователей показываем только базовую информацию
-    const selectFields = hasAdminPermission || hasDashboardPermission
+    // Проверяем наличие поля resume в таблице (на случай, если миграция еще не выполнена)
+    const hasResumeColumn = await db.schema.hasColumn('users', 'resume');
+    
+    const baseFields = ['id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'avatar_updated_at'];
+    const adminFields = hasAdminPermission || hasDashboardPermission
       ? ['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url', 'avatar_updated_at']
-      : ['id', 'email', 'first_name', 'last_name', 'middle_name', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'avatar_updated_at'];
+      : baseFields;
+    
+    // Добавляем поле resume только если оно существует в таблице
+    const selectFields = hasAdminPermission || hasDashboardPermission
+      ? (hasResumeColumn ? [...adminFields, 'resume'] : adminFields)
+      : baseFields;
     
     const users = await db('users')
       .select(...selectFields)
@@ -75,8 +84,13 @@ router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
   try {
     const { id } = req.params;
     
+    // Проверяем наличие поля resume в таблице (на случай, если миграция еще не выполнена)
+    const hasResumeColumn = await db.schema.hasColumn('users', 'resume');
+    const baseFields = ['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url'];
+    const selectFields = hasResumeColumn ? [...baseFields, 'resume'] : baseFields;
+    
     const user = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'is_active', 'created_at', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'avatar_url')
+      .select(...selectFields)
       .where('id', id)
       .first();
     
@@ -324,7 +338,8 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
       manager_id,
       mattermost_username,
       avatar_url,
-      is_manager
+      is_manager,
+      resume
     } = req.body;
 
     // Проверяем существование пользователя
@@ -372,6 +387,14 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
       updated_at: new Date()
     };
 
+    // Добавляем resume только если оно передано и поле существует в таблице
+    if (resume !== undefined) {
+      const hasResumeColumn = await db.schema.hasColumn('users', 'resume');
+      if (hasResumeColumn) {
+        updateData.resume = resume && String(resume).trim() !== '' ? resume : null;
+      }
+    }
+
     // Обрабатываем роль - приоритет у новой системы (role_id)
     if (req.body.role_id && String(req.body.role_id).trim() !== '') {
       // Используем новую систему ролей
@@ -394,8 +417,13 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
       .update(updateData);
 
     // Получаем обновленные данные
+    // Проверяем наличие поля resume в таблице (на случай, если миграция еще не выполнена)
+    const hasResumeColumn = await db.schema.hasColumn('users', 'resume');
+    const baseFields = ['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'];
+    const selectFields = hasResumeColumn ? [...baseFields, 'resume'] : baseFields;
+    
     const updatedUser = await db('users')
-      .select(['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'role_id', 'position', 'old_department', 'department_id', 'manager_id', 'mattermost_username', 'avatar_url', 'is_manager', 'is_active', 'created_at', 'updated_at'])
+      .select(...selectFields)
       .where('id', userId)
       .first();
 
