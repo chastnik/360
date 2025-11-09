@@ -21,6 +21,13 @@ export interface LlmCourse {
   description: string | null;
 }
 
+export interface LlmCompetency {
+  name: string;
+  level: 'junior' | 'middle' | 'senior';
+  score: number;
+  source: 'training' | 'manual';
+}
+
 export async function generateEmployeeRecommendations(params: {
   employeeFullName: string;
   cycleName: string;
@@ -28,6 +35,8 @@ export async function generateEmployeeRecommendations(params: {
   categories: LlmCategorySummary[];
   responses: LlmResponseItem[];
   courses?: LlmCourse[];
+  resume?: string | null;
+  competencies?: LlmCompetency[];
 }): Promise<string> {
   const baseUrl = process.env.LLM_BASE_URL;
   const token = process.env.LLM_PROXY_TOKEN;
@@ -42,7 +51,10 @@ export async function generateEmployeeRecommendations(params: {
     'Ты HR-эксперт по развитию персонала.',
     'Проанализируй результаты 360-градусной оценки и дай персональные рекомендации на русском языке.',
     'Учитывай числовые оценки по категориям и текстовые комментарии респондентов.',
-    'При формировании рекомендаций обязательно учитывай доступные курсы обучения и предлагай конкретные курсы, которые помогут сотруднику развить выявленные зоны роста.',
+    'При формировании рекомендаций обязательно учитывай:',
+    '- Резюме сотрудника (если указано) - опыт работы, навыки, образование',
+    '- Текущие компетенции сотрудника (полученные через обучение или введенные вручную)',
+    '- Доступные курсы обучения и предлагай конкретные курсы, которые помогут сотруднику развить выявленные зоны роста.',
     '',
     'Формат ответа (строго без лишних заголовков):',
     '',
@@ -73,6 +85,39 @@ export async function generateEmployeeRecommendations(params: {
     .map(r => `${r.category}: "${r.comment}"`)
     .join('\n');
 
+  // Формируем информацию о резюме
+  let resumeInfo = '';
+  if (params.resume && params.resume.trim()) {
+    // Удаляем HTML теги из резюме для более компактного представления
+    const resumeText = params.resume
+      .replace(/<[^>]+>/g, ' ') // Удаляем HTML теги
+      .replace(/\s+/g, ' ') // Удаляем лишние пробелы
+      .trim()
+      .substring(0, 2000); // Ограничиваем длину для экономии токенов
+    resumeInfo = [
+      '',
+      'Резюме сотрудника:',
+      resumeText,
+    ].join('\n');
+  }
+
+  // Формируем информацию о компетенциях
+  let competenciesInfo = '';
+  if (params.competencies && params.competencies.length > 0) {
+    const competenciesList = params.competencies
+      .map(c => {
+        const sourceLabel = c.source === 'manual' ? ' (введено вручную)' : ' (получено через обучение)';
+        const levelLabel = c.level === 'junior' ? 'Начальный' : c.level === 'middle' ? 'Средний' : 'Продвинутый';
+        return `- ${c.name}: ${levelLabel} (${c.score}/100)${sourceLabel}`;
+      })
+      .join('\n');
+    competenciesInfo = [
+      '',
+      'Текущие компетенции сотрудника:',
+      competenciesList,
+    ].join('\n');
+  }
+
   // Формируем информацию о курсах
   let coursesInfo = '';
   if (params.courses && params.courses.length > 0) {
@@ -95,6 +140,8 @@ export async function generateEmployeeRecommendations(params: {
     `Сотрудник: ${params.employeeFullName}`,
     `Цикл: ${params.cycleName}`,
     `Общий балл: ${params.overallAverage.toFixed(1)}/5.0`,
+    resumeInfo,
+    competenciesInfo,
     '',
     `Оценки по категориям: ${compactCategories}`,
     '',

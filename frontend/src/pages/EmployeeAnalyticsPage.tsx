@@ -224,18 +224,18 @@ export const EmployeeAnalyticsPage: React.FC = () => {
           </button>
         </div>
         {aiText ? (
-          <div className="markdown-body leading-7 text-gray-800 dark:text-gray-100">
+          <div className="markdown-body leading-7 text-gray-900 dark:text-gray-100">
             <ReactMarkdown
               components={{
                 h1: ({node, children, ...props}) => <h1 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white" {...props}>{children}</h1>,
-                h2: ({node, children, ...props}) => <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white" {...props}>{children}</h2>,
-                h3: ({node, children, ...props}) => <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white" {...props}>{children}</h3>,
-                p: ({node, ...props}) => <p className="mb-3 whitespace-pre-line text-gray-800 dark:text-gray-100" {...props} />,
-                ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
-                ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3 text-gray-800 dark:text-gray-100" {...props} />,
-                li: ({node, ...props}) => <li className="mb-1 text-gray-800 dark:text-gray-100" {...props} />,
+                h2: ({node, children, ...props}) => <h2 className="text-xl font-bold mb-2 mt-4 text-gray-900 dark:text-white" style={{ color: '#111827' }} {...props}>{children}</h2>,
+                h3: ({node, children, ...props}) => <h3 className="text-lg font-bold mb-2 mt-3 text-gray-900 dark:text-white" style={{ color: '#111827' }} {...props}>{children}</h3>,
+                p: ({node, ...props}) => <p className="mb-3 whitespace-pre-line text-gray-900 dark:text-gray-100" style={{ color: '#111827' }} {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-3 text-gray-900 dark:text-gray-100" style={{ color: '#111827' }} {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-3 text-gray-900 dark:text-gray-100" style={{ color: '#111827' }} {...props} />,
+                li: ({node, ...props}) => <li className="mb-1 text-gray-900 dark:text-gray-100" style={{ color: '#111827' }} {...props} />,
                 a: ({node, children, ...props}) => <a className="underline text-blue-600 dark:text-blue-400" target="_blank" rel="noreferrer" {...props}>{children}</a>,
-                strong: ({node, ...props}) => <strong className="text-gray-900 dark:text-white" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-bold text-gray-900 dark:text-white" style={{ color: '#111827' }} {...props} />,
                 code: ({node, inline, ...props}: any) => inline
                   ? <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-pink-600 dark:text-pink-300" {...props} />
                   : <pre className="block w-full p-3 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-300 overflow-auto"><code {...props} /></pre>,

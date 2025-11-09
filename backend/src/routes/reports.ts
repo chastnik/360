@@ -96,13 +96,40 @@ router.post('/user/:userId/recommendations', authenticateToken, async (req: any,
       .where('is_active', true)
       .orderBy('name');
 
+    // Получаем резюме сотрудника (если есть)
+    const user = await knex('users')
+      .select('resume')
+      .where('id', userId)
+      .first();
+    const resume = user?.resume || null;
+
+    // Получаем компетенции сотрудника из матрицы компетенций
+    const competencies = await knex('competence_matrix')
+      .join('competencies', 'competence_matrix.competency_id', 'competencies.id')
+      .where('competence_matrix.user_id', userId)
+      .where('competencies.is_active', true)
+      .select(
+        'competencies.name as competency_name',
+        'competence_matrix.level',
+        'competence_matrix.score',
+        'competence_matrix.source'
+      )
+      .orderBy('competencies.name');
+
     const llmText = await generateEmployeeRecommendations({
       employeeFullName: `${participant.first_name} ${participant.last_name}`.trim(),
       cycleName: participant.cycle_name,
       overallAverage,
       categories: avgScores.map((r: any) => ({ category: r.category_name, avgScore: Math.round(Number(r.avg_score || 0) * 100) / 100 })),
       responses: responses.map((r: any) => ({ category: r.category_name, question: r.question_text, score: Number(r.score || 0), comment: r.comment })),
-      courses: courses.map((c: any) => ({ name: c.name, description: c.description }))
+      courses: courses.map((c: any) => ({ name: c.name, description: c.description })),
+      resume: resume,
+      competencies: competencies.map((c: any) => ({
+        name: c.competency_name,
+        level: c.level,
+        score: Number(c.score || 0),
+        source: c.source || 'training'
+      }))
     });
 
     // Сохраняем/обновляем в assessment_reports.recommendations

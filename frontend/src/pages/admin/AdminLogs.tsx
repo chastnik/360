@@ -1,6 +1,6 @@
 
 // Автор: Стас Чашин @chastnik
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
 interface LogEntry {
@@ -27,11 +27,7 @@ const AdminLogs: React.FC = () => {
     limit: 100
   });
 
-  useEffect(() => {
-    loadLogs();
-  }, [filter]);
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -50,7 +46,11 @@ const AdminLogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const getLevelColor = (level: string) => {
     switch (level) {

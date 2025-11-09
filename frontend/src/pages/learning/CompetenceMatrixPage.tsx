@@ -210,27 +210,6 @@ const CompetenceMatrixPage: React.FC = () => {
     return Array.from(compMap.values());
   }, [matrixData]);
 
-  // Получаем уникальный список пользователей из матрицы
-  const uniqueUsers = useMemo(() => {
-    const userMap = new Map<string, User>();
-    matrixData.forEach((entry: any) => {
-      if (!userMap.has(entry.user_id)) {
-        // Используем first_name и last_name из entry, если они есть, иначе парсим user_name
-        const firstName = entry.first_name || (entry.user_name.split(' ')[1] || '');
-        const lastName = entry.last_name || (entry.user_name.split(' ')[0] || '');
-        
-        userMap.set(entry.user_id, {
-          id: entry.user_id,
-          first_name: firstName,
-          last_name: lastName,
-          email: entry.user_email,
-          position: entry.user_position,
-          department: entry.user_department
-        });
-      }
-    });
-    return Array.from(userMap.values());
-  }, [matrixData]);
 
   // Фильтруем данные матрицы
   const filteredMatrix = useMemo(() => {
