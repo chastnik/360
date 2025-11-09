@@ -57,7 +57,14 @@ const TestingPage: React.FC = () => {
   const fetchData = async () => {
     try {
       const response = await api.get('/learning/growth-plans');
-      setPlans(response.data);
+      // Обрабатываем ответ API - может быть массив или объект с пагинацией
+      let plansData: GrowthPlan[] = [];
+      if (Array.isArray(response.data)) {
+        plansData = response.data;
+      } else if (response.data.plans) {
+        plansData = response.data.plans;
+      }
+      setPlans(plansData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {

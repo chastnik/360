@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
 interface TestResult {
@@ -53,6 +53,21 @@ interface GrowthPlan {
   email?: string;
 }
 
+interface Filters {
+  search: string;
+  status: 'all' | 'active' | 'completed';
+  dateFrom: string;
+  dateTo: string;
+  userId: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 const GrowthPlansPage: React.FC = () => {
   const [plans, setPlans] = useState<GrowthPlan[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -62,6 +77,22 @@ const GrowthPlansPage: React.FC = () => {
   const [showTestModal, setShowTestModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<GrowthPlan | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  
+  // Фильтры и пагинация
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    search: '',
+    status: 'all',
+    dateFrom: '',
+    dateTo: '',
+    userId: ''
+  });
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  });
   
   // Form states for create plan modal
   const [formData, setFormData] = useState({
@@ -83,26 +114,56 @@ const GrowthPlansPage: React.FC = () => {
   const [testFormErrors, setTestFormErrors] = useState<{[key: string]: string}>({});
   const [isSubmittingTest, setIsSubmittingTest] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchCoursesAndUsers = async () => {
     try {
-      const [plansResponse, coursesResponse, usersResponse] = await Promise.all([
-        api.get('/learning/growth-plans'),
+      const [coursesResponse, usersResponse] = await Promise.all([
         api.get('/learning/courses'),
         api.get('/learning/users')
       ]);
       
-      // Обрабатываем ответы API - данные приходят напрямую в response.data
-      const plansData = Array.isArray(plansResponse.data) ? plansResponse.data : [];
       const coursesData = Array.isArray(coursesResponse.data) ? coursesResponse.data : [];
       const usersData = Array.isArray(usersResponse.data) ? usersResponse.data : [];
       
-      setPlans(plansData);
       setCourses(coursesData);
       setUsers(usersData);
+    } catch (error) {
+      console.error('Ошибка загрузки курсов и пользователей:', error);
+    }
+  };
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Формируем параметры запроса
+      const params = new URLSearchParams();
+      if (filters.search) params.append('search', filters.search);
+      if (filters.status !== 'all') params.append('status', filters.status);
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+      if (filters.userId) params.append('userId', filters.userId);
+      params.append('page', pagination.page.toString());
+      params.append('limit', pagination.limit.toString());
+      
+      const plansResponse = await api.get(`/learning/growth-plans?${params.toString()}`);
+      
+      // Обрабатываем ответ API - может быть массив или объект с пагинацией
+      let plansData: GrowthPlan[] = [];
+      let paginationData: Pagination | null = null;
+      
+      if (Array.isArray(plansResponse.data)) {
+        plansData = plansResponse.data;
+      } else if (plansResponse.data.plans) {
+        plansData = plansResponse.data.plans;
+        if (plansResponse.data.pagination) {
+          paginationData = plansResponse.data.pagination;
+        }
+      }
+      
+      setPlans(plansData);
+      if (paginationData) {
+        setPagination(prev => ({ ...prev, ...paginationData }));
+      }
       
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
@@ -110,6 +171,41 @@ const GrowthPlansPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  }, [filters, pagination.page, pagination.limit]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    fetchCoursesAndUsers();
+  }, []);
+
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPagination(prev => ({ ...prev, page: 1 })); // Сбрасываем на первую страницу при изменении фильтров
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: 'all',
+      dateFrom: '',
+      dateTo: '',
+      userId: ''
+    });
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const hasActiveFilters = filters.search !== '' || 
+    filters.status !== 'all' || 
+    filters.dateFrom !== '' || 
+    filters.dateTo !== '' || 
+    filters.userId !== '';
+
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getStatusColor = (status: string) => {
@@ -198,6 +294,8 @@ const GrowthPlansPage: React.FC = () => {
       });
       setCourseSelections(new Map());
       setFormErrors({});
+      // Сбрасываем пагинацию на первую страницу после создания плана
+      setPagination(prev => ({ ...prev, page: 1 }));
       fetchData();
     } catch (error) {
       console.error('Error creating plan:', error);
@@ -369,14 +467,131 @@ const GrowthPlansPage: React.FC = () => {
             Управление персональными планами развития
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
-        >
-          <span className="mr-2">➕</span>
-          Создать план
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Фильтры
+            {hasActiveFilters && (
+              <span className="ml-1 px-2 py-0.5 text-xs bg-blue-500 text-white rounded-full">
+                {[filters.search !== '', filters.status !== 'all', filters.dateFrom !== '', filters.dateTo !== '', filters.userId !== ''].filter(Boolean).length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center"
+          >
+            <span className="mr-2">➕</span>
+            Создать план
+          </button>
+        </div>
       </div>
+
+      {/* Панель фильтров */}
+      {showFilters && (
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Поиск */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Поиск
+              </label>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                placeholder="Имя, фамилия, email, должность..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Статус */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Статус
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="all">Все</option>
+                <option value="active">Активные</option>
+                <option value="completed">Завершенные</option>
+              </select>
+            </div>
+
+            {/* Пользователь */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Пользователь
+              </label>
+              <select
+                value={filters.userId}
+                onChange={(e) => handleFilterChange('userId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Все пользователи</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.last_name} {user.first_name} {user.middle_name}
+                    {user.position && ` - ${user.position}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Дата от */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Дата начала от
+              </label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Дата до */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Дата начала до
+              </label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Кнопка очистки */}
+            <div className="flex items-end">
+              <button
+                onClick={clearFilters}
+                disabled={!hasActiveFilters}
+                className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Очистить фильтры
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Информация о пагинации */}
+      {pagination.total > 0 && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Показано {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} из {pagination.total} планов
+        </div>
+      )}
 
       <div className="grid gap-6">
         {plans.map((plan) => (
@@ -580,21 +795,76 @@ const GrowthPlansPage: React.FC = () => {
         ))}
       </div>
 
-      {plans.length === 0 && (
+      {/* Пагинация */}
+      {pagination.totalPages > 1 && (
+        <div className="mt-8 flex justify-center items-center gap-2">
+          <button
+            onClick={() => handlePageChange(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Назад
+          </button>
+          
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              let pageNum: number;
+              if (pagination.totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (pagination.page <= 3) {
+                pageNum = i + 1;
+              } else if (pagination.page >= pagination.totalPages - 2) {
+                pageNum = pagination.totalPages - 4 + i;
+              } else {
+                pageNum = pagination.page - 2 + i;
+              }
+              
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`px-3 py-2 rounded-md transition-colors ${
+                    pagination.page === pageNum
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+          </div>
+          
+          <button
+            onClick={() => handlePageChange(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Вперед
+          </button>
+        </div>
+      )}
+
+      {plans.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📈</div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Планы роста не найдены
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Создайте свой первый план индивидуального роста
+            {hasActiveFilters 
+              ? 'Попробуйте изменить фильтры поиска'
+              : 'Создайте свой первый план индивидуального роста'
+            }
           </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
-          >
-            Создать план
-          </button>
+          {!hasActiveFilters && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg"
+            >
+              Создать план
+            </button>
+          )}
         </div>
       )}
 

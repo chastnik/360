@@ -419,6 +419,18 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
     // Проверяем, нужны ли все планы (для матрицы компетенций)
     const allPlans = req.query.all === 'true';
     
+    // Параметры пагинации (только если не запрошены все планы)
+    const page = allPlans ? 1 : (parseInt(req.query.page as string) || 1);
+    const limit = allPlans ? 999999 : (parseInt(req.query.limit as string) || 20);
+    const offset = (page - 1) * limit;
+    
+    // Параметры фильтров
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
+    const userId = req.query.userId as string;
+    
     // Админы и HR видят все планы, обычные пользователи только свои
     // Но если запрошены все планы (для матрицы компетенций), показываем все
     let plansQuery = knex('growth_plans as gp')
@@ -429,7 +441,53 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
       plansQuery = plansQuery.where('gp.user_id', req.user?.userId);
     }
     
-    const plans = await plansQuery.orderBy('gp.created_at', 'desc');
+    // Применяем фильтры (только если не запрошены все планы)
+    if (!allPlans) {
+      if (search) {
+        plansQuery = plansQuery.where(function() {
+          this.where('u.first_name', 'ilike', `%${search}%`)
+            .orWhere('u.last_name', 'ilike', `%${search}%`)
+            .orWhere('u.email', 'ilike', `%${search}%`)
+            .orWhere('u.position', 'ilike', `%${search}%`)
+            .orWhere('u.old_department', 'ilike', `%${search}%`);
+        });
+      }
+      
+      if (status && status !== 'all') {
+        plansQuery = plansQuery.where('gp.status', status);
+      }
+      
+      if (dateFrom) {
+        plansQuery = plansQuery.where('gp.start_date', '>=', dateFrom);
+      }
+      
+      if (dateTo) {
+        plansQuery = plansQuery.where('gp.start_date', '<=', dateTo);
+      }
+      
+      if (userId) {
+        plansQuery = plansQuery.where('gp.user_id', userId);
+      }
+    }
+    
+    // Получаем общее количество планов для пагинации (только если не запрошены все планы)
+    let total = 0;
+    if (!allPlans) {
+      const countQuery = plansQuery.clone().clearSelect().clearOrder().count('* as count').first();
+      const totalCount = await countQuery;
+      total = Number(totalCount?.count || 0);
+    }
+    
+    // Применяем пагинацию и сортировку
+    const plans = await plansQuery
+      .orderBy('gp.created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+    
+    // Если запрошены все планы, устанавливаем total равным количеству планов
+    if (allPlans) {
+      total = plans.length;
+    }
     
     // Получаем курсы для каждого плана и пересчитываем дату завершения
     for (const plan of plans) {
@@ -504,7 +562,21 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
       }
     }
     
-    return res.json(plans);
+    // Если запрошены все планы (для матрицы компетенций), возвращаем массив
+    if (allPlans) {
+      return res.json(plans);
+    }
+    
+    // Иначе возвращаем объект с пагинацией
+    return res.json({
+      plans,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching growth plans:', error);
     return res.status(500).json({ error: 'Internal server error' });

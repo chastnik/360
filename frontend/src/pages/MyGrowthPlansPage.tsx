@@ -70,7 +70,13 @@ const MyGrowthPlansPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get('/learning/growth-plans');
-      const plansData = Array.isArray(response.data) ? response.data : [];
+      // Обрабатываем ответ API - может быть массив или объект с пагинацией
+      let plansData: GrowthPlan[] = [];
+      if (Array.isArray(response.data)) {
+        plansData = response.data;
+      } else if (response.data.plans) {
+        plansData = response.data.plans;
+      }
       
       // Фильтруем только ПИРы текущего пользователя
       // Это важно, так как админы и HR могут видеть все ПИРы через API

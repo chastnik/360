@@ -79,30 +79,13 @@ export async function calculateEndDate(
       }
     }
     
-    // Рассчитываем среднее количество рабочих часов в неделю
-    let totalWeeklyWorkHours = 0;
-    for (let i = 1; i <= 7; i++) {
-      const schedule = scheduleMap.get(i);
-      if (schedule?.is_workday) {
-        totalWeeklyWorkHours += schedule.work_hours || 8;
-      }
-    }
-    
-    // Рассчитываем среднее количество рабочих часов в день с учетом нагрузки
-    const averageWorkDaysPerWeek = Array.from(scheduleMap.values()).filter(s => s.is_workday).length;
-    const averageWorkHoursPerDay = averageWorkDaysPerWeek > 0 ? totalWeeklyWorkHours / averageWorkDaysPerWeek : 8;
-    const workHoursPerDay = (studyLoadPercent / 100) * averageWorkHoursPerDay;
-    
-    // Рассчитываем общее количество рабочих дней, необходимых для прохождения курсов
-    const totalWorkDaysNeeded = Math.ceil(totalCourseHours / workHoursPerDay);
-    
-    // Идем по дням от даты старта, считая только рабочие дни
+    // Идем по дням от даты старта, считая часы с учетом нагрузки и календаря
     let currentDate = new Date(startDate);
-    let workDaysCounted = 0;
+    let hoursAccumulated = 0; // Накопленные часы обучения
     const maxDays = 365 * 2; // Максимальный срок - 2 года
     let daysChecked = 0;
     
-    while (workDaysCounted < totalWorkDaysNeeded && daysChecked < maxDays) {
+    while (hoursAccumulated < totalCourseHours && daysChecked < maxDays) {
       const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay(); // Преобразуем 0=вс в 7
       const dateStr = currentDate.toISOString().split('T')[0];
       
@@ -111,7 +94,12 @@ export async function calculateEndDate(
       const isWorkday = schedule?.is_workday && !holidayDates.has(dateStr) && !userVacationDates.has(dateStr);
       
       if (isWorkday) {
-        workDaysCounted++;
+        // Получаем количество рабочих часов в этот день
+        const workHoursInDay = schedule?.work_hours || 8;
+        // Рассчитываем часы обучения в этот день с учетом нагрузки
+        const studyHoursInDay = (studyLoadPercent / 100) * workHoursInDay;
+        // Добавляем часы к накопленным
+        hoursAccumulated += studyHoursInDay;
       }
       
       // Переходим к следующему дню

@@ -31,11 +31,17 @@ const LearningPage: React.FC = () => {
       const [coursesResponse, plansResponse, competenceResponse] = await Promise.all([
         api.get('/learning/courses').catch(() => ({ data: [] })),
         api.get('/learning/growth-plans').catch(() => ({ data: [] })),
-        api.get('/learning/competence-matrix').catch(() => ({ data: [] })) // Может быть недоступно для некоторых пользователей
+        api.get('/learning/competence-matrix/all').catch(() => ({ data: [] })) // Получаем все компетенции всех пользователей для статистики
       ]);
 
       const courses = Array.isArray(coursesResponse.data) ? coursesResponse.data : [];
-      const plans = Array.isArray(plansResponse.data) ? plansResponse.data : [];
+      // Обрабатываем ответ API - может быть массив или объект с пагинацией
+      let plans: any[] = [];
+      if (Array.isArray(plansResponse.data)) {
+        plans = plansResponse.data;
+      } else if (plansResponse.data?.plans) {
+        plans = plansResponse.data.plans;
+      }
       const competenceMatrix = Array.isArray(competenceResponse.data) ? competenceResponse.data : [];
 
       // Подсчитываем пройденные тесты из всех планов
