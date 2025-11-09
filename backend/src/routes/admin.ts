@@ -104,6 +104,64 @@ router.get('/recent-activity', authenticateToken, requireAdmin, async (_req: any
   }
 });
 
+// Получить логи системы
+router.get('/logs', authenticateToken, requirePermission('ui:view:admin.logs'), async (req: any, res: any): Promise<void> => {
+  try {
+    const { level, search, limit = 100 } = req.query;
+    
+    // В реальной системе логи обычно хранятся в файлах или специальной таблице
+    // Для примера создадим простую реализацию, которая читает логи из файла или возвращает моковые данные
+    // В production нужно использовать winston, pino или другую библиотеку для логирования
+    
+    // Здесь можно добавить чтение из файла логов или из таблицы БД
+    // Для демонстрации вернем моковые данные
+    const mockLogs = [
+      {
+        id: '1',
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: 'Система запущена',
+        context: 'server',
+        userId: null,
+        userEmail: null
+      },
+      {
+        id: '2',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        level: 'warn',
+        message: 'Предупреждение: высокая нагрузка на сервер',
+        context: 'performance',
+        userId: null,
+        userEmail: null
+      }
+    ];
+    
+    // Фильтрация по уровню
+    let filteredLogs = mockLogs;
+    if (level && level !== 'all') {
+      filteredLogs = filteredLogs.filter(log => log.level === level);
+    }
+    
+    // Поиск
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredLogs = filteredLogs.filter(log => 
+        log.message.toLowerCase().includes(searchLower) ||
+        log.context?.toLowerCase().includes(searchLower) ||
+        log.userEmail?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Лимит
+    const limitedLogs = filteredLogs.slice(0, parseInt(limit as string) || 100);
+    
+    res.json({ success: true, data: limitedLogs });
+  } catch (error) {
+    console.error('Ошибка получения логов:', error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 export default router;
 
 

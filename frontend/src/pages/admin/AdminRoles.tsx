@@ -27,6 +27,7 @@ const ALL_PERMISSIONS = [
   'ui:view:admin.mattermost',
   'ui:view:admin.settings',
   'ui:view:admin.roles',
+  'ui:view:admin.logs',
   // Действия
   'action:reports:generate_ai',
   'action:users:create',
@@ -53,6 +54,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'ui:view:admin.mattermost': 'Настройки Mattermost',
   'ui:view:admin.settings': 'Настройки системы',
   'ui:view:admin.roles': 'Управление ролями',
+  'ui:view:admin.logs': 'Просмотр логов системы',
   // Действия
   'action:reports:generate_ai': 'Генерация отчётов с помощью ИИ',
   'action:users:create': 'Создание пользователей',

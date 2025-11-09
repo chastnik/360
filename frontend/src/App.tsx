@@ -46,6 +46,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminRoles from './pages/admin/AdminRoles';
 import AdminCompetencies from './pages/admin/AdminCompetencies';
 import AdminCalendar from './pages/admin/AdminCalendar';
+import AdminLogs from './pages/admin/AdminLogs';
 
 function App() {
   return (
@@ -339,6 +340,16 @@ function App() {
                   <Layout>
                     <AdminLayout>
                       <AdminCalendar />
+                    </AdminLayout>
+                  </Layout>
+                </PrivateRoute>
+              } />
+
+              <Route path="/admin/logs" element={
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.logs">
+                  <Layout>
+                    <AdminLayout>
+                      <AdminLogs />
                     </AdminLayout>
                   </Layout>
                 </PrivateRoute>

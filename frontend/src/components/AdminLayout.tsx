@@ -68,6 +68,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       path: '/admin/calendar',
       icon: '📅',
       perm: undefined
+    },
+    {
+      name: 'Логи',
+      path: '/admin/logs',
+      icon: '📋',
+      perm: 'ui:view:admin.logs'
     }
   ];
 

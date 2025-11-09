@@ -148,14 +148,6 @@ const AdminDashboard: React.FC = () => {
             Обзор системы 360° оценки персонала
           </p>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          <Link
-            to="/admin/cycles"
-            className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            Создать цикл оценки
-          </Link>
-        </div>
       </div>
 
       {/* Основная статистика */}
@@ -269,6 +261,67 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Быстрые действия */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+            Быстрые действия
+          </h3>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              to="/admin/users"
+              className="relative rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <div className="flex-shrink-0">
+                <span className="text-xl">👥</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Добавить пользователя
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Зарегистрировать нового сотрудника
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/cycles"
+              className="relative rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <div className="flex-shrink-0">
+                <span className="text-xl">🔄</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Создать цикл оценки
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Запустить новый цикл 360° оценки
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/questions"
+              className="relative rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <div className="flex-shrink-0">
+                <span className="text-xl">❓</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Управление вопросами
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Добавить или изменить вопросы
+                </p>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Статус системы */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
@@ -359,67 +412,6 @@ const AdminDashboard: React.FC = () => {
                 Нет недавней активности
               </p>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Быстрые действия */}
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-            Быстрые действия
-          </h3>
-          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Link
-              to="/admin/users"
-              className="relative rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <div className="flex-shrink-0">
-                <span className="text-xl">👥</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Добавить пользователя
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Зарегистрировать нового сотрудника
-                </p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/cycles"
-              className="relative rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <div className="flex-shrink-0">
-                <span className="text-xl">🔄</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Создать цикл оценки
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Запустить новый цикл 360° оценки
-                </p>
-              </div>
-            </Link>
-
-            <Link
-              to="/admin/questions"
-              className="relative rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-            >
-              <div className="flex-shrink-0">
-                <span className="text-xl">❓</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Управление вопросами
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Добавить или изменить вопросы
-                </p>
-              </div>
-            </Link>
           </div>
         </div>
       </div>
