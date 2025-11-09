@@ -906,11 +906,23 @@ GRANT ALL PRIVILEGES ON DATABASE assessment360 TO assessment_user;
 ```
 
 2. Запустите миграции:
+
+**Автоматическое развертывание (рекомендуется):**
+
+```bash
+cd backend
+./scripts/deploy-migrations.sh --with-seeds
+```
+
+**Или вручную:**
+
 ```bash
 cd backend
 npm run migrate
 npm run seed
 ```
+
+Подробная документация по миграциям: [backend/MIGRATIONS.md](backend/MIGRATIONS.md)
 
 ## 🔧 Разработка
 

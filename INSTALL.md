@@ -120,6 +120,10 @@ REACT_APP_API_URL=http://localhost:5000/api
 
 ```bash
 # Из корневой папки проекта
+# Автоматическое развертывание (рекомендуется)
+cd backend && ./scripts/deploy-migrations.sh --with-seeds
+
+# Или вручную
 npm run db:migrate   # Применить миграции
 npm run db:seed     # Заполнить базу тестовыми данными
 ```
