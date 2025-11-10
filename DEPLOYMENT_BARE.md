@@ -54,16 +54,25 @@ npm install
 ### 5) Сборка и запуск
 ```bash
 # Сборка
-(cd backend && npm run build)
-(cd frontend && npm run build)
+cd backend && npm run build
+cd ../frontend && npm run build
 
 # Запуск backend
-(cd backend && npm start) &
+cd ../backend && npm start &
 
 # Отдача фронтенда
 # Вариант А: разверните содержимое frontend/build в ваш Nginx/статический хостинг
 # Вариант Б: временно через любой static-server, например:
-# npx serve -s frontend/build -l 3000
+cd ../frontend && npx serve -s build -l 3000
+```
+
+**Или используйте скрипты:**
+```bash
+# Режим разработки
+./dev.sh
+
+# Продакшн режим
+./start.sh --production
 ```
 
 ### 6) Reverse proxy (рекомендуется)

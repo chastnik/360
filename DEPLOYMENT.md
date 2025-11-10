@@ -77,12 +77,29 @@ nano .env
 ```
 
 ### 3. Выберите вариант развертывания
-- Для Docker: следуйте «DEPLOYMENT_DOCKER.md»
-- Для без-Docker: следуйте «DEPLOYMENT_BARE.md»
+
+**Для Docker (рекомендуется):**
+```bash
+# Автоматическая установка
+./docker-setup.sh
+
+# Или вручную
+docker compose up -d --build
+./docker-setup.sh migrate
+./docker-setup.sh seed
+```
+Подробнее см. [DEPLOYMENT_DOCKER.md](DEPLOYMENT_DOCKER.md)
+
+**Для без-Docker:**
+Следуйте инструкциям в [DEPLOYMENT_BARE.md](DEPLOYMENT_BARE.md)
 
 ### 4. Быстрый старт (альтернатива)
 При наличии Docker можно запустить всё разом:
 ```bash
+# Автоматическая установка (рекомендуется)
+./docker-setup.sh
+
+# Или вручную
 docker compose up -d --build
 ```
 

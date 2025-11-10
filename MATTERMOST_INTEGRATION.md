@@ -29,13 +29,27 @@
 ## 🔧 Настройка
 
 ### Переменные окружения (.env):
+
+**Для Docker установки:**
+Настройте в корневом `.env` файле:
 ```bash
 # Mattermost Integration
 MATTERMOST_URL=https://your-mattermost.com
 MATTERMOST_TOKEN=your-bot-token
 MATTERMOST_TEAM_ID=your-team-id
 MATTERMOST_BOT_USERNAME=360-assessment-bot
-FRONTEND_URL=https://your-frontend.com
+FRONTEND_URL=http://localhost
+```
+
+**Для установки без Docker:**
+Настройте в `backend/.env` файле:
+```bash
+# Mattermost Integration
+MATTERMOST_URL=https://your-mattermost.com
+MATTERMOST_TOKEN=your-bot-token
+MATTERMOST_TEAM_ID=your-team-id
+MATTERMOST_BOT_USERNAME=360-assessment-bot
+FRONTEND_URL=http://localhost:3000
 ```
 
 ### Права бота в Mattermost:

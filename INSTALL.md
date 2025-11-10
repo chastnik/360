@@ -3,6 +3,13 @@
 
 ## Требования к системе
 
+### Для установки с Docker (рекомендуется)
+
+- **Docker** 20.10+ и **Docker Compose** v2
+- Порты: 80 (frontend), 5000 (backend), 5432 (PostgreSQL), 6379 (Redis)
+
+### Для установки без Docker
+
 - **Node.js** v16.0.0 или выше
 - **PostgreSQL** v12.0 или выше
 - **npm** v7.0.0 или выше
@@ -10,14 +17,99 @@
 
 ## Пошаговая установка
 
-### 1. Клонирование репозитория
+### Вариант 1: Установка с Docker (рекомендуется)
+
+#### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/your-org/360-assessment-system.git
-cd 360-assessment-system
+git clone https://github.com/chastnik/360.git
+cd 360
 ```
 
-### 2. Установка зависимостей
+#### 2. Настройка переменных окружения
+
+```bash
+# Создание .env файла из примера
+cp env.example .env
+
+# Редактирование .env файла
+nano .env  # или используйте любой редактор
+```
+
+**Обязательно измените следующие переменные:**
+- `DB_PASSWORD` - пароль для базы данных
+- `JWT_SECRET` - секретный ключ для JWT (минимум 32 символа)
+- `REDIS_PASSWORD` - пароль для Redis
+- `MATTERMOST_TOKEN` - токен бота Mattermost (если используется)
+
+#### 3. Автоматическая установка
+
+```bash
+# Запуск скрипта автоматической установки
+./docker-setup.sh
+
+# Скрипт выполнит:
+# - Проверку зависимостей
+# - Сборку Docker образов
+# - Запуск всех сервисов
+# - Выполнение миграций базы данных
+# - Заполнение начальными данными (опционально)
+```
+
+#### 4. Проверка установки
+
+```bash
+# Проверка статуса
+./docker-setup.sh status
+
+# Просмотр логов
+docker compose logs -f
+```
+
+Система будет доступна по адресам:
+- **Frontend**: http://localhost
+- **Backend API**: http://localhost:5000/api
+
+**Учетные данные по умолчанию** (после выполнения seed):
+- Email: `admin@company.com` / Пароль: `admin123`
+- Email: `manager@company.com` / Пароль: `manager123`
+- Email: `user@company.com` / Пароль: `user123`
+
+#### 5. Управление системой
+
+```bash
+# Остановка
+./docker-setup.sh stop
+# или
+docker compose down
+
+# Запуск
+./docker-setup.sh start
+# или
+docker compose up -d
+
+# Перезапуск
+./docker-setup.sh restart
+
+# Выполнение миграций
+./docker-setup.sh migrate
+
+# Заполнение начальными данными
+./docker-setup.sh seed
+```
+
+Подробнее см. [DEPLOYMENT_DOCKER.md](DEPLOYMENT_DOCKER.md)
+
+### Вариант 2: Установка без Docker
+
+#### 1. Клонирование репозитория
+
+```bash
+git clone https://github.com/chastnik/360.git
+cd 360
+```
+
+#### 2. Установка зависимостей
 
 ```bash
 # Установка зависимостей для всех частей проекта
@@ -29,7 +121,19 @@ cd backend && npm install     # Backend зависимости
 cd ../frontend && npm install # Frontend зависимости
 ```
 
-### 3. Настройка базы данных PostgreSQL
+#### 3. Настройка переменных окружения
+
+```bash
+# Создание .env файлов
+cp env.example .env
+cp backend/env.example backend/.env
+
+# Редактирование файлов
+nano .env
+nano backend/.env
+```
+
+#### 4. Настройка базы данных PostgreSQL
 
 #### Создание базы данных
 
@@ -50,51 +154,7 @@ GRANT ALL PRIVILEGES ON DATABASE assessment_db TO assessment_user;
 \q
 ```
 
-### 4. Конфигурация переменных окружения
-
-#### Backend (.env)
-
-Создайте файл `.env` в папке `backend/`:
-
-```bash
-cd backend
-cp env.example .env
-```
-
-Отредактируйте файл `.env`:
-
-```env
-# База данных
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=assessment_db
-DB_USER=assessment_user
-DB_PASSWORD=your_password
-
-# JWT секрет (сгенерируйте надежный ключ)
-JWT_SECRET=your-super-secret-jwt-key-here
-
-# Сервер
-PORT=5000
-NODE_ENV=development
-
-# Frontend URL
-FRONTEND_URL=http://localhost:3000
-
-# Mattermost настройки
-MATTERMOST_URL=https://your-mattermost-instance.com
-MATTERMOST_TOKEN=your-bot-token-here
-```
-
-#### Frontend (.env)
-
-Создайте файл `.env` в папке `frontend/`:
-
-```env
-REACT_APP_API_URL=http://localhost:5000/api
-```
-
-### 5. Настройка интеграции с Mattermost
+#### 5. Настройка интеграции с Mattermost
 
 #### Создание бота в Mattermost
 
@@ -116,7 +176,7 @@ REACT_APP_API_URL=http://localhost:5000/api
    - Поиск пользователей по email
    - Создание постов в каналах
 
-### 6. Инициализация базы данных
+#### 6. Инициализация базы данных
 
 ```bash
 # Из корневой папки проекта
@@ -124,11 +184,12 @@ REACT_APP_API_URL=http://localhost:5000/api
 cd backend && ./scripts/deploy-migrations.sh --with-seeds
 
 # Или вручную
-npm run db:migrate   # Применить миграции
-npm run db:seed     # Заполнить базу тестовыми данными
+cd backend
+npm run migrate   # Применить миграции
+npm run seed      # Заполнить базу тестовыми данными
 ```
 
-### 7. Запуск приложения
+#### 7. Запуск приложения
 
 #### Режим разработки
 
@@ -153,10 +214,19 @@ npm start
 
 ## Проверка установки
 
+### Для Docker установки
+
+1. Откройте браузер и перейдите на `http://localhost`
+2. Вы должны увидеть страницу входа в систему
+3. Войдите с учетными данными по умолчанию (см. выше)
+4. Проверьте работу API: `http://localhost:5000/api`
+
+### Для установки без Docker
+
 1. Откройте браузер и перейдите на `http://localhost:3000`
 2. Вы должны увидеть страницу входа в систему
 3. Попробуйте зарегистрировать нового пользователя
-4. Проверьте, что пароль приходит в Mattermost
+4. Проверьте, что пароль приходит в Mattermost (если настроено)
 
 ## Пользователи по умолчанию
 
