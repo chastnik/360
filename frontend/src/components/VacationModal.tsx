@@ -102,7 +102,6 @@ const VacationModal: React.FC<VacationModalProps> = ({
     
     // Предотвращаем множественные отправки
     if (loading) {
-      console.log('⚠️ Сохранение уже выполняется, игнорируем повторную отправку');
       return;
     }
     

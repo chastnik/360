@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
 
 interface CompetenceMatrixEntry {
@@ -492,9 +493,12 @@ const CompetenceMatrixPage: React.FC = () => {
                   return (
                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white dark:bg-gray-800 z-10 border-r border-gray-200 dark:border-gray-700">
-                        <div className="font-medium text-gray-900 dark:text-white">
+                        <Link 
+                          to={`/profile/${user.id}`}
+                          className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                        >
                           {user.last_name} {user.first_name}
-                        </div>
+                        </Link>
                         {user.position && (
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             {user.position}

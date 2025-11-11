@@ -1,6 +1,7 @@
 
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import VacationModal from '../components/VacationModal';
@@ -585,15 +586,6 @@ const VacationsPage: React.FC = () => {
                 return true;
               }
               
-              console.log(`Проверяем пользователя ${user.first_name} ${user.last_name}:`, {
-                selectedManager,
-                userManagerId: user.manager_id,
-                selectedDepartment,
-                userDepartment: user.department,
-                selectedUser,
-                userId: user.id
-              });
-              
               // Если выбран конкретный пользователь
               if (selectedUser && user.id !== selectedUser) {
                 return false;
@@ -617,9 +609,12 @@ const VacationsPage: React.FC = () => {
                 <div key={user.id} className="flex border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 min-h-[60px]">
                   {/* Имя сотрудника */}
                   <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 dark:border-gray-700">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    <Link 
+                      to={`/profile/${user.id}`}
+                      className="text-sm font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
                       {user.last_name} {user.first_name}
-                    </div>
+                    </Link>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       {user.position || '—'}
                     </div>

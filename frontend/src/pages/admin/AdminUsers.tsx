@@ -977,7 +977,6 @@ const AdminUsers: React.FC = () => {
           }}
           onSave={async (vacationData) => {
             try {
-              console.log('💾 Сохранение отпуска (Admin):', vacationData, 'selectedUser:', selectedUser);
               // Убеждаемся, что user_id присутствует в данных (всегда используем selectedUser.id)
               const dataToSend = {
                 ...vacationData,

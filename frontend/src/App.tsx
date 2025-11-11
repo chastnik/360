@@ -120,6 +120,14 @@ function App() {
                 </PrivateRoute>
               } />
               
+              <Route path="/profile/:userId" element={
+                <PrivateRoute>
+                  <Layout>
+                    <ProfilePage />
+                  </Layout>
+                </PrivateRoute>
+              } />
+              
               <Route path="/cycles" element={
                 <PrivateRoute requiredPermission="ui:view:cycles">
                   <Layout>

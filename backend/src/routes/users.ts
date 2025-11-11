@@ -112,7 +112,7 @@ router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
 // Обновление профиля пользователя
 router.put('/profile', authenticateToken, async (req: any, res: any): Promise<void> => {
   try {
-    const { first_name, last_name, email, position, department, department_id, avatar_url } = req.body;
+    const { first_name, last_name, email, position, department, department_id, avatar_url, resume } = req.body;
     const userId = req.user.userId;
 
     // Проверяем, не занят ли email другим пользователем
@@ -128,23 +128,37 @@ router.put('/profile', authenticateToken, async (req: any, res: any): Promise<vo
       }
     }
 
+    // Проверяем наличие поля resume в таблице
+    const hasResumeColumn = await db.schema.hasColumn('users', 'resume');
+
+    // Подготавливаем данные для обновления
+    const updateData: any = {
+      first_name,
+      last_name,
+      email,
+      position,
+      old_department: department,
+      department_id: department_id && department_id.trim() !== '' ? department_id : null,
+      avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
+      updated_at: new Date()
+    };
+
+    // Добавляем resume только если оно передано и поле существует в таблице
+    if (hasResumeColumn && resume !== undefined) {
+      updateData.resume = resume && String(resume).trim() !== '' ? resume : null;
+    }
+
     // Обновляем данные пользователя
     await db('users')
       .where('id', userId)
-      .update({
-        first_name,
-        last_name,
-        email,
-        position,
-        old_department: department,
-        department_id: department_id && department_id.trim() !== '' ? department_id : null,
-        avatar_url: avatar_url && String(avatar_url).trim() !== '' ? avatar_url : null,
-        updated_at: new Date()
-      });
+      .update(updateData);
 
     // Получаем обновленные данные пользователя
+    const baseFields = ['id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at', 'avatar_url'];
+    const selectFields = hasResumeColumn ? [...baseFields, 'resume'] : baseFields;
+    
     const updatedUser = await db('users')
-      .select('id', 'email', 'first_name', 'last_name', 'middle_name', 'role', 'position', 'old_department as department', 'department_id', 'manager_id', 'mattermost_username', 'is_manager', 'is_active', 'created_at', 'updated_at', 'avatar_url')
+      .select(...selectFields)
       .where('id', userId)
       .first();
 

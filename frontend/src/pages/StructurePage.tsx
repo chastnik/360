@@ -1,6 +1,7 @@
 
 // Автор: Стас Чашин @chastnik
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api, { getPublicConfig } from '../services/api';
 import Avatar from '../components/Avatar';
 
@@ -175,9 +176,12 @@ const StructurePage: React.FC = () => {
             <div className="flex items-center gap-3 mb-2">
               <Avatar userId={node.id} size={40} version={node.avatar_updated_at || ''} />
               <div>
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                <Link 
+                  to={`/profile/${node.id}`}
+                  className="text-sm font-semibold text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
                   {node.last_name} {node.first_name}{node.middle_name ? ` ${node.middle_name}` : ''}
-                </div>
+                </Link>
                 <div className="text-xs text-gray-500 dark:text-gray-400">{node.position || '—'}</div>
               </div>
             </div>
@@ -253,7 +257,12 @@ const StructurePage: React.FC = () => {
                 onClick={() => expandPathTo(String(u.id))}
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
-                <div className="text-sm text-gray-900 dark:text-white font-medium">{u.last_name} {u.first_name}{u.middle_name ? ` ${u.middle_name}` : ''}</div>
+                <Link 
+                  to={`/profile/${u.id}`}
+                  className="text-sm text-gray-900 dark:text-white font-medium hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  {u.last_name} {u.first_name}{u.middle_name ? ` ${u.middle_name}` : ''}
+                </Link>
                 <div className="text-xs text-gray-500 dark:text-gray-400">{u.email}{u.position ? ` • ${u.position}` : ''}{u.mattermost_username ? ` • @${u.mattermost_username}` : ''}</div>
               </button>
             ))}
