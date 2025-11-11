@@ -50,10 +50,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting (увеличен лимит для разработки)
+// trustProxy: false - игнорируем trust proxy для безопасности rate limiting
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 минута
   max: 1000, // максимум 1000 запросов на IP
-  message: 'Слишком много запросов с этого IP, попробуйте позже.'
+  message: 'Слишком много запросов с этого IP, попробуйте позже.',
+  trustProxy: false // Отключаем trust proxy для rate limiting в целях безопасности
 });
 app.use('/api/', limiter);
 
