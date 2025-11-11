@@ -42,6 +42,7 @@ import AdminDepartments from './pages/admin/AdminDepartments';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminQuestions from './pages/admin/AdminQuestions';
 import AdminMattermost from './pages/admin/AdminMattermost';
+import { AdminJira } from './pages/admin/AdminJira';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminRoles from './pages/admin/AdminRoles';
 import AdminCompetencies from './pages/admin/AdminCompetencies';
@@ -303,11 +304,21 @@ function App() {
                 </PrivateRoute>
               } />
               
-              <Route path="/admin/mattermost" element={
+              <Route path="/admin/integrations/mattermost" element={
                 <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.mattermost">
                   <Layout>
                     <AdminLayout>
                       <AdminMattermost />
+                    </AdminLayout>
+                  </Layout>
+                </PrivateRoute>
+              } />
+              
+              <Route path="/admin/integrations/jira" element={
+                <PrivateRoute requiredRole="admin" requiredPermission="ui:view:admin.jira">
+                  <Layout>
+                    <AdminLayout>
+                      <AdminJira />
                     </AdminLayout>
                   </Layout>
                 </PrivateRoute>

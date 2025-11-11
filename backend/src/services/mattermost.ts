@@ -357,15 +357,22 @@ class MattermostService {
     respondentUsername: string, 
     participantName: string, 
     cycleTitle: string, 
-    respondentId: string
+    respondentId: string,
+    jiraTaskUrl?: string
   ): Promise<boolean> {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const actionUrl = `${frontendUrl}/survey/${respondentId}`;
     
+    let message = `Вас попросили оценить ${participantName} в рамках цикла "${cycleTitle}". Пожалуйста, пройдите опрос.`;
+    
+    if (jiraTaskUrl) {
+      message += `\n\n🎯 Для списания трудозатрат создана задача в Jira: ${jiraTaskUrl}`;
+    }
+    
     return this.sendNotification({
       recipientUsername: respondentUsername,
       title: '📝 Требуется ваша оценка',
-      message: `Вас попросили оценить ${participantName} в рамках цикла "${cycleTitle}". Пожалуйста, пройдите опрос.`,
+      message: message,
       actionUrl: actionUrl,
       actionText: 'Пройти опрос'
     });

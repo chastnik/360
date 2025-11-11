@@ -1,6 +1,6 @@
 
 // Автор: Стас Чашин @chastnik
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,8 +12,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user, permissions } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
   const can = (perm?: string) => !perm || permissions.includes(perm);
+  
+  // Проверяем, открыт ли раздел интеграций по умолчанию
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin/integrations')) {
+      setIntegrationsOpen(true);
+    }
+  }, [location.pathname]);
+
   const adminNavigation = [
     {
       name: 'Пользователи',
@@ -38,12 +47,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       path: '/admin/questions',
       icon: '❓',
       perm: 'ui:view:admin.questions'
-    },
-    {
-      name: 'Mattermost',
-      path: '/admin/mattermost',
-      icon: '💬',
-      perm: 'ui:view:admin.mattermost'
     },
     {
       name: 'Настройки',
@@ -74,6 +77,21 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       path: '/admin/logs',
       icon: '📋',
       perm: 'ui:view:admin.logs'
+    }
+  ];
+
+  const integrationsMenu = [
+    {
+      name: 'Mattermost',
+      path: '/admin/integrations/mattermost',
+      icon: '💬',
+      perm: 'ui:view:admin.mattermost'
+    },
+    {
+      name: 'Jira',
+      path: '/admin/integrations/jira',
+      icon: '🎯',
+      perm: 'ui:view:admin.jira'
     }
   ];
 
@@ -162,6 +180,50 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     {item.name}
                   </Link>
                 ))}
+                
+                {/* Раздел Интеграции */}
+                <div className="mt-2">
+                  <button
+                    onClick={() => setIntegrationsOpen(!integrationsOpen)}
+                    className={`${
+                      location.pathname.startsWith('/admin/integrations')
+                        ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
+                        : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                    } group flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors`}
+                  >
+                    <div className="flex items-center">
+                      <span className="mr-3 text-lg">🔌</span>
+                      <span>Интеграции</span>
+                    </div>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${integrationsOpen ? 'rotate-90' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  {integrationsOpen && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {integrationsMenu.filter(i => can(i.perm)).map((item) => (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`${
+                            isActive(item.path)
+                              ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
+                              : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                          } group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors`}
+                        >
+                          <span className="mr-3 text-lg">{item.icon}</span>
+                          {item.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </nav>
             </div>
           </div>
@@ -203,6 +265,49 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       {item.name}
                     </Link>
                   ))}
+                  
+                  {/* Раздел Интеграции */}
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setIntegrationsOpen(!integrationsOpen)}
+                      className={`${
+                        location.pathname.startsWith('/admin/integrations')
+                          ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
+                          : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                      } group flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md transition-colors`}
+                    >
+                      <div className="flex items-center">
+                        <span className="mr-3 text-lg">🔌</span>
+                        <span>Интеграции</span>
+                      </div>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${integrationsOpen ? 'rotate-90' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    {integrationsOpen && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {integrationsMenu.filter(i => can(i.perm)).map((item) => (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`${
+                              isActive(item.path)
+                                ? 'bg-primary-100 text-primary-900 dark:bg-primary-900 dark:text-primary-100'
+                                : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+                            } group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors`}
+                          >
+                            <span className="mr-3 text-lg">{item.icon}</span>
+                            {item.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </nav>
               </div>
             </div>

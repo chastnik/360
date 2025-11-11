@@ -7,6 +7,7 @@ import { Router, Response } from 'express';
 import db from '../database/connection';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import mattermostService from '../services/mattermost';
+import jiraService from '../services/jira';
 
 const router = Router();
 
@@ -547,27 +548,54 @@ router.post('/:id/participants/:participantId/respondents', authenticateToken, a
       .where('assessment_respondents.participant_id', participantId)
       .whereIn('assessment_respondents.respondent_user_id', allRespondentIds)
       .where('assessment_respondents.status', 'invited')
-      .whereNotNull('respondent_users.mattermost_username')
       .select(
         'assessment_respondents.id as respondent_id',
         'respondent_users.mattermost_username as respondent_username',
+        'respondent_users.email as respondent_email',
         'respondent_users.first_name as respondent_first_name',
         'respondent_users.last_name as respondent_last_name',
         'participant_users.first_name as participant_first_name',
         'participant_users.last_name as participant_last_name'
       );
 
-    // Отправить уведомления респондентам
+    const participantName = `${newlyAddedRespondents[0]?.participant_first_name || ''} ${newlyAddedRespondents[0]?.participant_last_name || ''}`.trim();
+
+    // Отправить уведомления респондентам через Mattermost
+    // Сначала создаем задачи в Jira, затем отправляем уведомления со ссылками
     for (const respondent of newlyAddedRespondents) {
-      const participantName = `${respondent.participant_first_name} ${respondent.participant_last_name}`;
-      mattermostService.notifyRespondentAssessment(
-        respondent.respondent_username,
-        participantName,
-        cycle.name,
-        respondent.respondent_id.toString()
-      ).catch(error => {
-        console.error(`Ошибка отправки уведомления респонденту ${respondent.respondent_username}:`, error);
-      });
+      let jiraTaskUrl: string | undefined;
+
+      // Создать задачу в Jira для респондента (если есть email)
+      if (respondent.respondent_email) {
+        try {
+          const jiraResult = await jiraService.createTaskForRespondent(
+            participantName,
+            respondent.respondent_email
+          );
+          
+          if (jiraResult.success && jiraResult.taskUrl) {
+            jiraTaskUrl = jiraResult.taskUrl;
+            console.log(`Задача Jira создана для респондента ${respondent.respondent_email}: ${jiraResult.taskKey} (${jiraTaskUrl})`);
+          } else {
+            console.error(`Ошибка создания задачи Jira для респондента ${respondent.respondent_email}: ${jiraResult.error}`);
+          }
+        } catch (error) {
+          console.error(`Ошибка создания задачи Jira для респондента ${respondent.respondent_email}:`, error);
+        }
+      }
+
+      // Отправить уведомление в Mattermost со ссылкой на задачу Jira
+      if (respondent.respondent_username) {
+        mattermostService.notifyRespondentAssessment(
+          respondent.respondent_username,
+          participantName,
+          cycle.name,
+          respondent.respondent_id.toString(),
+          jiraTaskUrl
+        ).catch(error => {
+          console.error(`Ошибка отправки уведомления респонденту ${respondent.respondent_username}:`, error);
+        });
+      }
     }
 
     // Формируем сообщение с информацией о добавленных респондентах

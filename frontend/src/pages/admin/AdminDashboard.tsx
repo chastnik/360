@@ -253,7 +253,7 @@ const AdminDashboard: React.FC = () => {
           </div>
           <div className="bg-gray-50 dark:bg-gray-700 px-5 py-3">
             <div className="text-sm">
-              <Link to="/admin/mattermost" className="font-medium text-primary-600 hover:text-primary-500">
+              <Link to="/admin/integrations/mattermost" className="font-medium text-primary-600 hover:text-primary-500">
                 Настройка интеграции
               </Link>
             </div>
