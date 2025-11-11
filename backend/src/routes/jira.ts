@@ -245,26 +245,84 @@ router.post('/test-connection', authenticateToken, async (req: AuthRequest, res)
     }
 
     // Тестируем подключение к Jira
+    // Пробуем разные эндпоинты для совместимости с разными версиями Jira
     try {
       const jiraUrl = settingsMap.url.replace(/\/$/, ''); // Убираем завершающий слеш
       const auth = Buffer.from(`${settingsMap.username}:${settingsMap.password}`).toString('base64');
+      const headers = {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      };
       
-      const response = await axios.get(`${jiraUrl}/rest/api/3/myself`, {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 секунд таймаут
-      });
-
-      if (response.status === 200 && response.data) {
-        const userData = response.data;
+      // Сначала пробуем получить информацию о сервере (более универсальный эндпоинт)
+      let response;
+      let userData: any = null;
+      
+      try {
+        // Пробуем API v3 serverInfo
+        response = await axios.get(`${jiraUrl}/rest/api/3/serverInfo`, {
+          headers,
+          timeout: 10000
+        });
+      } catch (error: any) {
+        // Если API v3 не работает, пробуем API v2
+        if (error.response?.status === 404) {
+          try {
+            response = await axios.get(`${jiraUrl}/rest/api/2/serverInfo`, {
+              headers,
+              timeout: 10000
+            });
+          } catch (error2: any) {
+            // Если и v2 не работает, пробуем latest
+            response = await axios.get(`${jiraUrl}/rest/api/latest/serverInfo`, {
+              headers,
+              timeout: 10000
+            });
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // Если serverInfo успешно, пробуем получить информацию о пользователе
+      if (response.status === 200) {
+        try {
+          // Пробуем разные эндпоинты для получения информации о пользователе
+          const myselfEndpoints = [
+            '/rest/api/3/myself',
+            '/rest/api/2/myself',
+            '/rest/api/latest/myself'
+          ];
+          
+          for (const endpoint of myselfEndpoints) {
+            try {
+              const myselfResponse = await axios.get(`${jiraUrl}${endpoint}`, {
+                headers,
+                timeout: 10000
+              });
+              if (myselfResponse.status === 200 && myselfResponse.data) {
+                userData = myselfResponse.data;
+                break;
+              }
+            } catch (e) {
+              // Продолжаем пробовать следующий эндпоинт
+              continue;
+            }
+          }
+        } catch (e) {
+          // Игнорируем ошибку получения информации о пользователе
+        }
+        
+        const serverInfo = response.data;
+        const userName = userData?.displayName || userData?.name || settingsMap.username;
+        const serverVersion = serverInfo?.version || serverInfo?.versionNumbers?.join('.') || 'неизвестна';
+        
         res.json({
           success: true,
           data: {
             connected: true,
-            message: `Подключение успешно. Пользователь: ${userData.displayName || userData.name || settingsMap.username}`
+            message: `Подключение успешно. Пользователь: ${userName}. Версия Jira: ${serverVersion}`
           }
         });
       } else {
@@ -354,14 +412,39 @@ router.get('/projects', authenticateToken, async (req: AuthRequest, res): Promis
     try {
       const jiraUrl = settingsMap.url.replace(/\/$/, '');
       const auth = Buffer.from(`${settingsMap.username}:${settingsMap.password}`).toString('base64');
+      const headers = {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json'
+      };
       
-      const response = await axios.get(`${jiraUrl}/rest/api/3/project`, {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json'
-        },
-        timeout: 10000
-      });
+      // Пробуем разные версии API для совместимости
+      let response;
+      const projectEndpoints = [
+        '/rest/api/3/project',
+        '/rest/api/2/project',
+        '/rest/api/latest/project'
+      ];
+      
+      let lastError: any = null;
+      for (const endpoint of projectEndpoints) {
+        try {
+          response = await axios.get(`${jiraUrl}${endpoint}`, {
+            headers,
+            timeout: 10000
+          });
+          if (response.status === 200) {
+            break;
+          }
+        } catch (error: any) {
+          lastError = error;
+          // Продолжаем пробовать следующий эндпоинт
+          continue;
+        }
+      }
+      
+      if (!response || response.status !== 200) {
+        throw lastError || new Error('Не удалось получить список проектов');
+      }
 
       const projects = Array.isArray(response.data) ? response.data.map((p: any) => ({
         key: p.key,
@@ -437,20 +520,46 @@ router.get('/projects/:projectKey/epics', authenticateToken, async (req: AuthReq
     try {
       const jiraUrl = settingsMap.url.replace(/\/$/, '');
       const auth = Buffer.from(`${settingsMap.username}:${settingsMap.password}`).toString('base64');
+      const headers = {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json'
+      };
       
       // Получаем эпики через JQL запрос
       const jql = `project = ${projectKey} AND issuetype = Epic ORDER BY summary ASC`;
-      const response = await axios.get(`${jiraUrl}/rest/api/3/search`, {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json'
-        },
-        params: {
-          jql: jql,
-          fields: 'key,summary,id'
-        },
-        timeout: 10000
-      });
+      
+      // Пробуем разные версии API для совместимости
+      let response;
+      const searchEndpoints = [
+        '/rest/api/3/search',
+        '/rest/api/2/search',
+        '/rest/api/latest/search'
+      ];
+      
+      let lastError: any = null;
+      for (const endpoint of searchEndpoints) {
+        try {
+          response = await axios.get(`${jiraUrl}${endpoint}`, {
+            headers,
+            params: {
+              jql: jql,
+              fields: 'key,summary,id'
+            },
+            timeout: 10000
+          });
+          if (response.status === 200) {
+            break;
+          }
+        } catch (error: any) {
+          lastError = error;
+          // Продолжаем пробовать следующий эндпоинт
+          continue;
+        }
+      }
+      
+      if (!response || response.status !== 200) {
+        throw lastError || new Error('Не удалось получить список эпиков');
+      }
 
       const epics = Array.isArray(response.data.issues) ? response.data.issues.map((issue: any) => ({
         key: issue.key,

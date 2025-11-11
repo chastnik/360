@@ -89,20 +89,44 @@ class JiraService {
     try {
       const jiraUrl = settings.url.replace(/\/$/, '');
       const auth = Buffer.from(`${settings.username}:${settings.password}`).toString('base64');
+      const headers = {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json'
+      };
 
-      const response = await axios.get(`${jiraUrl}/rest/api/3/user/search`, {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json'
-        },
-        params: {
-          query: email
-        },
-        timeout: 10000
-      });
+      // Пробуем разные версии API для совместимости
+      const userSearchEndpoints = [
+        '/rest/api/3/user/search',
+        '/rest/api/2/user/search',
+        '/rest/api/latest/user/search'
+      ];
+      
+      let response;
+      for (const endpoint of userSearchEndpoints) {
+        try {
+          response = await axios.get(`${jiraUrl}${endpoint}`, {
+            headers,
+            params: {
+              query: email
+            },
+            timeout: 10000
+          });
+          if (response.status === 200) {
+            break;
+          }
+        } catch (error: any) {
+          // Продолжаем пробовать следующий эндпоинт
+          continue;
+        }
+      }
+
+      if (!response || response.status !== 200) {
+        return null;
+      }
 
       if (Array.isArray(response.data) && response.data.length > 0) {
-        return response.data[0].accountId;
+        // В API v3 используется accountId, в v2 может быть key или name
+        return response.data[0].accountId || response.data[0].key || response.data[0].name || null;
       }
 
       return null;
@@ -176,14 +200,38 @@ class JiraService {
       // Если поле не существует, Jira вернет ошибку, которую мы обработаем
       taskData.fields['customfield_10011'] = settings.epicKey; // Epic Link (ключ эпика)
 
-      const response = await axios.post(`${jiraUrl}/rest/api/3/issue`, taskData, {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      });
+      // Пробуем разные версии API для совместимости
+      const issueEndpoints = [
+        '/rest/api/3/issue',
+        '/rest/api/2/issue',
+        '/rest/api/latest/issue'
+      ];
+      
+      let response;
+      let lastError: any = null;
+      for (const endpoint of issueEndpoints) {
+        try {
+          response = await axios.post(`${jiraUrl}${endpoint}`, taskData, {
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          });
+          if (response.status === 200 || response.status === 201) {
+            break;
+          }
+        } catch (error: any) {
+          lastError = error;
+          // Продолжаем пробовать следующий эндпоинт
+          continue;
+        }
+      }
+      
+      if (!response || (response.status !== 200 && response.status !== 201)) {
+        throw lastError || new Error('Не удалось создать задачу');
+      }
 
       if (response.data && response.data.key) {
         const taskKey = response.data.key;

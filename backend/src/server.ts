@@ -36,8 +36,9 @@ config({ path: path.resolve(__dirname, '../../.env') });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust proxy - необходимо для корректной работы rate limiting за прокси/балансировщиком
-app.set('trust proxy', true);
+// Trust proxy - устанавливаем в 1 для доверия только первому прокси (более безопасно)
+// Это нужно для корректной работы за прокси/балансировщиком, но не позволяет обойти rate limiting
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
