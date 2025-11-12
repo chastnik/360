@@ -4,6 +4,7 @@
 /* eslint-disable no-console */
 import axios, { AxiosInstance } from 'axios';
 import dotenv from 'dotenv';
+import emailService from './email';
 
 dotenv.config();
 
@@ -243,6 +244,139 @@ class MattermostService {
   }
 
   /**
+   * Конвертировать markdown в простой HTML для email
+   */
+  private markdownToHtml(text: string): string {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+  }
+
+  /**
+   * Экранировать HTML символы
+   */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * Отправить email-уведомление (дублирование Mattermost уведомления)
+   */
+  private async sendEmailNotification(
+    userEmail: string,
+    notification: MattermostNotification
+  ): Promise<void> {
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      
+      // Очищаем title от markdown и экранируем
+      const cleanTitle = notification.title.replace(/\*\*/g, '').replace(/\*/g, '');
+      
+      // Формируем текст письма
+      let emailText = `${cleanTitle}\n\n${notification.message}`;
+      
+      // Формируем HTML письма
+      const messageHtml = this.markdownToHtml(notification.message);
+      const escapedActionUrl = notification.actionUrl ? this.escapeHtml(notification.actionUrl) : '';
+      const escapedActionText = notification.actionText ? this.escapeHtml(notification.actionText) : '';
+      const escapedFrontendUrl = this.escapeHtml(frontendUrl);
+      
+      let emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      background-color: #f9f9f9;
+      padding: 30px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    h2 {
+      color: #007bff;
+      margin-top: 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #007bff;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    .button:hover {
+      background-color: #0056b3;
+    }
+    .footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+      font-size: 12px;
+      color: #666;
+    }
+    .system-link {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e7f3ff;
+      border-left: 4px solid #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>${this.escapeHtml(cleanTitle)}</h2>
+    <p>${messageHtml}</p>`;
+
+      if (notification.actionUrl && notification.actionText) {
+        emailText += `\n\n${notification.actionText}: ${notification.actionUrl}`;
+        emailHtml += `
+    <p style="text-align: center;">
+      <a href="${escapedActionUrl}" class="button">${escapedActionText}</a>
+    </p>`;
+      }
+
+      emailHtml += `
+    <div class="system-link">
+      <p><strong>Ссылка на систему:</strong> <a href="${escapedFrontendUrl}">${escapedFrontendUrl}</a></p>
+    </div>
+    <div class="footer">
+      <p>С уважением,<br>Команда 360 Assessment</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      emailText += `\n\nСсылка на систему: ${frontendUrl}`;
+
+      await emailService.sendEmail({
+        to: userEmail,
+        subject: cleanTitle,
+        text: emailText,
+        html: emailHtml
+      });
+    } catch (error) {
+      console.error('Ошибка отправки email-уведомления:', error);
+      // Не прерываем выполнение, если email не отправился
+    }
+  }
+
+  /**
    * Отправить уведомление пользователю
    */
   async sendNotification(notification: MattermostNotification): Promise<boolean> {
@@ -265,8 +399,15 @@ class MattermostService {
         message += `\n\n[${notification.actionText}](${notification.actionUrl})`;
       }
 
-      const post = await this.sendMessage(channel.id, message);
-      return post !== null;
+      // Отправляем Mattermost и email уведомления параллельно
+      const [post] = await Promise.allSettled([
+        this.sendMessage(channel.id, message),
+        // Отправляем email параллельно, если у пользователя есть email
+        user.email ? this.sendEmailNotification(user.email, notification) : Promise.resolve()
+      ]);
+
+      const mattermostSuccess = post.status === 'fulfilled' && post.value !== null;
+      return mattermostSuccess;
     } catch (error) {
       console.error('Ошибка отправки уведомления:', error);
       return false;
