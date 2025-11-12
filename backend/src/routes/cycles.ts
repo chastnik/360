@@ -800,7 +800,7 @@ router.post('/:id/complete', authenticateToken, async (req: AuthRequest, res): P
         .whereNotNull('mattermost_username')
         .first();
 
-      if (adminUser) {
+      if (adminUser && id) {
         await mattermostService.notifyCycleComplete(
           adminUser.mattermost_username,
           cycle.name,

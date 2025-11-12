@@ -13,7 +13,7 @@ import redisService from './services/redis';
 import databaseService from './services/database';
 import schedulerService from './services/scheduler';
 
-import authRoutes from './routes/auth';
+// import authRoutes from './routes/auth'; // временно отключен
 import userRoutes from './routes/users';
 import categoryRoutes from './routes/categories';
 import questionRoutes from './routes/questions';
@@ -55,8 +55,8 @@ app.use(express.urlencoded({ extended: true }));
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 минута
   max: 1000, // максимум 1000 запросов на IP
-  message: 'Слишком много запросов с этого IP, попробуйте позже.',
-  trustProxy: false // Отключаем trust proxy для rate limiting в целях безопасности
+  message: 'Слишком много запросов с этого IP, попробуйте позже.'
+  // trustProxy отключен через app.set('trust proxy', 1) выше
 });
 app.use('/api/', limiter);
 

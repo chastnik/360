@@ -31,7 +31,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
       query = query.where('v.user_id', user_id);
     }
     
-    if (department_id) {
+    if (department_id && typeof department_id === 'string') {
       // Поддерживаем как department_id, так и название отдела
       if (department_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
         // Это UUID department_id
@@ -98,13 +98,13 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
     // Все могут просматривать любой отпуск (без ограничений на просмотр)
     
-    res.json({
+    return res.json({
       success: true,
       data: vacation
     });
   } catch (error) {
     console.error('Ошибка получения отпуска:', error);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
@@ -237,7 +237,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     
     console.log('✅ Отпуск создан:', vacation);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: vacation
     });
@@ -250,7 +250,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       constraint: error.constraint,
       stack: error.stack
     });
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: 'Внутренняя ошибка сервера',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -312,7 +312,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         // Проверяем пересечения с другими отпусками ТОЛЬКО для этого пользователя (исключая текущий)
         const overlapping = await db('vacations')
           .where('user_id', existingVacation.user_id) // Важно: проверяем только для конкретного пользователя
-          .where('id', '!=', id)
+          .where('id', '!=', db.raw('?', [id]))
           .where('status', '!=', 'rejected')
           .where(function() {
             this.where(function() {
@@ -389,7 +389,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
     const updatedVacation = updated[0];
 
-    res.json({
+    return res.json({
       success: true,
       data: updatedVacation
     });
@@ -401,7 +401,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
       body: req.body,
       params: req.params
     });
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: error.message || 'Внутренняя ошибка сервера',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -436,13 +436,13 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
       .where('id', id)
       .del();
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Отпуск удален'
     });
   } catch (error) {
     console.error('Ошибка удаления отпуска:', error);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 

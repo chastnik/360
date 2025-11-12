@@ -145,11 +145,12 @@ router.get('/logs', authenticateToken, requirePermission('ui:view:admin.logs'), 
     // Поиск
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredLogs = filteredLogs.filter(log => 
-        log.message.toLowerCase().includes(searchLower) ||
-        log.context?.toLowerCase().includes(searchLower) ||
-        log.userEmail?.toLowerCase().includes(searchLower)
-      );
+      filteredLogs = filteredLogs.filter(log => {
+        const contextMatch = log.context ? log.context.toLowerCase().includes(searchLower) : false;
+        const userEmailStr = log.userEmail as string | null;
+        const emailMatch = userEmailStr ? userEmailStr.toLowerCase().includes(searchLower) : false;
+        return log.message.toLowerCase().includes(searchLower) || contextMatch || emailMatch;
+      });
     }
     
     // Лимит

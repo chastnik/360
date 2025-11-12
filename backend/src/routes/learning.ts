@@ -8,7 +8,7 @@ import { calculateEndDate } from '../services/calendar';
 const router = express.Router();
 
 // Получить пользователей для создания планов роста
-router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/users', authenticateToken, async (_req: AuthRequest, res) => {
   try {
     // Все авторизованные пользователи могут видеть всех активных пользователей
     // Это нужно для матрицы компетенций и других функций
@@ -25,7 +25,7 @@ router.get('/users', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Получить компетенции для learning модуля
-router.get('/competencies', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/competencies', authenticateToken, async (_req: AuthRequest, res) => {
   try {
     // Все авторизованные пользователи могут просматривать компетенции
     const competencies = await knex('competencies')
@@ -887,7 +887,7 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
 });
 
 // Получить матрицу компетенций всех пользователей
-router.get('/competence-matrix/all', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/competence-matrix/all', authenticateToken, async (_req: AuthRequest, res) => {
   try {
     // Все авторизованные пользователи могут видеть матрицу всех пользователей
     const matrix = await knex('competence_matrix')

@@ -464,7 +464,7 @@ router.post('/reset-password', async (req, res): Promise<void> => {
 });
 
 // Тестовый эндпоинт для отладки базы данных
-router.get('/test-db', async (req, res) => {
+router.get('/test-db', async (_req, res) => {
   try {
     const user = await db('users')
       .where({ email: 'admin@company.com', is_active: true })
@@ -527,7 +527,7 @@ router.post('/test-login', async (req, res) => {
     // Получить права
     const permissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
 
-    res.json({
+    return res.json({
       success: true,
       test_user: {
         id: user.id,
@@ -541,7 +541,7 @@ router.post('/test-login', async (req, res) => {
     });
 
   } catch (error: any) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message
     });
@@ -549,7 +549,7 @@ router.post('/test-login', async (req, res) => {
 });
 
 // Тестовый эндпоинт с прямым SQL
-router.get('/test-sql', async (req, res) => {
+router.get('/test-sql', async (_req, res) => {
   try {
     // Прямой SQL запрос
     const result = await db.raw(`

@@ -491,6 +491,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </main>
         </div>
       </div>
+
+      {/* Ссылка обратной связи в левом нижнем углу */}
+      <a
+        href="mailto:SVChashin@1cbit.ru?subject=Обратная связь по системе 360° оценки"
+        className="fixed bottom-4 left-4 z-50 flex items-center gap-2 px-4 py-2 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-all"
+        title="Отправить сообщение об ошибках и предложениях по улучшению"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <span className="hidden sm:inline">Обратная связь</span>
+      </a>
     </div>
   );
 }; 

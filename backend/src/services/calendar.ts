@@ -29,20 +29,21 @@ export async function calculateEndDate(
     }
     
     // Получаем все праздники
+    const startDateStr = startDate.toISOString().split('T')[0]!;
     const holidays = await knex('holidays')
       .select('date')
-      .where('date', '>=', startDate.toISOString().split('T')[0]);
+      .where('date', '>=', startDateStr);
     
-    const holidayDates = new Set(holidays.map((h: any) => h.date.toISOString().split('T')[0]));
+    const holidayDates = new Set(holidays.map((h: any) => h.date.toISOString().split('T')[0]!));
     
     // Получаем отпуска пользователя (утвержденные)
-    let userVacationDates = new Set<string>();
+    const userVacationDates = new Set<string>();
     if (userId) {
       const userVacations = await knex('vacations')
         .select('start_date', 'end_date')
         .where('user_id', userId)
         .where('status', 'approved')
-        .where('end_date', '>=', startDate.toISOString().split('T')[0]);
+        .where('end_date', '>=', startDateStr);
       
       // Добавляем все даты из диапазона отпусков
       for (const vacation of userVacations) {
@@ -51,8 +52,8 @@ export async function calculateEndDate(
         const currentDate = new Date(start);
         
         while (currentDate <= end) {
-          const dateStr = currentDate.toISOString().split('T')[0];
-          if (dateStr >= startDate.toISOString().split('T')[0]) {
+          const dateStr = currentDate.toISOString().split('T')[0]!;
+          if (dateStr >= startDate.toISOString().split('T')[0]!) {
             userVacationDates.add(dateStr);
           }
           currentDate.setDate(currentDate.getDate() + 1);
@@ -87,7 +88,7 @@ export async function calculateEndDate(
     
     while (hoursAccumulated < totalCourseHours && daysChecked < maxDays) {
       const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay(); // Преобразуем 0=вс в 7
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = currentDate.toISOString().split('T')[0]!;
       
       // Проверяем, является ли день рабочим
       const schedule = scheduleMap.get(dayOfWeek);

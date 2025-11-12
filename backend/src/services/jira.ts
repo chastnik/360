@@ -13,9 +13,13 @@ function decrypt(text: string): string {
   try {
     const parts = text.split(':');
     if (parts.length !== 2) return text;
-    const iv = Buffer.from(parts[0], 'hex');
+    const ivPart = parts[0];
     const encryptedText = parts[1];
-    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY.slice(0, 32), 'hex'), iv);
+    if (!ivPart || !encryptedText) return text;
+    const iv = Buffer.from(ivPart, 'hex');
+    const encryptionKey = ENCRYPTION_KEY.slice(0, 32);
+    if (!encryptionKey) return text;
+    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(encryptionKey, 'hex'), iv);
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
