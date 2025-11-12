@@ -180,6 +180,20 @@ check_status() {
         source .env
     fi
     
+    # Получаем порты из переменных окружения с значениями по умолчанию
+    BACKEND_PORT=${BACKEND_PORT:-5000}
+    FRONTEND_PORT=${FRONTEND_PORT:-80}
+    
+    # Формируем URL для frontend (порт 80 не указываем в URL)
+    if [ "$FRONTEND_PORT" = "80" ]; then
+        FRONTEND_URL="http://localhost"
+    else
+        FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
+    fi
+    
+    # Формируем URL для backend
+    BACKEND_URL="http://localhost:${BACKEND_PORT}"
+    
     echo ""
     echo "=== Статус контейнеров ==="
     $DOCKER_COMPOSE_CMD ps
@@ -196,14 +210,14 @@ check_status() {
     
     # Проверка backend
     sleep 5
-    if curl -f http://localhost:5000/health &> /dev/null 2>&1; then
+    if curl -f "${BACKEND_URL}/health" &> /dev/null 2>&1; then
         success "Backend: работает"
     else
         warning "Backend: проверьте логи ($DOCKER_COMPOSE_CMD logs backend)"
     fi
     
     # Проверка frontend
-    if curl -f http://localhost/health &> /dev/null 2>&1; then
+    if curl -f "${FRONTEND_URL}/health" &> /dev/null 2>&1; then
         success "Frontend: работает"
     else
         warning "Frontend: проверьте логи ($DOCKER_COMPOSE_CMD logs frontend)"
@@ -211,8 +225,8 @@ check_status() {
     
     echo ""
     echo "=== Доступные URL ==="
-    echo "Frontend: http://localhost"
-    echo "Backend API: http://localhost:5000/api"
+    echo "Frontend: ${FRONTEND_URL}"
+    echo "Backend API: ${BACKEND_URL}/api"
     echo ""
     echo "=== Учетные данные по умолчанию (после seed) ==="
     echo "Email: admin@company.com / Пароль: admin123"
