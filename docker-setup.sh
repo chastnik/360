@@ -81,6 +81,14 @@ create_env_file() {
     success "Переменные окружения проверены"
 }
 
+# Определение команды docker compose
+DOCKER_COMPOSE_CMD="docker compose"
+if ! docker compose version &> /dev/null; then
+    if command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+    fi
+fi
+
 # Ожидание готовности базы данных
 wait_for_database() {
     log "Ожидание готовности базы данных..."
@@ -89,7 +97,7 @@ wait_for_database() {
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
-        if docker compose exec -T database pg_isready -U "${DB_USER:-assessment_user}" &> /dev/null; then
+        if $DOCKER_COMPOSE_CMD exec -T database pg_isready -U "${DB_USER:-assessment_user}" &> /dev/null; then
             success "База данных готова"
             return 0
         fi
@@ -106,7 +114,7 @@ wait_for_database() {
 run_migrations() {
     log "Выполнение миграций базы данных..."
     
-    if docker compose exec -T backend npm run migrate; then
+    if $DOCKER_COMPOSE_CMD exec -T backend npm run migrate; then
         success "Миграции выполнены успешно"
     else
         error "Ошибка при выполнении миграций"
@@ -118,7 +126,7 @@ run_migrations() {
 run_seeds() {
     log "Заполнение базы данных начальными данными..."
     
-    if docker compose exec -T backend npm run seed; then
+    if $DOCKER_COMPOSE_CMD exec -T backend npm run seed; then
         success "Начальные данные загружены"
     else
         warning "Предупреждение: ошибка при выполнении сидов (это нормально, если данные уже есть)"
@@ -129,7 +137,7 @@ run_seeds() {
 build_images() {
     log "Сборка Docker образов..."
     
-    if docker compose build; then
+    if $DOCKER_COMPOSE_CMD build; then
         success "Образы собраны успешно"
     else
         error "Ошибка при сборке образов"
@@ -143,14 +151,14 @@ start_system() {
     
     # Запуск базы данных и Redis
     log "Запуск базы данных и Redis..."
-    docker compose up -d database redis
+    $DOCKER_COMPOSE_CMD up -d database redis
     
     # Ожидание готовности базы данных
     wait_for_database
     
     # Запуск backend
     log "Запуск backend..."
-    docker compose up -d backend
+    $DOCKER_COMPOSE_CMD up -d backend
     
     # Ожидание готовности backend
     log "Ожидание готовности backend..."
@@ -158,7 +166,7 @@ start_system() {
     
     # Запуск frontend
     log "Запуск frontend..."
-    docker compose up -d frontend
+    $DOCKER_COMPOSE_CMD up -d frontend
     
     success "Система запущена"
 }
@@ -167,15 +175,20 @@ start_system() {
 check_status() {
     log "Проверка статуса системы..."
     
+    # Загружаем переменные окружения если они не загружены
+    if [ -f .env ]; then
+        source .env
+    fi
+    
     echo ""
     echo "=== Статус контейнеров ==="
-    docker compose ps
+    $DOCKER_COMPOSE_CMD ps
     
     echo ""
     echo "=== Проверка здоровья ==="
     
     # Проверка базы данных
-    if docker compose exec -T database pg_isready -U "${DB_USER:-assessment_user}" &> /dev/null; then
+    if $DOCKER_COMPOSE_CMD exec -T database pg_isready -U "${DB_USER:-assessment_user}" &> /dev/null; then
         success "База данных: работает"
     else
         error "База данных: не работает"
@@ -186,14 +199,14 @@ check_status() {
     if curl -f http://localhost:5000/health &> /dev/null 2>&1; then
         success "Backend: работает"
     else
-        warning "Backend: проверьте логи (docker compose logs backend)"
+        warning "Backend: проверьте логи ($DOCKER_COMPOSE_CMD logs backend)"
     fi
     
     # Проверка frontend
     if curl -f http://localhost/health &> /dev/null 2>&1; then
         success "Frontend: работает"
     else
-        warning "Frontend: проверьте логи (docker compose logs frontend)"
+        warning "Frontend: проверьте логи ($DOCKER_COMPOSE_CMD logs frontend)"
     fi
     
     echo ""
@@ -235,8 +248,8 @@ install() {
     echo ""
     success "Установка завершена!"
     echo ""
-    log "Для просмотра логов используйте: docker compose logs -f"
-    log "Для остановки системы используйте: docker compose down"
+    log "Для просмотра логов используйте: $DOCKER_COMPOSE_CMD logs -f"
+    log "Для остановки системы используйте: $DOCKER_COMPOSE_CMD down"
 }
 
 # Функция помощи
@@ -278,12 +291,12 @@ main() {
             ;;
         stop)
             log "Остановка системы..."
-            docker compose down
+            $DOCKER_COMPOSE_CMD down
             success "Система остановлена"
             ;;
         restart)
             log "Перезапуск системы..."
-            docker compose restart
+            $DOCKER_COMPOSE_CMD restart
             check_status
             ;;
         migrate)
@@ -298,7 +311,7 @@ main() {
             check_status
             ;;
         logs)
-            docker compose logs -f ${2:-}
+            $DOCKER_COMPOSE_CMD logs -f ${2:-}
             ;;
         help|--help|-h)
             show_help
