@@ -10,6 +10,14 @@ interface TestResult {
   status: 'passed' | 'failed';
   test_date: string;
   notes?: string;
+  certificates?: Array<{
+    id: number;
+    name: string;
+    file_name: string;
+    file_size: number;
+    file_mime: string;
+    created_at: string;
+  }>;
 }
 
 interface Course {
@@ -33,26 +41,92 @@ interface GrowthPlan {
   email?: string;
 }
 
+interface Filters {
+  search: string;
+  status: 'all' | 'passed' | 'failed';
+  dateFrom: string;
+  dateTo: string;
+  courseId: string;
+  userId: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 const TestingPage: React.FC = () => {
   const [plans, setPlans] = useState<GrowthPlan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'passed' | 'failed'>('all');
   const [showTestModal, setShowTestModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<GrowthPlan | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  
+  // Фильтры и пагинация
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    search: '',
+    status: 'all',
+    dateFrom: '',
+    dateTo: '',
+    courseId: '',
+    userId: ''
+  });
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  });
+  
+  // Список курсов и пользователей для фильтров
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [allUsers, setAllUsers] = useState<Array<{id: number; first_name?: string; last_name?: string; email?: string}>>([]);
   
   // Form states for test result modal
   const [testFormData, setTestFormData] = useState({
     test_date: new Date().toISOString().split('T')[0],
     status: 'passed' as 'passed' | 'failed',
-    notes: ''
+    notes: '',
+    certificateFile: null as File | null,
+    certificateName: ''
   });
   const [testFormErrors, setTestFormErrors] = useState<{[key: string]: string}>({});
   const [isSubmittingTest, setIsSubmittingTest] = useState(false);
+  
+  // Состояния для модального окна загрузки сертификата к существующему тесту
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [selectedTestResult, setSelectedTestResult] = useState<TestResult | null>(null);
+  const [certificateFormData, setCertificateFormData] = useState({
+    certificateFile: null as File | null,
+    certificateName: ''
+  });
+  const [certificateFormErrors, setCertificateFormErrors] = useState<{[key: string]: string}>({});
+  const [isUploadingCertificate, setIsUploadingCertificate] = useState(false);
 
   useEffect(() => {
     fetchData();
+    fetchCoursesAndUsers();
   }, []);
+
+  const fetchCoursesAndUsers = async () => {
+    try {
+      const [coursesResponse, usersResponse] = await Promise.all([
+        api.get('/learning/courses').catch(() => ({ data: [] })),
+        api.get('/learning/users').catch(() => ({ data: [] }))
+      ]);
+      
+      const coursesData = Array.isArray(coursesResponse.data) ? coursesResponse.data : [];
+      const usersData = Array.isArray(usersResponse.data) ? usersResponse.data : [];
+      
+      setAllCourses(coursesData);
+      setAllUsers(usersData);
+    } catch (error) {
+      console.error('Ошибка загрузки курсов и пользователей:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -78,7 +152,8 @@ const TestingPage: React.FC = () => {
     setTestFormErrors({});
 
     try {
-      await api.post('/learning/test-results', {
+      // Создаем результат теста
+      const testResultResponse = await api.post('/learning/test-results', {
         growth_plan_id: selectedPlan?.id,
         course_id: selectedCourse?.id,
         status: testFormData.status,
@@ -86,19 +161,48 @@ const TestingPage: React.FC = () => {
         notes: testFormData.notes || null
       });
       
+      const testResultId = testResultResponse.data.id;
+      
+      // Если есть сертификат, загружаем его
+      if (testFormData.certificateFile && testFormData.certificateName) {
+        const formData = new FormData();
+        formData.append('certificate', testFormData.certificateFile);
+        formData.append('test_result_id', testResultId.toString());
+        formData.append('name', testFormData.certificateName);
+        
+        try {
+          await api.post('/learning/certificates/test-result', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+        } catch (certError: any) {
+          console.error('Error uploading certificate:', certError);
+          const errorMessage = certError.response?.data?.error || 'Не удалось загрузить сертификат';
+          setTestFormErrors({
+            certificate: errorMessage
+          });
+          // Не закрываем модальное окно, чтобы пользователь мог увидеть ошибку
+          setIsSubmittingTest(false);
+          return;
+        }
+      }
+      
       setShowTestModal(false);
       setSelectedPlan(null);
       setSelectedCourse(null);
       setTestFormData({
         test_date: new Date().toISOString().split('T')[0],
         status: 'passed',
-        notes: ''
+        notes: '',
+        certificateFile: null,
+        certificateName: ''
       });
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding test result:', error);
       setTestFormErrors({
-        general: 'Произошла ошибка при сохранении результата теста'
+        general: error.response?.data?.error || 'Произошла ошибка при сохранении результата теста'
       });
     } finally {
       setIsSubmittingTest(false);
@@ -109,9 +213,11 @@ const TestingPage: React.FC = () => {
     const allResults: TestResult[] = [];
     plans.forEach(plan => {
       plan.test_results.forEach(test => {
+        // Сохраняем все поля, включая certificates
         allResults.push({
           ...test,
-          growth_plan_id: plan.id
+          growth_plan_id: plan.id,
+          certificates: test.certificates || []
         });
       });
     });
@@ -120,8 +226,114 @@ const TestingPage: React.FC = () => {
 
   const getFilteredTestResults = () => {
     const allResults = getAllTestResults();
-    if (filterStatus === 'all') return allResults;
-    return allResults.filter(test => test.status === filterStatus);
+    let filtered = allResults;
+    
+    // Фильтр по статусу
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(test => test.status === filters.status);
+    }
+    
+    // Фильтр по поиску (название курса, имя пользователя)
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(test => {
+        const courseName = test.course_name?.toLowerCase() || '';
+        const plan = plans.find(p => p.id === test.growth_plan_id);
+        const userName = plan ? `${plan.first_name || ''} ${plan.last_name || ''}`.toLowerCase() : '';
+        const userEmail = plan?.email?.toLowerCase() || '';
+        return courseName.includes(searchLower) || 
+               userName.includes(searchLower) || 
+               userEmail.includes(searchLower);
+      });
+    }
+    
+    // Фильтр по дате от
+    if (filters.dateFrom) {
+      filtered = filtered.filter(test => {
+        const testDate = new Date(test.test_date);
+        const filterDate = new Date(filters.dateFrom);
+        return testDate >= filterDate;
+      });
+    }
+    
+    // Фильтр по дате до
+    if (filters.dateTo) {
+      filtered = filtered.filter(test => {
+        const testDate = new Date(test.test_date);
+        const filterDate = new Date(filters.dateTo);
+        filterDate.setHours(23, 59, 59, 999); // Включаем весь день
+        return testDate <= filterDate;
+      });
+    }
+    
+    // Фильтр по курсу
+    if (filters.courseId) {
+      filtered = filtered.filter(test => test.course_id === parseInt(filters.courseId));
+    }
+    
+    // Фильтр по пользователю
+    if (filters.userId) {
+      filtered = filtered.filter(test => {
+        const plan = plans.find(p => p.id === test.growth_plan_id);
+        return plan && plan.user_id === parseInt(filters.userId);
+      });
+    }
+    
+    return filtered;
+  };
+  
+  const getPaginatedTestResults = () => {
+    const filtered = getFilteredTestResults();
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / pagination.limit);
+    
+    // Обновляем пагинацию
+    if (pagination.total !== total || pagination.totalPages !== totalPages) {
+      setPagination(prev => ({
+        ...prev,
+        total,
+        totalPages
+      }));
+    }
+    
+    // Применяем пагинацию
+    const startIndex = (pagination.page - 1) * pagination.limit;
+    const endIndex = startIndex + pagination.limit;
+    
+    return {
+      results: filtered.slice(startIndex, endIndex),
+      total,
+      totalPages
+    };
+  };
+  
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPagination(prev => ({ ...prev, page: 1 })); // Сбрасываем на первую страницу при изменении фильтров
+  };
+  
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: 'all',
+      dateFrom: '',
+      dateTo: '',
+      courseId: '',
+      userId: ''
+    });
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+  
+  const hasActiveFilters = filters.search !== '' || 
+    filters.status !== 'all' || 
+    filters.dateFrom !== '' || 
+    filters.dateTo !== '' || 
+    filters.courseId !== '' || 
+    filters.userId !== '';
+  
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getStatusColor = (status: string) => {
@@ -159,6 +371,58 @@ const TestingPage: React.FC = () => {
     return { total, passed, failed, successRate };
   };
 
+  // Обработчик загрузки сертификата к существующему тесту
+  const handleCertificateUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUploadingCertificate(true);
+    setCertificateFormErrors({});
+
+    if (!selectedTestResult) {
+      setCertificateFormErrors({ general: 'Не выбран тест' });
+      setIsUploadingCertificate(false);
+      return;
+    }
+
+    if (!certificateFormData.certificateFile || !certificateFormData.certificateName) {
+      setCertificateFormErrors({ general: 'Необходимо выбрать файл и указать название сертификата' });
+      setIsUploadingCertificate(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('certificate', certificateFormData.certificateFile);
+      formData.append('test_result_id', selectedTestResult.id.toString());
+      formData.append('name', certificateFormData.certificateName);
+
+      await api.post('/learning/certificates/test-result', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Успешно загружено
+      setShowCertificateModal(false);
+      setSelectedTestResult(null);
+      setCertificateFormData({
+        certificateFile: null,
+        certificateName: ''
+      });
+      setCertificateFormErrors({});
+      
+      // Обновляем данные
+      fetchData();
+    } catch (error: any) {
+      console.error('Error uploading certificate:', error);
+      const errorMessage = error.response?.data?.error || 'Не удалось загрузить сертификат. Проверьте формат файла и попробуйте снова.';
+      setCertificateFormErrors({
+        general: errorMessage
+      });
+    } finally {
+      setIsUploadingCertificate(false);
+    }
+  };
+
   // Не используется - закомментировано для будущего использования
   // const handleAddTestResult = async (formData: any) => {
   //   try {
@@ -185,7 +449,7 @@ const TestingPage: React.FC = () => {
   }
 
   const stats = getStatistics();
-  const filteredResults = getFilteredTestResults();
+  const { results: paginatedResults, total: filteredTotal, totalPages } = getPaginatedTestResults();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -239,44 +503,162 @@ const TestingPage: React.FC = () => {
       </div>
 
       {/* Фильтры */}
-      <div className="mb-6">
-        <div className="flex space-x-4">
+      <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Фильтры</h2>
           <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              filterStatus === 'all'
+            onClick={() => setShowFilters(!showFilters)}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-2"
+          >
+            <svg className={`w-5 h-5 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            {showFilters ? 'Скрыть' : 'Показать'} фильтры
+          </button>
+        </div>
+        
+        {/* Быстрые фильтры по статусу */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => handleFilterChange('status', 'all')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filters.status === 'all'
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
           >
             Все ({stats.total})
           </button>
           <button
-            onClick={() => setFilterStatus('passed')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              filterStatus === 'passed'
+            onClick={() => handleFilterChange('status', 'passed')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filters.status === 'passed'
                 ? 'bg-green-500 text-white'
-                : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
           >
             Пройдено ({stats.passed})
           </button>
           <button
-            onClick={() => setFilterStatus('failed')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              filterStatus === 'failed'
+            onClick={() => handleFilterChange('status', 'failed')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filters.status === 'failed'
                 ? 'bg-red-500 text-white'
-                : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
           >
             Не пройдено ({stats.failed})
           </button>
         </div>
+        
+        {/* Расширенные фильтры */}
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            {/* Поиск */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Поиск
+              </label>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                placeholder="Курс, имя, email..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            
+            {/* Дата от */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Дата от
+              </label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            
+            {/* Дата до */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Дата до
+              </label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            
+            {/* Курс */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Курс
+              </label>
+              <select
+                value={filters.courseId}
+                onChange={(e) => handleFilterChange('courseId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Все курсы</option>
+                {allCourses.map(course => (
+                  <option key={course.id} value={course.id.toString()}>
+                    {course.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Пользователь */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Пользователь
+              </label>
+              <select
+                value={filters.userId}
+                onChange={(e) => handleFilterChange('userId', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Все пользователи</option>
+                {allUsers.map(user => (
+                  <option key={user.id} value={user.id.toString()}>
+                    {user.last_name || ''} {user.first_name || ''} {user.email ? `(${user.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Кнопка очистки фильтров */}
+            <div className="flex items-end">
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Очистить фильтры
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Информация о результатах фильтрации */}
+        {hasActiveFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Найдено результатов: <span className="font-semibold text-gray-900 dark:text-white">{filteredTotal}</span>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Результаты тестирования */}
       <div className="space-y-4">
-        {filteredResults.map((test) => {
+        {paginatedResults.map((test) => {
           const plan = plans.find(p => p.id === test.growth_plan_id);
           const course = plan?.courses.find(c => c.id === test.course_id);
           
@@ -338,6 +720,78 @@ const TestingPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Сертификаты для пройденных тестов */}
+              {test.status === 'passed' && (
+                <div className="mb-4">
+                  {(() => {
+                    const certs = test.certificates || [];
+                    if (certs.length > 0) {
+                      return (
+                        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg mb-2">
+                          <div className="text-sm font-medium text-green-800 dark:text-green-400 mb-2">
+                            📜 Сертификаты
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {certs.map((cert) => (
+                              <button
+                                key={cert.id}
+                                onClick={async () => {
+                                  try {
+                                    const response = await api.get(`/learning/certificates/${cert.id}/file`, {
+                                      responseType: 'blob'
+                                    });
+                                    const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' });
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = cert.file_name || cert.name;
+                                    link.target = '_blank';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    window.URL.revokeObjectURL(url);
+                                  } catch (error) {
+                                    console.error('Ошибка загрузки сертификата:', error);
+                                    alert('Не удалось загрузить сертификат. Проверьте подключение к серверу.');
+                                  }
+                                }}
+                                className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 rounded-md border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                              >
+                                <span>📄</span>
+                                <span className="text-sm font-medium">{cert.name}</span>
+                                <span className="text-xs text-green-600 dark:text-green-400">
+                                  ({Math.round(cert.file_size / 1024)} KB)
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
+                  {/* Кнопка для добавления сертификата */}
+                  <button
+                    onClick={() => {
+                      setSelectedTestResult(test);
+                      setCertificateFormData({
+                        certificateFile: null,
+                        certificateName: ''
+                      });
+                      setCertificateFormErrors({});
+                      setShowCertificateModal(true);
+                    }}
+                    className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    {test.certificates && test.certificates.length > 0 ? 'Добавить еще сертификат' : 'Добавить сертификат'}
+                  </button>
+                </div>
+              )}
+
               {/* Кнопка "Тестировать заново" для непройденных тестов */}
               {test.status === 'failed' && plan && course && (
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -348,7 +802,9 @@ const TestingPage: React.FC = () => {
                       setTestFormData({
                         test_date: new Date().toISOString().split('T')[0],
                         status: 'passed',
-                        notes: ''
+                        notes: '',
+                        certificateFile: null,
+                        certificateName: ''
                       });
                       setShowTestModal(true);
                     }}
@@ -365,6 +821,85 @@ const TestingPage: React.FC = () => {
           );
         })}
       </div>
+      
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Показано <span className="font-semibold text-gray-900 dark:text-white">
+              {(pagination.page - 1) * pagination.limit + 1}
+            </span> - <span className="font-semibold text-gray-900 dark:text-white">
+              {Math.min(pagination.page * pagination.limit, filteredTotal)}
+            </span> из <span className="font-semibold text-gray-900 dark:text-white">{filteredTotal}</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(1)}
+              disabled={pagination.page === 1}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Первая
+            </button>
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Назад
+            </button>
+            
+            {/* Номера страниц */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (pagination.page <= 3) {
+                  pageNum = i + 1;
+                } else if (pagination.page >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = pagination.page - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      pagination.page === pageNum
+                        ? 'bg-blue-500 text-white'
+                        : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page === totalPages}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Вперед
+            </button>
+            <button
+              onClick={() => handlePageChange(totalPages)}
+              disabled={pagination.page === totalPages}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Последняя
+            </button>
+          </div>
+          
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Страница <span className="font-semibold text-gray-900 dark:text-white">{pagination.page}</span> из <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
+          </div>
+        </div>
+      )}
 
       {/* Курсы без тестирования */}
       <div className="mt-8">
@@ -422,18 +957,28 @@ const TestingPage: React.FC = () => {
         </div>
       </div>
 
-      {filteredResults.length === 0 && (
+      {paginatedResults.length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">✅</div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Результаты тестирования не найдены
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            {filterStatus === 'all' 
-              ? 'Начните проходить тесты по курсам'
-              : `Нет ${filterStatus === 'passed' ? 'пройденных' : 'не пройденных'} тестов`
+            {hasActiveFilters
+              ? 'Попробуйте изменить параметры фильтрации'
+              : filters.status === 'all' 
+                ? 'Начните проходить тесты по курсам'
+                : `Нет ${filters.status === 'passed' ? 'пройденных' : 'не пройденных'} тестов`
             }
           </p>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+            >
+              Очистить фильтры
+            </button>
+          )}
         </div>
       )}
 
@@ -459,8 +1004,14 @@ const TestingPage: React.FC = () => {
             </div>
             
             {testFormErrors.general && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded">
                 {testFormErrors.general}
+              </div>
+            )}
+            
+            {testFormErrors.certificate && (
+              <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 rounded">
+                ⚠️ {testFormErrors.certificate}
               </div>
             )}
 
@@ -511,7 +1062,7 @@ const TestingPage: React.FC = () => {
               </div>
 
               {/* Заметки */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Заметки (опционально)
                 </label>
@@ -524,6 +1075,34 @@ const TestingPage: React.FC = () => {
                 />
               </div>
 
+              {/* Сертификат (опционально) */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Сертификат (опционально)
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={testFormData.certificateName}
+                    onChange={(e) => setTestFormData({...testFormData, certificateName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Название сертификата"
+                  />
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setTestFormData({...testFormData, certificateFile: file});
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Поддерживаемые форматы: PDF, JPEG, PNG, TIFF (макс. 10 МБ)
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -534,7 +1113,9 @@ const TestingPage: React.FC = () => {
                     setTestFormData({
                       test_date: new Date().toISOString().split('T')[0],
                       status: 'passed',
-                      notes: ''
+                      notes: '',
+                      certificateFile: null,
+                      certificateName: ''
                     });
                     setTestFormErrors({});
                   }}
@@ -555,6 +1136,101 @@ const TestingPage: React.FC = () => {
                     </>
                   ) : (
                     'Сохранить'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно для загрузки сертификата к существующему тесту */}
+      {showCertificateModal && selectedTestResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Добавить сертификат
+            </h2>
+            <div className="mb-4">
+              <p className="text-gray-600 dark:text-gray-400">
+                Курс: <strong>{selectedTestResult.course_name}</strong>
+              </p>
+              <p className="text-gray-600 dark:text-gray-400">
+                Дата теста: <strong>{new Date(selectedTestResult.test_date).toLocaleDateString('ru-RU')}</strong>
+              </p>
+            </div>
+            
+            {certificateFormErrors.general && (
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded">
+                {certificateFormErrors.general}
+              </div>
+            )}
+
+            <form onSubmit={handleCertificateUpload}>
+              {/* Название сертификата */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Название сертификата <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={certificateFormData.certificateName}
+                  onChange={(e) => setCertificateFormData({...certificateFormData, certificateName: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Например: Сертификат об окончании курса"
+                  required
+                />
+              </div>
+
+              {/* Файл сертификата */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Файл сертификата <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setCertificateFormData({...certificateFormData, certificateFile: file});
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white text-sm"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Поддерживаемые форматы: PDF, JPEG, PNG, TIFF (макс. 10 МБ)
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCertificateModal(false);
+                    setSelectedTestResult(null);
+                    setCertificateFormData({
+                      certificateFile: null,
+                      certificateName: ''
+                    });
+                    setCertificateFormErrors({});
+                  }}
+                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  disabled={isUploadingCertificate}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                  disabled={isUploadingCertificate}
+                >
+                  {isUploadingCertificate ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                      Загрузка...
+                    </>
+                  ) : (
+                    'Загрузить сертификат'
                   )}
                 </button>
               </div>

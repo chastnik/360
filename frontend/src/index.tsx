@@ -7,26 +7,39 @@ import App from './App';
 
 // Подавляем известную ошибку ResizeObserver, которая не критична
 // Это происходит когда ResizeObserver callback изменяет размеры наблюдаемых элементов
-const originalError = window.console.error;
-window.console.error = (...args: any[]) => {
-  if (
-    typeof args[0] === 'string' &&
-    args[0].includes('ResizeObserver loop completed with undelivered notifications')
-  ) {
+// Это известная проблема в браузерах и не влияет на функциональность приложения
+
+const isResizeObserverError = (message: any): boolean => {
+  if (!message) return false;
+  const messageStr = typeof message === 'string' ? message : String(message);
+  return messageStr.includes('ResizeObserver loop completed with undelivered notifications') ||
+         messageStr.includes('ResizeObserver loop');
+};
+
+// Перехватываем console.error
+const originalConsoleError = console.error;
+console.error = (...args: any[]) => {
+  const errorMessage = args.length > 0 ? args[0] : '';
+  if (isResizeObserverError(errorMessage)) {
     // Подавляем эту конкретную ошибку, так как она не критична
     return;
   }
-  originalError.apply(console, args);
+  originalConsoleError.apply(console, args);
 };
 
-// Также обрабатываем через window.onerror
+// Обрабатываем через window.onerror
 window.addEventListener('error', (event) => {
-  if (
-    event.message &&
-    event.message.includes('ResizeObserver loop completed with undelivered notifications')
-  ) {
+  if (isResizeObserverError(event.message)) {
     event.preventDefault();
     event.stopPropagation();
+    return false;
+  }
+});
+
+// Обрабатываем через unhandledrejection (для Promise rejections)
+window.addEventListener('unhandledrejection', (event) => {
+  if (isResizeObserverError(event.reason)) {
+    event.preventDefault();
     return false;
   }
 });

@@ -20,6 +20,14 @@ interface CompetenceMatrixEntry {
   source?: 'training' | 'manual';
   first_name?: string;
   last_name?: string;
+  certificates?: Array<{
+    id: number;
+    name: string;
+    file_name: string;
+    file_size: number;
+    file_mime: string;
+    created_at: string;
+  }>;
 }
 
 interface Competency {
@@ -87,6 +95,15 @@ const CompetenceMatrixPage: React.FC = () => {
           ? `${item.last_name} ${item.first_name}` 
           : item.user_name || item.email || '';
         
+        // Логируем сертификаты для отладки
+        if (item.certificates && item.certificates.length > 0) {
+          console.log(`[FRONTEND] Компетенция ${item.competency_name} (${item.competency_id}) для пользователя ${userName}:`, item.certificates);
+        } else if (item.certificates === undefined) {
+          console.warn(`[FRONTEND] Компетенция ${item.competency_name} (${item.competency_id}) для пользователя ${userName}: certificates = undefined`);
+        } else {
+          console.log(`[FRONTEND] Компетенция ${item.competency_name} (${item.competency_id}) для пользователя ${userName}: сертификатов нет (массив пустой)`);
+        }
+        
         matrixEntries.push({
           id: item.id,
           competency_id: item.competency_id,
@@ -104,7 +121,9 @@ const CompetenceMatrixPage: React.FC = () => {
           source: item.source || 'training',
           // Сохраняем first_name и last_name для правильного отображения
           first_name: item.first_name,
-          last_name: item.last_name
+          last_name: item.last_name,
+          // Сохраняем сертификаты, если они есть
+          certificates: item.certificates || []
         });
       });
 
@@ -515,19 +534,19 @@ const CompetenceMatrixPage: React.FC = () => {
                         return (
                           <td key={comp.id} className="px-4 py-3 text-center">
                             {entry ? (
-                              <div className="flex flex-col items-center">
+                              <div className="flex flex-col items-center gap-1">
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getLevelColor(entry.level)}`}>
                                   {getLevelIcon(entry.level)} {entry.level}
                                 </span>
-                                <span className={`text-xs font-medium mt-1 ${getScoreColor(entry.score)}`}>
+                                <span className={`text-xs font-medium ${getScoreColor(entry.score)}`}>
                                   {entry.score}/100
                                 </span>
-                                <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                <span className="text-xs text-gray-400 dark:text-gray-500">
                                   {new Date(entry.assessment_date).toLocaleDateString('ru-RU')}
                                 </span>
                                 {entry.source && (
                                   <span 
-                                    className={`text-xs mt-1 px-2 py-0.5 rounded ${
+                                    className={`text-xs px-2 py-0.5 rounded ${
                                       entry.source === 'manual' 
                                         ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400' 
                                         : 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
@@ -536,6 +555,48 @@ const CompetenceMatrixPage: React.FC = () => {
                                   >
                                     {entry.source === 'manual' ? '✏️ Вручную' : '📚 Обучение'}
                                   </span>
+                                )}
+                                {/* Сертификаты */}
+                                {(() => {
+                                  // Отладочное логирование
+                                  if (entry.certificates !== undefined) {
+                                    console.log(`[FRONTEND RENDER] Компетенция ${entry.competency_name}: certificates =`, entry.certificates, 'length =', entry.certificates?.length);
+                                  }
+                                  return null;
+                                })()}
+                                {entry.certificates && entry.certificates.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1 justify-center">
+                                    {entry.certificates.map((cert: { id: number; name: string; file_name: string; file_size: number; file_mime: string; created_at: string }) => (
+                                      <button
+                                        key={cert.id}
+                                        onClick={async () => {
+                                          try {
+                                            const response = await api.get(`/learning/certificates/${cert.id}/file`, {
+                                              responseType: 'blob'
+                                            });
+                                            const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' });
+                                            const url = window.URL.createObjectURL(blob);
+                                            const link = document.createElement('a');
+                                            link.href = url;
+                                            link.download = cert.file_name || cert.name;
+                                            link.target = '_blank';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                            window.URL.revokeObjectURL(url);
+                                          } catch (error) {
+                                            console.error('Ошибка загрузки сертификата:', error);
+                                            alert('Не удалось загрузить сертификат. Проверьте подключение к серверу.');
+                                          }
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors cursor-pointer text-xs"
+                                        title={`${cert.name} (${Math.round(cert.file_size / 1024)} KB)`}
+                                      >
+                                        <span>📜</span>
+                                        <span className="truncate max-w-[80px]">{cert.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                             ) : (

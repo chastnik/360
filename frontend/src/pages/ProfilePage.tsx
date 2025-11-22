@@ -829,6 +829,38 @@ export const ProfilePage: React.FC = () => {
                           {competence.notes}
                         </p>
                       )}
+                      {competence.certificates && competence.certificates.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {competence.certificates.map((cert: any) => (
+                            <button
+                              key={cert.id}
+                              onClick={async () => {
+                                try {
+                                  const response = await api.get(`/learning/certificates/${cert.id}/file`, {
+                                    responseType: 'blob'
+                                  });
+                                  const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' });
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = cert.file_name || cert.name;
+                                  link.target = '_blank';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                } catch (error) {
+                                  console.error('Ошибка загрузки сертификата:', error);
+                                  alert('Не удалось загрузить сертификат. Проверьте подключение к серверу.');
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer bg-transparent border-none p-0"
+                            >
+                              📜 {cert.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4">

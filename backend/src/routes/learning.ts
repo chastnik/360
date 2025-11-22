@@ -4,8 +4,10 @@ import express from 'express';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import knex from '../database/connection';
 import { calculateEndDate } from '../services/calendar';
+import multer from 'multer';
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB для сертификатов
 
 // Получить пользователей для создания планов роста
 router.get('/users', authenticateToken, async (_req: AuthRequest, res) => {
@@ -504,6 +506,15 @@ router.get('/growth-plans', authenticateToken, async (req: AuthRequest, res) => 
         .select('tr.*', 'tc.name as course_name')
         .where('tr.growth_plan_id', plan.id);
       
+      // Получаем сертификаты для каждого результата теста
+      for (const testResult of testResults) {
+        const certificates = await knex('certificates')
+          .where('test_result_id', testResult.id)
+          .select('id', 'name', 'file_name', 'file_size', 'file_mime', 'created_at')
+          .orderBy('created_at', 'desc');
+        testResult.certificates = certificates;
+      }
+      
       plan.test_results = testResults;
       
       // Проверяем, все ли курсы пройдены, и обновляем статус ПИРа
@@ -879,6 +890,88 @@ router.get('/competence-matrix', authenticateToken, async (req: AuthRequest, res
       )
       .orderBy('competencies.name');
     
+    // Получаем сертификаты для каждой компетенции
+    for (const entry of matrix) {
+      // Сертификаты, привязанные напрямую к компетенции (ручной ввод)
+      const directCertificates = await knex('certificates')
+        .where('competence_matrix_id', entry.id)
+        .select('id', 'name', 'file_name', 'file_size', 'file_mime', 'created_at')
+        .orderBy('created_at', 'desc');
+      
+      // Сертификаты из результатов тестов
+      // Находим все результаты тестов пользователя с сертификатами
+      const testResultsWithCerts = await knex('test_results as tr')
+        .join('growth_plans as gp', 'tr.growth_plan_id', 'gp.id')
+        .join('training_courses as tc', 'tr.course_id', 'tc.id')
+        .join('certificates as c', 'c.test_result_id', 'tr.id')
+        .where('gp.user_id', entry.user_id)
+        .where('tr.status', 'passed')
+        .select(
+          'c.id',
+          'c.name',
+          'c.file_name',
+          'c.file_size',
+          'c.file_mime',
+          'c.created_at',
+          'tc.name as course_name',
+          'tc.competency_id as course_competency_id'
+        );
+      
+      // Фильтруем сертификаты: оставляем только те, которые связаны с текущей компетенцией
+      // Связь может быть через:
+      // 1. competency_id курса совпадает с competency_id компетенции
+      // 2. Название курса содержит название компетенции или наоборот
+      // 3. Название курса содержит ключевые слова из названия компетенции (более гибкое сопоставление)
+      // 4. Если у пользователя есть сертификаты из тестов, показываем их для всех его компетенций
+      const competencyNameLower = entry.competency_name.toLowerCase();
+      // Извлекаем ключевые слова из названия компетенции (слова длиннее 2 символов)
+      const competencyKeywords = competencyNameLower
+        .split(/[\s\-_]+/)
+        .filter((w: string) => w.length > 2)
+        .map((w: string) => w.trim());
+      
+      const testResultCertificates = testResultsWithCerts
+        .filter((cert: any) => {
+          // Проверяем связь через competency_id (самый надежный способ)
+          if (cert.course_competency_id && String(cert.course_competency_id) === String(entry.competency_id)) {
+            return true;
+          }
+          // Проверяем связь по названию (только если competency_id не совпал)
+          const courseNameLower = (cert.course_name || '').toLowerCase();
+          if (courseNameLower && competencyNameLower) {
+            // Точное совпадение или включение
+            if (courseNameLower.includes(competencyNameLower) || 
+                competencyNameLower.includes(courseNameLower)) {
+              return true;
+            }
+            // Проверяем совпадение по ключевым словам (только если слова длиннее 2 символов)
+            if (competencyKeywords.length > 0 && competencyKeywords.some((keyword: string) => courseNameLower.includes(keyword))) {
+              return true;
+            }
+          }
+          // Если нет прямой связи, не показываем сертификат для этой компетенции
+          return false;
+        })
+        .map((cert: any) => ({
+          id: cert.id,
+          name: cert.name,
+          file_name: cert.file_name,
+          file_size: cert.file_size,
+          file_mime: cert.file_mime,
+          created_at: cert.created_at
+        }));
+      
+      // Объединяем оба типа сертификатов
+      entry.certificates = [...directCertificates, ...testResultCertificates];
+      
+      // Логируем итоговый результат
+      if (entry.certificates.length > 0) {
+        console.log(`[DEBUG /competence-matrix] Итого для компетенции ${entry.competency_name} (${entry.competency_id}) пользователя ${entry.user_id}: ${entry.certificates.length} сертификатов (${directCertificates.length} прямых + ${testResultCertificates.length} из тестов)`);
+      } else if (testResultsWithCerts.length > 0) {
+        console.log(`[DEBUG /competence-matrix] Для компетенции ${entry.competency_name} найдено ${testResultsWithCerts.length} сертификатов из тестов, но ни один не прошел фильтрацию. Сертификаты:`, testResultsWithCerts.map((c: any) => ({ id: c.id, name: c.name, course: c.course_name })));
+      }
+    }
+    
     return res.json(matrix);
   } catch (error) {
     console.error('Error fetching competence matrix:', error);
@@ -916,6 +1009,93 @@ router.get('/competence-matrix/all', authenticateToken, async (_req: AuthRequest
       )
       .orderBy('users.last_name', 'users.first_name')
       .orderBy('competencies.name');
+    
+    // Получаем сертификаты для каждой компетенции
+    for (const entry of matrix) {
+      // Сертификаты, привязанные напрямую к компетенции (ручной ввод)
+      const directCertificates = await knex('certificates')
+        .where('competence_matrix_id', entry.id)
+        .select('id', 'name', 'file_name', 'file_size', 'file_mime', 'created_at')
+        .orderBy('created_at', 'desc');
+      
+      // Сертификаты из результатов тестов
+      // Находим все результаты тестов пользователя с сертификатами
+      const testResultsWithCerts = await knex('test_results as tr')
+        .join('growth_plans as gp', 'tr.growth_plan_id', 'gp.id')
+        .join('training_courses as tc', 'tr.course_id', 'tc.id')
+        .join('certificates as c', 'c.test_result_id', 'tr.id')
+        .where('gp.user_id', entry.user_id)
+        .where('tr.status', 'passed')
+        .select(
+          'c.id',
+          'c.name',
+          'c.file_name',
+          'c.file_size',
+          'c.file_mime',
+          'c.created_at',
+          'tc.name as course_name',
+          'tc.competency_id as course_competency_id'
+        );
+      
+      // Логируем для отладки
+      if (testResultsWithCerts.length > 0) {
+        console.log(`[DEBUG /competence-matrix/all] Для компетенции ${entry.competency_name} (${entry.competency_id}) пользователя ${entry.user_id} найдено ${testResultsWithCerts.length} сертификатов из тестов`);
+      }
+      
+      // Фильтруем сертификаты: оставляем только те, которые связаны с текущей компетенцией
+      // Связь может быть через:
+      // 1. competency_id курса совпадает с competency_id компетенции
+      // 2. Название курса содержит название компетенции или наоборот
+      // 3. Название курса содержит ключевые слова из названия компетенции (более гибкое сопоставление)
+      const competencyNameLower = entry.competency_name.toLowerCase();
+      // Извлекаем ключевые слова из названия компетенции (слова длиннее 2 символов)
+      const competencyKeywords = competencyNameLower
+        .split(/[\s\-_]+/)
+        .filter((w: string) => w.length > 2)
+        .map((w: string) => w.trim());
+      
+      const testResultCertificates = testResultsWithCerts
+        .filter((cert: any) => {
+          // Проверяем связь через competency_id (самый надежный способ)
+          if (cert.course_competency_id && String(cert.course_competency_id) === String(entry.competency_id)) {
+            return true;
+          }
+          // Проверяем связь по названию (только если competency_id не совпал)
+          const courseNameLower = (cert.course_name || '').toLowerCase();
+          if (courseNameLower && competencyNameLower) {
+            // Точное совпадение или включение
+            if (courseNameLower.includes(competencyNameLower) || 
+                competencyNameLower.includes(courseNameLower)) {
+              return true;
+            }
+            // Проверяем совпадение по ключевым словам (только если слова длиннее 2 символов)
+            if (competencyKeywords.length > 0 && competencyKeywords.some((keyword: string) => courseNameLower.includes(keyword))) {
+              return true;
+            }
+          }
+          // Если нет прямой связи, не показываем сертификат для этой компетенции
+          return false;
+        })
+        .map((cert: any) => ({
+          id: cert.id,
+          name: cert.name,
+          file_name: cert.file_name,
+          file_size: cert.file_size,
+          file_mime: cert.file_mime,
+          created_at: cert.created_at
+        }));
+      
+      // Объединяем оба типа сертификатов
+      entry.certificates = [...directCertificates, ...testResultCertificates];
+      
+      // Логируем итоговый результат
+      if (entry.certificates.length > 0) {
+        console.log(`[DEBUG /competence-matrix/all] Итого для компетенции ${entry.competency_name} (${entry.competency_id}) пользователя ${entry.user_id}: ${entry.certificates.length} сертификатов (${directCertificates.length} прямых + ${testResultCertificates.length} из тестов)`);
+      } else if (testResultsWithCerts.length > 0) {
+        console.log(`[DEBUG /competence-matrix/all] Для компетенции ${entry.competency_name} найдено ${testResultsWithCerts.length} сертификатов из тестов, но ни один не прошел фильтрацию. Сертификаты:`, testResultsWithCerts.map((c: any) => ({ id: c.id, name: c.name, course: c.course_name })));
+        console.log(`[DEBUG /competence-matrix/all] Ключевые слова компетенции "${entry.competency_name}": [${competencyKeywords.join(', ')}]`);
+      }
+    }
     
     return res.json(matrix);
   } catch (error) {
@@ -1033,6 +1213,317 @@ router.get('/training-schedule', authenticateToken, async (req: AuthRequest, res
     return res.json(schedule);
   } catch (error) {
     console.error('Error fetching training schedule:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== СЕРТИФИКАТЫ ====================
+
+// Загрузить сертификат для компетенции (ручной ввод)
+router.post('/certificates/competence', authenticateToken, upload.single('certificate'), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { competence_matrix_id, name } = req.body;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+    
+    if (!competence_matrix_id || !name) {
+      return res.status(400).json({ error: 'Не указаны competence_matrix_id или name' });
+    }
+    
+    // Проверяем, что компетенция принадлежит пользователю или пользователь имеет права
+    const competence = await knex('competence_matrix')
+      .where('id', competence_matrix_id)
+      .first();
+    
+    if (!competence) {
+      return res.status(404).json({ error: 'Competence matrix entry not found' });
+    }
+    
+    // Проверяем доступ (пользователь может загружать только для своих компетенций, админы и HR - для любых)
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && competence.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Проверяем MIME тип (разрешаем PDF, изображения)
+    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/tif'];
+    if (!allowedMimes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Неподдерживаемый формат файла. Разрешены: PDF, JPEG, PNG, TIFF' });
+    }
+    
+    // Обрабатываем кодировку для названия и имени файла
+    // Multer может передавать данные в latin1, нужно конвертировать в UTF-8
+    let decodedName = typeof name === 'string' ? name.trim() : String(name).trim();
+    
+    // Исправляем кодировку названия (если пришло в неправильной кодировке)
+    try {
+      // Проверяем, содержит ли строка символы, которые выглядят как неправильно декодированные UTF-8
+      if (/Ð|Ñ|Ð|Ñ/.test(decodedName)) {
+        // Пытаемся исправить: если строка выглядит как latin1 интерпретация UTF-8
+        decodedName = Buffer.from(decodedName, 'latin1').toString('utf8');
+      }
+    } catch {
+      // Если не удалось декодировать, оставляем как есть
+    }
+    
+    let decodedFileName = req.file.originalname || 'certificate';
+    
+    // Исправляем кодировку имени файла (multer передает в latin1)
+    if (req.file.originalname) {
+      try {
+        // Multer всегда передает originalname в latin1, нужно конвертировать в UTF-8
+        decodedFileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+      } catch {
+        decodedFileName = req.file.originalname;
+      }
+    }
+    
+    // Сохраняем сертификат
+    const [certificate] = await knex('certificates')
+      .insert({
+        user_id: competence.user_id,
+        competence_matrix_id: parseInt(competence_matrix_id),
+        test_result_id: null,
+        name: decodedName,
+        file_data: req.file.buffer,
+        file_mime: req.file.mimetype,
+        file_name: decodedFileName,
+        file_size: req.file.size
+      })
+      .returning('*');
+    
+    return res.status(201).json({
+      id: certificate.id,
+      name: certificate.name,
+      file_name: certificate.file_name,
+      file_size: certificate.file_size,
+      file_mime: certificate.file_mime,
+      competence_matrix_id: certificate.competence_matrix_id,
+      created_at: certificate.created_at
+    });
+  } catch (error) {
+    console.error('Error uploading certificate for competence:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Загрузить сертификат для результата тестирования
+router.post('/certificates/test-result', authenticateToken, upload.single('certificate'), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { test_result_id, name } = req.body;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+    
+    if (!test_result_id || !name) {
+      return res.status(400).json({ error: 'Не указаны test_result_id или name' });
+    }
+    
+    // Проверяем, что результат теста существует
+    const testResult = await knex('test_results')
+      .join('growth_plans', 'test_results.growth_plan_id', 'growth_plans.id')
+      .where('test_results.id', test_result_id)
+      .select('test_results.*', 'growth_plans.user_id')
+      .first();
+    
+    if (!testResult) {
+      return res.status(404).json({ error: 'Test result not found' });
+    }
+    
+    // Проверяем доступ (пользователь может загружать только для своих тестов, админы и HR - для любых)
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && testResult.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Проверяем MIME тип
+    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/tif'];
+    if (!allowedMimes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Неподдерживаемый формат файла. Разрешены: PDF, JPEG, PNG, TIFF' });
+    }
+    
+    // Обрабатываем кодировку для названия и имени файла
+    // Multer может передавать данные в latin1, нужно конвертировать в UTF-8
+    let decodedName = typeof name === 'string' ? name.trim() : String(name).trim();
+    
+    // Исправляем кодировку названия (если пришло в неправильной кодировке)
+    try {
+      // Проверяем, содержит ли строка символы, которые выглядят как неправильно декодированные UTF-8
+      if (/Ð|Ñ|Ð|Ñ/.test(decodedName)) {
+        // Пытаемся исправить: если строка выглядит как latin1 интерпретация UTF-8
+        decodedName = Buffer.from(decodedName, 'latin1').toString('utf8');
+      }
+    } catch {
+      // Если не удалось декодировать, оставляем как есть
+    }
+    
+    let decodedFileName = req.file.originalname || 'certificate';
+    
+    // Исправляем кодировку имени файла (multer передает в latin1)
+    if (req.file.originalname) {
+      try {
+        // Multer всегда передает originalname в latin1, нужно конвертировать в UTF-8
+        decodedFileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+      } catch {
+        decodedFileName = req.file.originalname;
+      }
+    }
+    
+    // Сохраняем сертификат
+    const [certificate] = await knex('certificates')
+      .insert({
+        user_id: testResult.user_id,
+        competence_matrix_id: null,
+        test_result_id: parseInt(test_result_id),
+        name: decodedName,
+        file_data: req.file.buffer,
+        file_mime: req.file.mimetype,
+        file_name: decodedFileName,
+        file_size: req.file.size
+      })
+      .returning('*');
+    
+    return res.status(201).json({
+      id: certificate.id,
+      name: certificate.name,
+      file_name: certificate.file_name,
+      file_size: certificate.file_size,
+      file_mime: certificate.file_mime,
+      test_result_id: certificate.test_result_id,
+      created_at: certificate.created_at
+    });
+  } catch (error) {
+    console.error('Error uploading certificate for test result:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Получить сертификат (файл)
+router.get('/certificates/:id/file', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    const certificate = await knex('certificates')
+      .where('id', id)
+      .first();
+    
+    if (!certificate) {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+    
+    // Проверяем доступ (пользователь может просматривать только свои сертификаты, админы и HR - все)
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && certificate.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.setHeader('Content-Type', certificate.file_mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(certificate.file_name)}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(certificate.file_data);
+  } catch (error) {
+    console.error('Error fetching certificate file:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Получить информацию о сертификатах пользователя
+router.get('/certificates', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { user_id, competence_matrix_id, test_result_id } = req.query;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    // Определяем, для какого пользователя запрашиваем сертификаты
+    let targetUserId = user_id ? String(user_id) : userId;
+    
+    // Проверяем доступ (пользователь может видеть только свои сертификаты, админы и HR - все)
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && targetUserId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    let query = knex('certificates')
+      .where('certificates.user_id', targetUserId)
+      .select(
+        'certificates.id',
+        'certificates.name',
+        'certificates.file_name',
+        'certificates.file_size',
+        'certificates.file_mime',
+        'certificates.competence_matrix_id',
+        'certificates.test_result_id',
+        'certificates.created_at',
+        'certificates.updated_at'
+      )
+      .orderBy('certificates.created_at', 'desc');
+    
+    // Фильтр по компетенции
+    if (competence_matrix_id) {
+      query = query.where('certificates.competence_matrix_id', competence_matrix_id);
+    }
+    
+    // Фильтр по результату теста
+    if (test_result_id) {
+      query = query.where('certificates.test_result_id', test_result_id);
+    }
+    
+    const certificates = await query;
+    
+    return res.json(certificates);
+  } catch (error) {
+    console.error('Error fetching certificates:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Удалить сертификат
+router.delete('/certificates/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    const certificate = await knex('certificates')
+      .where('id', id)
+      .first();
+    
+    if (!certificate) {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+    
+    // Проверяем доступ (пользователь может удалять только свои сертификаты, админы и HR - все)
+    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && certificate.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    await knex('certificates')
+      .where('id', id)
+      .delete();
+    
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting certificate:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

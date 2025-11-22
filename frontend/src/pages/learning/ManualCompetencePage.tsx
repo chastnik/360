@@ -48,7 +48,9 @@ const ManualCompetencePage: React.FC = () => {
     level: 'junior' as 'junior' | 'middle' | 'senior',
     score: 50,
     assessment_date: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    certificateFile: null as File | null,
+    certificateName: ''
   });
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -180,7 +182,27 @@ const ManualCompetencePage: React.FC = () => {
         source: 'manual'
       };
 
-      await api.post('/learning/competence-matrix', competenceData);
+      const response = await api.post('/learning/competence-matrix', competenceData);
+      const competenceMatrixId = response.data.id || editingEntry?.id;
+      
+      // Если есть сертификат, загружаем его
+      if (competenceMatrixId && formData.certificateFile && formData.certificateName) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('certificate', formData.certificateFile);
+        formDataUpload.append('competence_matrix_id', competenceMatrixId.toString());
+        formDataUpload.append('name', formData.certificateName);
+        
+        try {
+          await api.post('/learning/certificates/competence', formDataUpload, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+        } catch (certError) {
+          console.error('Error uploading certificate:', certError);
+          // Не прерываем процесс, если загрузка сертификата не удалась
+        }
+      }
 
       setSuccessMessage(editingEntry ? 'Компетенция успешно обновлена!' : 'Компетенция успешно указана!');
       
@@ -196,7 +218,9 @@ const ManualCompetencePage: React.FC = () => {
         level: 'junior',
         score: 50,
         assessment_date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        certificateFile: null,
+        certificateName: ''
       });
       setFormErrors({});
 
@@ -236,7 +260,9 @@ const ManualCompetencePage: React.FC = () => {
       level: entry.level,
       score: entry.score,
       assessment_date: entry.assessment_date,
-      notes: entry.notes || ''
+      notes: entry.notes || '',
+      certificateFile: null,
+      certificateName: ''
     });
     // Прокручиваем к форме
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -274,7 +300,9 @@ const ManualCompetencePage: React.FC = () => {
       level: 'junior',
       score: 50,
       assessment_date: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      certificateFile: null,
+      certificateName: ''
     });
     setFormErrors({});
   };
@@ -645,7 +673,7 @@ const ManualCompetencePage: React.FC = () => {
           </div>
 
           {/* Примечания */}
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Примечания (необязательно)
             </label>
@@ -656,6 +684,34 @@ const ManualCompetencePage: React.FC = () => {
               placeholder="Дополнительная информация о компетенции..."
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             />
+          </div>
+
+          {/* Сертификат (опционально) */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Сертификат (опционально)
+            </label>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={formData.certificateName}
+                onChange={(e) => setFormData({ ...formData, certificateName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Название сертификата"
+              />
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setFormData({ ...formData, certificateFile: file });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Поддерживаемые форматы: PDF, JPEG, PNG, TIFF (макс. 10 МБ)
+              </p>
+            </div>
           </div>
 
           {/* Ошибка отправки */}

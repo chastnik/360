@@ -109,7 +109,9 @@ const GrowthPlansPage: React.FC = () => {
   const [testFormData, setTestFormData] = useState({
     test_date: new Date().toISOString().split('T')[0],
     status: 'passed' as 'passed' | 'failed',
-    notes: ''
+    notes: '',
+    certificateFile: null as File | null,
+    certificateName: ''
   });
   const [testFormErrors, setTestFormErrors] = useState<{[key: string]: string}>({});
   const [isSubmittingTest, setIsSubmittingTest] = useState(false);
@@ -404,7 +406,8 @@ const GrowthPlansPage: React.FC = () => {
     setTestFormErrors({});
 
     try {
-      await api.post('/learning/test-results', {
+      // Создаем результат теста
+      const testResultResponse = await api.post('/learning/test-results', {
         growth_plan_id: selectedPlan?.id,
         course_id: selectedCourse?.id,
         status: testFormData.status,
@@ -412,19 +415,48 @@ const GrowthPlansPage: React.FC = () => {
         notes: testFormData.notes || null
       });
       
+      const testResultId = testResultResponse.data.id;
+      
+      // Если есть сертификат, загружаем его
+      if (testFormData.certificateFile && testFormData.certificateName) {
+        const formData = new FormData();
+        formData.append('certificate', testFormData.certificateFile);
+        formData.append('test_result_id', testResultId.toString());
+        formData.append('name', testFormData.certificateName);
+        
+        try {
+          await api.post('/learning/certificates/test-result', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+        } catch (certError: any) {
+          console.error('Error uploading certificate:', certError);
+          const errorMessage = certError.response?.data?.error || 'Не удалось загрузить сертификат';
+          setTestFormErrors({
+            certificate: errorMessage
+          });
+          // Не закрываем модальное окно, чтобы пользователь мог увидеть ошибку
+          setIsSubmittingTest(false);
+          return;
+        }
+      }
+      
       setShowTestModal(false);
       setSelectedPlan(null);
       setSelectedCourse(null);
       setTestFormData({
         test_date: new Date().toISOString().split('T')[0],
         status: 'passed',
-        notes: ''
+        notes: '',
+        certificateFile: null,
+        certificateName: ''
       });
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding test result:', error);
       setTestFormErrors({
-        general: 'Произошла ошибка при сохранении результата теста'
+        general: error.response?.data?.error || 'Произошла ошибка при сохранении результата теста'
       });
     } finally {
       setIsSubmittingTest(false);
@@ -1122,8 +1154,14 @@ const GrowthPlansPage: React.FC = () => {
             </div>
             
             {testFormErrors.general && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded">
                 {testFormErrors.general}
+              </div>
+            )}
+            
+            {testFormErrors.certificate && (
+              <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 rounded">
+                ⚠️ {testFormErrors.certificate}
               </div>
             )}
 
@@ -1174,7 +1212,7 @@ const GrowthPlansPage: React.FC = () => {
               </div>
 
               {/* Заметки */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Заметки (опционально)
                 </label>
@@ -1187,6 +1225,34 @@ const GrowthPlansPage: React.FC = () => {
                 />
               </div>
 
+              {/* Сертификат (опционально) */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Сертификат (опционально)
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={testFormData.certificateName}
+                    onChange={(e) => setTestFormData({...testFormData, certificateName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Название сертификата"
+                  />
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setTestFormData({...testFormData, certificateFile: file});
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Поддерживаемые форматы: PDF, JPEG, PNG, TIFF (макс. 10 МБ)
+                  </p>
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -1197,7 +1263,9 @@ const GrowthPlansPage: React.FC = () => {
                     setTestFormData({
                       test_date: new Date().toISOString().split('T')[0],
                       status: 'passed',
-                      notes: ''
+                      notes: '',
+                      certificateFile: null,
+                      certificateName: ''
                     });
                     setTestFormErrors({});
                   }}
