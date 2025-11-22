@@ -4,9 +4,11 @@
 Этот документ описывает production-развертывание системы 360° с использованием Docker Compose.
 
 ## Требования
-- Docker 20.10+
-- Docker Compose v2 (команда `docker compose`)
+- Docker 20.10+ (проверяется автоматически)
+- Docker Compose v2 (команда `docker compose`) или v1 (docker-compose)
+- curl (опционально, для проверки здоровья сервисов)
 - Порты: 80 (frontend), 5000 (backend), 5432 (PostgreSQL), 6379 (Redis)
+- Права доступа к Docker (пользователь должен быть в группе docker)
 
 ## Структура
 - `docker-compose.yml` - конфигурация всех сервисов
@@ -36,11 +38,26 @@ cp env.example .env
 ./docker-setup.sh
 
 # Скрипт выполнит:
-# - Проверку зависимостей
+# - Проверку зависимостей (Docker версия, права доступа)
+# - Безопасную загрузку переменных окружения
 # - Сборку Docker образов
-# - Запуск всех сервисов
+# - Запуск всех сервисов с проверкой готовности
 # - Выполнение миграций
-# - Заполнение начальными данными (опционально)
+# - Заполнение начальными данными (опционально, интерактивно)
+```
+
+### Неинтерактивная установка (для CI/CD)
+
+```bash
+# Установка без интерактивных запросов
+./docker-setup.sh install --non-interactive
+# или
+./docker-setup.sh install -y
+
+# В этом режиме:
+# - Пропускается ожидание редактирования .env
+# - Пропускается запрос на выполнение seed
+# - Все проверки выполняются автоматически
 ```
 
 ### Ручная установка
@@ -81,13 +98,15 @@ docker compose logs -f
 ```
 
 #### 4) Инициализация БД
-Миграции/сиды вызываются командами npm внутри контейнера backend:
+Миграции/сиды можно выполнить через скрипт или вручную:
 ```bash
-# Выполнение миграций
-docker compose exec backend npm run migrate
+# Через скрипт (рекомендуется)
+./docker-setup.sh migrate
+./docker-setup.sh seed
 
-# Заполнение начальными данными
-docker compose exec backend npm run seed
+# Или вручную через docker compose
+docker compose exec -T backend npm run migrate
+docker compose exec -T backend npm run seed
 ```
 
 #### 5) Проверка здоровья
@@ -140,12 +159,25 @@ docker compose logs -f backend
 ### Выполнение миграций
 
 ```bash
-# Автоматически через скрипт
+# Автоматически через скрипт (рекомендуется)
 ./docker-setup.sh migrate
 
+# Выполнение seed
+./docker-setup.sh seed
+
 # Или вручную
-docker compose exec backend npm run migrate
-docker compose exec backend npm run seed
+docker compose exec -T backend npm run migrate
+docker compose exec -T backend npm run seed
+```
+
+### Сборка образов
+
+```bash
+# Сборка через скрипт
+./docker-setup.sh build
+
+# Или вручную
+docker compose build
 ```
 
 ## Резервное копирование
@@ -162,20 +194,81 @@ docker compose exec -T database psql -U "${DB_USER:-assessment_user}" -d "${DB_N
 
 ```bash
 # Остановка системы
+./docker-setup.sh stop
+# или
 docker compose down
 
 # Обновление кода (если используется git)
 git pull origin main
 
 # Пересборка образов
+./docker-setup.sh build
+# или
 docker compose build
 
 # Запуск системы
+./docker-setup.sh start
+# или
 docker compose up -d
 
 # Выполнение миграций (если есть новые)
 ./docker-setup.sh migrate
 ```
+
+## Возможности скрипта docker-setup.sh
+
+Скрипт `docker-setup.sh` версии 2.0.0 предоставляет следующие возможности:
+
+### Команды
+
+- `install` - Полная автоматическая установка (по умолчанию)
+- `build` - Собрать Docker образы
+- `start` - Запустить систему
+- `stop` - Остановить систему
+- `restart` - Перезапустить систему
+- `migrate` - Выполнить миграции базы данных
+- `seed` - Заполнить базу данных начальными данными
+- `status` - Проверить статус системы
+- `logs [service]` - Просмотр логов (всех или конкретного сервиса)
+- `help` - Показать справку
+
+### Опции
+
+- `--non-interactive` или `-y` - Неинтерактивный режим (для CI/CD)
+
+### Примеры использования
+
+```bash
+# Полная установка
+./docker-setup.sh
+
+# Полная установка без интерактивных запросов
+./docker-setup.sh install --non-interactive
+
+# Только сборка образов
+./docker-setup.sh build
+
+# Только миграции
+./docker-setup.sh migrate
+
+# Просмотр логов backend
+./docker-setup.sh logs backend
+
+# Проверка статуса
+./docker-setup.sh status
+```
+
+### Улучшения в версии 2.0.0
+
+- ✅ Безопасная загрузка `.env` файла
+- ✅ Автоматическая проверка версии Docker (минимум 20.10)
+- ✅ Проверка прав доступа к Docker
+- ✅ Неинтерактивный режим для автоматизации
+- ✅ Улучшенные health checks вместо фиксированных задержек
+- ✅ Таймауты для всех сетевых запросов
+- ✅ Обработка сигналов (SIGINT/SIGTERM)
+- ✅ Более информативные сообщения об ошибках
+- ✅ Версионирование скрипта
 
 ## Масштабирование
 
@@ -260,9 +353,12 @@ docker compose restart frontend
 
 ### Важные замечания
 
-- Используйте `docker compose` (v2), а не `docker-compose` (v1)
+- Скрипт автоматически определяет версию Docker Compose (v2 или v1)
 - Убедитесь, что `.env` в корне содержит `FRONTEND_URL` — он нужен для CORS и ссылок в уведомлениях
 - Все пароли и секреты должны быть изменены перед запуском в production
+- Скрипт автоматически проверяет, что пароли и секреты изменены (не используются значения по умолчанию)
 - Healthchecks автоматически проверяют готовность сервисов перед запуском зависимых контейнеров
+- Для автоматизации используйте флаг `--non-interactive` или `-y`
+- Скрипт проверяет версию Docker (минимум 20.10) и права доступа перед выполнением операций
 
 
