@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import StructurePage from './StructurePage';
 import VacationsPage from './VacationsPage';
 import CompetenceMatrixPage from './learning/CompetenceMatrixPage';
+import CertificatesPage from './CertificatesPage';
 
 const EmployeesPage: React.FC = () => {
   const location = useLocation();
@@ -16,13 +17,17 @@ const EmployeesPage: React.FC = () => {
     if (location.pathname.includes('/employees/competence-matrix')) {
       return 'competence-matrix';
     }
+    if (location.pathname.includes('/employees/certificates')) {
+      return 'certificates';
+    }
     return 'structure';
   });
 
   const tabs = [
     { id: 'structure', name: 'Структура', icon: '🏢' },
     { id: 'vacations', name: 'Отпуска', icon: '🏖️' },
-    { id: 'competence-matrix', name: 'Матрица компетенций', icon: '🧠' }
+    { id: 'competence-matrix', name: 'Матрица компетенций', icon: '🧠' },
+    { id: 'certificates', name: 'Сертификаты', icon: '📜' }
   ];
 
   const renderContent = () => {
@@ -33,6 +38,8 @@ const EmployeesPage: React.FC = () => {
         return <VacationsPage />;
       case 'competence-matrix':
         return <CompetenceMatrixPage />;
+      case 'certificates':
+        return <CertificatesPage />;
       default:
         return <StructurePage />;
     }

@@ -1469,13 +1469,21 @@ router.get('/certificates', authenticateToken, async (req: AuthRequest, res) => 
     // Определяем, для какого пользователя запрашиваем сертификаты
     let targetUserId = user_id ? String(user_id) : userId;
     
-    // Проверяем доступ (пользователь может видеть только свои сертификаты, админы и HR - все)
-    if (req.user?.role !== 'admin' && req.user?.role !== 'hr' && targetUserId !== userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
+    // Проверяем доступ:
+    // - Пользователь может видеть свои сертификаты
+    // - Пользователь может видеть сертификаты других пользователей (публичный профиль)
+    // - Админы и HR могут видеть все сертификаты
+    // Сертификаты являются публичной информацией в профиле пользователя
+    // Сертификаты могут быть связаны либо с competence_matrix_id, либо с test_result_id
+    // Для test_result_id нужно получить компетенцию через training_courses
     
     let query = knex('certificates')
       .where('certificates.user_id', targetUserId)
+      .leftJoin('competence_matrix', 'certificates.competence_matrix_id', 'competence_matrix.id')
+      .leftJoin('competencies as comp1', 'competence_matrix.competency_id', 'comp1.id')
+      .leftJoin('test_results', 'certificates.test_result_id', 'test_results.id')
+      .leftJoin('training_courses', 'test_results.course_id', 'training_courses.id')
+      .leftJoin('competencies as comp2', 'training_courses.competency_id', 'comp2.id')
       .select(
         'certificates.id',
         'certificates.name',
@@ -1485,7 +1493,9 @@ router.get('/certificates', authenticateToken, async (req: AuthRequest, res) => 
         'certificates.competence_matrix_id',
         'certificates.test_result_id',
         'certificates.created_at',
-        'certificates.updated_at'
+        'certificates.updated_at',
+        knex.raw('COALESCE(comp1.name, comp2.name) as competency_name'),
+        knex.raw('COALESCE(comp1.id, comp2.id) as competency_id')
       )
       .orderBy('certificates.created_at', 'desc');
     
@@ -1504,6 +1514,91 @@ router.get('/certificates', authenticateToken, async (req: AuthRequest, res) => 
     return res.json(certificates);
   } catch (error) {
     console.error('Error fetching certificates:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Поиск сертификатов (по компетенциям, ФИО, тексту)
+router.get('/certificates/search', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { search, competency_id, user_name } = req.query;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    // Все авторизованные пользователи могут искать сертификаты
+    // Сертификаты являются публичной информацией в профилях пользователей
+    // Сертификаты могут быть связаны либо с competence_matrix_id, либо с test_result_id
+    // Для test_result_id нужно получить компетенцию через training_courses
+    let query = knex('certificates')
+      .join('users', 'certificates.user_id', 'users.id')
+      .leftJoin('competence_matrix', 'certificates.competence_matrix_id', 'competence_matrix.id')
+      .leftJoin('competencies as comp1', 'competence_matrix.competency_id', 'comp1.id')
+      .leftJoin('test_results', 'certificates.test_result_id', 'test_results.id')
+      .leftJoin('training_courses', 'test_results.course_id', 'training_courses.id')
+      .leftJoin('competencies as comp2', 'training_courses.competency_id', 'comp2.id')
+      .select(
+        'certificates.id',
+        'certificates.name',
+        'certificates.file_name',
+        'certificates.file_size',
+        'certificates.file_mime',
+        'certificates.competence_matrix_id',
+        'certificates.test_result_id',
+        'certificates.created_at',
+        'certificates.updated_at',
+        'users.id as user_id',
+        'users.first_name',
+        'users.last_name',
+        'users.email',
+        'users.position',
+        knex.raw('COALESCE(comp1.name, comp2.name) as competency_name'),
+        knex.raw('COALESCE(comp1.id, comp2.id) as competency_id')
+      );
+    
+    // Поиск по тексту (название сертификата, имя файла)
+    if (search && typeof search === 'string' && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+      query = query.where(function() {
+        this.where('certificates.name', 'ilike', searchTerm)
+          .orWhere('certificates.file_name', 'ilike', searchTerm);
+      });
+    }
+    
+    // Поиск по компетенции (может быть через competence_matrix или через training_courses)
+    if (competency_id && String(competency_id).trim()) {
+      const compId = String(competency_id).trim();
+      query = query.where(function() {
+        this.where('comp1.id', compId)
+          .orWhere('comp2.id', compId);
+      });
+    }
+    
+    // Поиск по ФИО пользователя
+    if (user_name && typeof user_name === 'string' && user_name.trim()) {
+      const nameTerm = `%${user_name.trim()}%`;
+      query = query.where(function() {
+        this.where('users.first_name', 'ilike', nameTerm)
+          .orWhere('users.last_name', 'ilike', nameTerm)
+          .orWhere(knex.raw("COALESCE(users.first_name, '') || ' ' || COALESCE(users.last_name, '')"), 'ilike', nameTerm);
+      });
+    }
+    
+    const certificates = await query
+      .orderBy('certificates.created_at', 'desc');
+    
+    console.log('Certificates search result:', {
+      search,
+      competency_id,
+      user_name,
+      count: certificates.length
+    });
+    
+    return res.json(certificates);
+  } catch (error) {
+    console.error('Error searching certificates:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

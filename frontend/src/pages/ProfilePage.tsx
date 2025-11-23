@@ -44,6 +44,9 @@ export const ProfilePage: React.FC = () => {
   // Компетенции
   const [competencies, setCompetencies] = useState<any[]>([]);
 
+  // Сертификаты
+  const [certificates, setCertificates] = useState<any[]>([]);
+
   // Управление отпусками
   const [vacations, setVacations] = useState<any[]>([]);
   const [showVacationModal, setShowVacationModal] = useState(false);
@@ -208,6 +211,16 @@ export const ProfilePage: React.FC = () => {
         } catch (error) {
           console.error('Ошибка загрузки отпусков:', error);
         }
+      }
+
+      // Загрузка сертификатов пользователя (для всех - публичный профиль)
+      try {
+        const certificatesResponse = await api.get(`/learning/certificates?user_id=${currentUserData.id}`);
+        const certificatesData = Array.isArray(certificatesResponse.data) ? certificatesResponse.data : [];
+        setCertificates(certificatesData);
+      } catch (error) {
+        console.error('Ошибка загрузки сертификатов:', error);
+        setCertificates([]);
       }
 
       await Promise.all(promises);
@@ -1129,6 +1142,81 @@ export const ProfilePage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Карточка сертификатов (для всех - публичный профиль) */}
+      <div className="card p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Сертификаты</h2>
+
+        {certificates.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {certificates.map((cert: any) => (
+              <div
+                key={cert.id}
+                className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg hover:shadow-md transition-all border border-gray-200 dark:border-gray-700"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white flex-1">
+                    {cert.name}
+                  </h3>
+                </div>
+                {cert.competency_name && (
+                  <div className="mb-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                      🧠 {cert.competency_name}
+                    </span>
+                  </div>
+                )}
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  {cert.file_name}
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(cert.created_at).toLocaleDateString('ru-RU', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await api.get(`/learning/certificates/${cert.id}/file`, {
+                          responseType: 'blob'
+                        });
+                        const blob = new Blob([response.data], { type: response.headers['content-type'] || cert.file_mime || 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = cert.file_name || cert.name;
+                        link.target = '_blank';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                      } catch (error) {
+                        console.error('Ошибка загрузки сертификата:', error);
+                        alert('Не удалось загрузить сертификат. Проверьте подключение к серверу.');
+                      }
+                    }}
+                    className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 font-medium"
+                  >
+                    Скачать
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">Сертификаты не загружены</p>
+            {!isViewingOtherProfile && (
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
+                Загрузите сертификаты в блоке обучения
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Карточка истории обратной связи (только для собственного профиля) */}
       {!isViewingOtherProfile && (
