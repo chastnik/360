@@ -1010,70 +1010,92 @@ router.get('/competence-matrix/all', authenticateToken, async (_req: AuthRequest
       .orderBy('users.last_name', 'users.first_name')
       .orderBy('competencies.name');
     
-    // Получаем сертификаты для каждой компетенции
-    for (const entry of matrix) {
-      // Сертификаты, привязанные напрямую к компетенции (ручной ввод)
-      const directCertificates = await knex('certificates')
-        .where('competence_matrix_id', entry.id)
-        .select('id', 'name', 'file_name', 'file_size', 'file_mime', 'created_at')
-        .orderBy('created_at', 'desc');
-      
-      // Сертификаты из результатов тестов
-      // Находим все результаты тестов пользователя с сертификатами
-      const testResultsWithCerts = await knex('test_results as tr')
-        .join('growth_plans as gp', 'tr.growth_plan_id', 'gp.id')
-        .join('training_courses as tc', 'tr.course_id', 'tc.id')
-        .join('certificates as c', 'c.test_result_id', 'tr.id')
-        .where('gp.user_id', entry.user_id)
-        .where('tr.status', 'passed')
-        .select(
-          'c.id',
-          'c.name',
-          'c.file_name',
-          'c.file_size',
-          'c.file_mime',
-          'c.created_at',
-          'tc.name as course_name',
-          'tc.competency_id as course_competency_id'
-        );
-      
-      // Логируем для отладки
-      if (testResultsWithCerts.length > 0) {
-        console.log(`[DEBUG /competence-matrix/all] Для компетенции ${entry.competency_name} (${entry.competency_id}) пользователя ${entry.user_id} найдено ${testResultsWithCerts.length} сертификатов из тестов`);
+    // Оптимизация: получаем все сертификаты одним запросом
+    const matrixIds = matrix.map(m => m.id);
+    const userIds = [...new Set(matrix.map(m => m.user_id))];
+    
+    // Получаем все прямые сертификаты одним запросом
+    const allDirectCertificates = matrixIds.length > 0
+      ? await knex('certificates')
+          .whereIn('competence_matrix_id', matrixIds)
+          .select('id', 'name', 'file_name', 'file_size', 'file_mime', 'created_at', 'competence_matrix_id')
+          .orderBy('created_at', 'desc')
+      : [];
+
+    // Получаем все сертификаты из тестов одним запросом
+    const allTestResultsWithCerts = userIds.length > 0
+      ? await knex('test_results as tr')
+          .join('growth_plans as gp', 'tr.growth_plan_id', 'gp.id')
+          .join('training_courses as tc', 'tr.course_id', 'tc.id')
+          .join('certificates as c', 'c.test_result_id', 'tr.id')
+          .whereIn('gp.user_id', userIds)
+          .where('tr.status', 'passed')
+          .select(
+            'c.id',
+            'c.name',
+            'c.file_name',
+            'c.file_size',
+            'c.file_mime',
+            'c.created_at',
+            'tc.name as course_name',
+            'tc.competency_id as course_competency_id',
+            'gp.user_id'
+          )
+      : [];
+
+    // Создаем мапы для быстрого доступа
+    const directCertsMap = new Map<string, any[]>();
+    allDirectCertificates.forEach((cert: any) => {
+      const key = cert.competence_matrix_id;
+      if (!directCertsMap.has(key)) {
+        directCertsMap.set(key, []);
       }
+      directCertsMap.get(key)!.push(cert);
+    });
+
+    const testCertsMap = new Map<string, any[]>();
+    allTestResultsWithCerts.forEach((cert: any) => {
+      const key = `${cert.user_id}_${cert.course_competency_id || 'null'}`;
+      if (!testCertsMap.has(key)) {
+        testCertsMap.set(key, []);
+      }
+      testCertsMap.get(key)!.push(cert);
+    });
+
+    // Обрабатываем каждую запись матрицы
+    for (const entry of matrix) {
+      // Получаем прямые сертификаты из мапы
+      const directCertificates = directCertsMap.get(entry.id) || [];
+      
+      // Получаем сертификаты из тестов для этого пользователя
+      const userTestCerts = allTestResultsWithCerts.filter(
+        (cert: any) => cert.user_id === entry.user_id
+      );
       
       // Фильтруем сертификаты: оставляем только те, которые связаны с текущей компетенцией
-      // Связь может быть через:
-      // 1. competency_id курса совпадает с competency_id компетенции
-      // 2. Название курса содержит название компетенции или наоборот
-      // 3. Название курса содержит ключевые слова из названия компетенции (более гибкое сопоставление)
       const competencyNameLower = entry.competency_name.toLowerCase();
-      // Извлекаем ключевые слова из названия компетенции (слова длиннее 2 символов)
       const competencyKeywords = competencyNameLower
         .split(/[\s\-_]+/)
         .filter((w: string) => w.length > 2)
         .map((w: string) => w.trim());
       
-      const testResultCertificates = testResultsWithCerts
+      const testResultCertificates = userTestCerts
         .filter((cert: any) => {
           // Проверяем связь через competency_id (самый надежный способ)
           if (cert.course_competency_id && String(cert.course_competency_id) === String(entry.competency_id)) {
             return true;
           }
-          // Проверяем связь по названию (только если competency_id не совпал)
+          // Проверяем связь по названию
           const courseNameLower = (cert.course_name || '').toLowerCase();
           if (courseNameLower && competencyNameLower) {
-            // Точное совпадение или включение
             if (courseNameLower.includes(competencyNameLower) || 
                 competencyNameLower.includes(courseNameLower)) {
               return true;
             }
-            // Проверяем совпадение по ключевым словам (только если слова длиннее 2 символов)
             if (competencyKeywords.length > 0 && competencyKeywords.some((keyword: string) => courseNameLower.includes(keyword))) {
               return true;
             }
           }
-          // Если нет прямой связи, не показываем сертификат для этой компетенции
           return false;
         })
         .map((cert: any) => ({
@@ -1087,14 +1109,6 @@ router.get('/competence-matrix/all', authenticateToken, async (_req: AuthRequest
       
       // Объединяем оба типа сертификатов
       entry.certificates = [...directCertificates, ...testResultCertificates];
-      
-      // Логируем итоговый результат
-      if (entry.certificates.length > 0) {
-        console.log(`[DEBUG /competence-matrix/all] Итого для компетенции ${entry.competency_name} (${entry.competency_id}) пользователя ${entry.user_id}: ${entry.certificates.length} сертификатов (${directCertificates.length} прямых + ${testResultCertificates.length} из тестов)`);
-      } else if (testResultsWithCerts.length > 0) {
-        console.log(`[DEBUG /competence-matrix/all] Для компетенции ${entry.competency_name} найдено ${testResultsWithCerts.length} сертификатов из тестов, но ни один не прошел фильтрацию. Сертификаты:`, testResultsWithCerts.map((c: any) => ({ id: c.id, name: c.name, course: c.course_name })));
-        console.log(`[DEBUG /competence-matrix/all] Ключевые слова компетенции "${entry.competency_name}": [${competencyKeywords.join(', ')}]`);
-      }
     }
     
     return res.json(matrix);

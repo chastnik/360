@@ -1,15 +1,55 @@
 // © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
-/* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
+import Joi from 'joi';
 import db from '../database/connection';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest, requireAdmin } from '../middleware/auth';
+import { validate } from '../middleware/validation';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
+// Схемы валидации
+const createDepartmentSchema = Joi.object({
+  name: Joi.string().required().min(1).max(255).trim().messages({
+    'string.empty': 'Название отдела обязательно для заполнения',
+    'string.min': 'Название отдела должно содержать минимум 1 символ',
+    'string.max': 'Название отдела не должно превышать 255 символов',
+    'any.required': 'Название отдела обязательно'
+  }),
+  description: Joi.string().allow('', null).max(1000).trim().optional(),
+  code: Joi.string().allow('', null).max(50).trim().optional(),
+  head_id: Joi.string().uuid().allow(null).optional()
+});
+
+const updateDepartmentSchema = Joi.object({
+  name: Joi.string().min(1).max(255).trim().required().messages({
+    'string.empty': 'Название отдела обязательно для заполнения',
+    'string.min': 'Название отдела должно содержать минимум 1 символ',
+    'string.max': 'Название отдела не должно превышать 255 символов',
+    'any.required': 'Название отдела обязательно'
+  }),
+  description: Joi.string().allow('', null).max(1000).trim().optional(),
+  code: Joi.string().allow('', null).max(50).trim().optional(),
+  head_id: Joi.string().uuid().allow(null).optional()
+});
+
+const departmentIdSchema = Joi.object({
+  id: Joi.string().uuid().required()
+});
+
+const reorderDepartmentsSchema = Joi.object({
+  departments: Joi.array().items(
+    Joi.object({
+      id: Joi.string().uuid().required(),
+      sort_order: Joi.number().integer().min(0).required()
+    })
+  ).min(1).required()
+});
+
 // Получить все отделы
-router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user;
     
@@ -38,45 +78,46 @@ router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => 
 
     const departments = await query;
 
-    // Получаем количество сотрудников в каждом отделе
-    const departmentsWithCounts = await Promise.all(
-      departments.map(async (department) => {
-        try {
-          const employeeCount = await db('users')
-            .where('department_id', department.id)
-            .where('is_active', true)
-            .count('id as count')
-            .first();
+    // Оптимизация: получаем количество сотрудников одним запросом для всех отделов
+    const departmentIds = departments.map(d => d.id);
+    const employeeCounts = departmentIds.length > 0
+      ? await db('users')
+          .select('department_id')
+          .count('id as count')
+          .whereIn('department_id', departmentIds)
+          .where('is_active', true)
+          .groupBy('department_id')
+      : [];
 
-          return {
-            ...department,
-            employee_count: parseInt(String(employeeCount?.count || '0')),
-            head_name: department.head_first_name && department.head_last_name 
-              ? `${department.head_first_name} ${department.head_last_name}`
-              : null
-          };
-        } catch (error) {
-          return {
-            ...department,
-            employee_count: 0,
-            head_name: null
-          };
-        }
-      })
+    // Создаем мапу для быстрого доступа к количеству сотрудников
+    const countMap = new Map(
+      employeeCounts.map((item: { department_id: string; count: string | number }) => [
+        item.department_id,
+        parseInt(String(item.count || '0'))
+      ])
     );
+
+    // Объединяем данные
+    const departmentsWithCounts = departments.map((department) => ({
+      ...department,
+      employee_count: countMap.get(department.id) || 0,
+      head_name: department.head_first_name && department.head_last_name 
+        ? `${department.head_first_name} ${department.head_last_name}`
+        : null
+    }));
 
     res.json({
       success: true,
       data: departmentsWithCounts
     });
   } catch (error) {
-    console.error('Ошибка получения отделов:', error);
+    logger.error({ error }, 'Ошибка получения отделов');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Получить отдел по ID
-router.get('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.get('/:id', authenticateToken, validate(departmentIdSchema, 'params'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     
@@ -115,32 +156,23 @@ router.get('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
       data: result
     });
   } catch (error) {
-    console.error('Ошибка получения отдела:', error);
+    logger.error({ error }, 'Ошибка получения отдела');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Создать новый отдел (только для админов)
-router.post('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.post('/', authenticateToken, requireAdmin, validate(createDepartmentSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = req.user;
-    
-    if (user?.role !== 'admin') {
-      res.status(403).json({ error: 'Недостаточно прав доступа' });
-      return;
-    }
-
     const { name, description, code, head_id } = req.body;
-
-    if (!name || !name.trim()) {
-      res.status(400).json({ error: 'Название отдела обязательно для заполнения' });
-      return;
-    }
 
     // Проверяем уникальность названия
     const existingDepartment = await db('departments').where('name', name.trim()).first();
     if (existingDepartment) {
-      res.status(400).json({ error: 'Отдел с таким названием уже существует' });
+      res.status(400).json({ 
+        success: false,
+        error: 'Отдел с таким названием уже существует' 
+      });
       return;
     }
 
@@ -148,7 +180,10 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
     if (code && code.trim()) {
       const existingCode = await db('departments').where('code', code.trim()).first();
       if (existingCode) {
-        res.status(400).json({ error: 'Отдел с таким кодом уже существует' });
+        res.status(400).json({ 
+          success: false,
+          error: 'Отдел с таким кодом уже существует' 
+        });
         return;
       }
     }
@@ -157,7 +192,10 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
     if (head_id) {
       const headUser = await db('users').where('id', head_id).where('is_active', true).first();
       if (!headUser) {
-        res.status(400).json({ error: 'Указанный руководитель не найден' });
+        res.status(400).json({ 
+          success: false,
+          error: 'Указанный руководитель не найден' 
+        });
         return;
       }
     }
@@ -181,33 +219,24 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
       message: 'Отдел создан успешно'
     });
   } catch (error) {
-    console.error('Ошибка создания отдела:', error);
+    logger.error({ error }, 'Ошибка создания отдела');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Обновить отдел (только для админов)
-router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.put('/:id', authenticateToken, requireAdmin, validate(departmentIdSchema, 'params'), validate(updateDepartmentSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = req.user;
-    
-    if (user?.role !== 'admin') {
-      res.status(403).json({ error: 'Недостаточно прав доступа' });
-      return;
-    }
-
     const departmentId = req.params.id;
     const { name, description, code, head_id } = req.body;
 
     // Проверяем существование отдела
     const existingDepartment = await db('departments').where('id', departmentId).first();
     if (!existingDepartment) {
-      res.status(404).json({ error: 'Отдел не найден' });
-      return;
-    }
-
-    if (!name || !name.trim()) {
-      res.status(400).json({ error: 'Название отдела обязательно для заполнения' });
+      res.status(404).json({ 
+        success: false,
+        error: 'Отдел не найден' 
+      });
       return;
     }
 
@@ -269,21 +298,14 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
       message: 'Отдел обновлен успешно'
     });
   } catch (error) {
-    console.error('Ошибка обновления отдела:', error);
+    logger.error({ error }, 'Ошибка обновления отдела');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Активировать/деактивировать отдел
-router.patch('/:id/toggle-active', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/:id/toggle-active', authenticateToken, requireAdmin, validate(departmentIdSchema, 'params'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = req.user;
-    
-    if (user?.role !== 'admin') {
-      res.status(403).json({ error: 'Недостаточно прав доступа' });
-      return;
-    }
-
     const departmentId = req.params.id;
 
     const department = await db('departments').where('id', departmentId).first();
@@ -306,27 +328,15 @@ router.patch('/:id/toggle-active', authenticateToken, async (req: any, res: any)
       message: newStatus ? 'Отдел активирован' : 'Отдел деактивирован'
     });
   } catch (error) {
-    console.error('Ошибка изменения статуса отдела:', error);
+    logger.error({ error }, 'Ошибка изменения статуса отдела');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Изменить порядок отделов
-router.patch('/reorder', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/reorder', authenticateToken, requireAdmin, validate(reorderDepartmentsSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = req.user;
-    
-    if (user?.role !== 'admin') {
-      res.status(403).json({ error: 'Недостаточно прав доступа' });
-      return;
-    }
-
     const { departments } = req.body;
-
-    if (!departments || !Array.isArray(departments)) {
-      res.status(400).json({ error: 'Неверный формат данных' });
-      return;
-    }
 
     // Обновляем порядок в транзакции
     await db.transaction(async (trx) => {
@@ -345,21 +355,14 @@ router.patch('/reorder', authenticateToken, async (req: any, res: any): Promise<
       message: 'Порядок отделов обновлен'
     });
   } catch (error) {
-    console.error('Ошибка изменения порядка отделов:', error);
+    logger.error({ error }, 'Ошибка изменения порядка отделов');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Удалить отдел (только если нет сотрудников)
-router.delete('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.delete('/:id', authenticateToken, requireAdmin, validate(departmentIdSchema, 'params'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = req.user;
-    
-    if (user?.role !== 'admin') {
-      res.status(403).json({ error: 'Недостаточно прав доступа' });
-      return;
-    }
-
     const departmentId = req.params.id;
 
     const department = await db('departments').where('id', departmentId).first();
@@ -388,7 +391,7 @@ router.delete('/:id', authenticateToken, async (req: any, res: any): Promise<voi
       message: 'Отдел удален успешно'
     });
   } catch (error) {
-    console.error('Ошибка удаления отдела:', error);
+    logger.error({ error }, 'Ошибка удаления отдела');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });

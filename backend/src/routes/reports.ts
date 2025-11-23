@@ -1000,7 +1000,27 @@ router.get('/ml-analysis', authenticateToken, async (_req: any, res: any): Promi
 
     console.log(`[ML-анализ] Найдено участников для анализа: ${participants.length}`);
 
+    // Оптимизация: получаем все средние баллы одним запросом
     if (participants.length > 0) {
+      const participantIds = participants.map(p => p.participant_id);
+      
+      // Получаем средние баллы для всех участников одним запросом
+      const avgResults = await knex('assessment_responses')
+        .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+        .select('assessment_respondents.participant_id')
+        .avg('assessment_responses.rating_value as avg_score')
+        .whereIn('assessment_respondents.participant_id', participantIds)
+        .groupBy('assessment_respondents.participant_id');
+
+      // Создаем мапу для быстрого доступа
+      const avgScoresMap = new Map(
+        avgResults.map((result: { participant_id: string; avg_score: string | number | null }) => [
+          result.participant_id,
+          result.avg_score !== null ? Number(result.avg_score) : null
+        ])
+      );
+
+      // Обрабатываем участников
       for (const participant of participants) {
         try {
           const userId = participant.user_id;
@@ -1010,18 +1030,10 @@ router.get('/ml-analysis', authenticateToken, async (_req: any, res: any): Promi
             userScores[userId] = { scores: [], cycles: [] };
           }
 
-          const responses = await knex('assessment_responses')
-            .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
-            .where('assessment_respondents.participant_id', participant.participant_id)
-            .avg('assessment_responses.rating_value as avg_score')
-            .first();
-
-          if (responses && responses.avg_score !== null && responses.avg_score !== undefined) {
-            const score = Number(responses.avg_score);
-            if (!isNaN(score) && score > 0) {
-              userScores[userId].scores.push(score);
-              userScores[userId].cycles.push(participant.cycle_id);
-            }
+          const avgScore = avgScoresMap.get(participant.participant_id);
+          if (avgScore !== null && avgScore !== undefined && !isNaN(avgScore) && avgScore > 0) {
+            userScores[userId].scores.push(avgScore);
+            userScores[userId].cycles.push(participant.cycle_id);
           }
         } catch (error) {
           console.warn(`Ошибка обработки участника ${participant.participant_id}:`, error);

@@ -113,8 +113,6 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { user_id, start_date, end_date, type, comment } = req.body;
     
-    console.log('📝 Создание отпуска:', { user_id, start_date, end_date, type, comment, userRole: req.user?.role, userId: req.user?.userId });
-    
     // Проверяем права: админы и пользователи с правом на создание отпусков могут создавать для любого пользователя
     const hasCreatePermission = req.user?.permissions?.includes('action:vacations:create');
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'hr';
@@ -139,11 +137,8 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     }
     
     if (!targetUserId) {
-      console.error('❌ Ошибка: не указан user_id');
       return res.status(400).json({ error: 'Не указан идентификатор пользователя' });
     }
-    
-    console.log('✅ targetUserId определен:', targetUserId, 'из user_id:', user_id, 'req.user?.userId:', req.user?.userId, 'canCreateForOthers:', canCreateForOthers);
 
     // Валидация данных
     if (!start_date || !end_date) {
@@ -312,7 +307,7 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
         // Проверяем пересечения с другими отпусками ТОЛЬКО для этого пользователя (исключая текущий)
         const overlapping = await db('vacations')
           .where('user_id', existingVacation.user_id) // Важно: проверяем только для конкретного пользователя
-          .where('id', '!=', db.raw('?', [id]))
+          .where('id', '!=', db.raw('$1', [id]))
           .where('status', '!=', 'rejected')
           .where(function() {
             this.where(function() {

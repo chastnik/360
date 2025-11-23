@@ -5,8 +5,25 @@ import axios from 'axios';
 import knex from '../database/connection';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-const ALGORITHM = 'aes-256-cbc';
+// Ключ шифрования должен быть установлен в переменных окружения
+// Требуется 128 бит (16 байт = 32 hex символа)
+// Проверка выполняется лениво при первом использовании
+const ALGORITHM = 'aes-128-cbc';
+
+/**
+ * Получить ключ шифрования с валидацией
+ * @throws Error если ключ не установлен или невалиден
+ */
+function getEncryptionKey(): string {
+  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+  if (!ENCRYPTION_KEY) {
+    throw new Error('ENCRYPTION_KEY must be set in environment variables. This is required for Jira integration.');
+  }
+  if (ENCRYPTION_KEY.length < 32) {
+    throw new Error('ENCRYPTION_KEY must be at least 32 hex characters (128 bits).');
+  }
+  return ENCRYPTION_KEY;
+}
 
 function decrypt(text: string): string {
   if (!text) return '';
@@ -17,8 +34,8 @@ function decrypt(text: string): string {
     const encryptedText = parts[1];
     if (!ivPart || !encryptedText) return text;
     const iv = Buffer.from(ivPart, 'hex');
-    const encryptionKey = ENCRYPTION_KEY.slice(0, 32);
-    if (!encryptionKey) return text;
+    const encryptionKey = getEncryptionKey().slice(0, 32); // 32 hex символа = 16 байт = 128 бит
+    if (!encryptionKey || encryptionKey.length < 32) return text;
     const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(encryptionKey, 'hex'), iv);
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
     decrypted += decipher.final('utf8');

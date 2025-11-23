@@ -2,14 +2,14 @@
 
 // Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import knex from '../database/connection';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // Получить рабочее расписание
-router.get('/work-schedule', authenticateToken, requireAdmin, async (_req: any, res: any): Promise<void> => {
+router.get('/work-schedule', authenticateToken, requireAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const schedule = await knex('work_schedule')
       .select('*')
@@ -39,7 +39,7 @@ router.get('/work-schedule', authenticateToken, requireAdmin, async (_req: any, 
 });
 
 // Обновить рабочее расписание
-router.put('/work-schedule', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.put('/work-schedule', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { schedule } = req.body;
     
@@ -51,7 +51,7 @@ router.put('/work-schedule', authenticateToken, requireAdmin, async (req: any, r
     await knex('work_schedule').del();
     
     // Вставляем новое
-    const scheduleData = schedule.map((item: any) => ({
+    const scheduleData = schedule.map((item: { day_of_week: number; is_workday?: boolean; work_hours?: number; start_time?: string; end_time?: string }) => ({
       day_of_week: item.day_of_week,
       is_workday: item.is_workday !== false,
       work_hours: item.work_hours || 8,
@@ -70,7 +70,7 @@ router.put('/work-schedule', authenticateToken, requireAdmin, async (req: any, r
 });
 
 // Получить список праздников
-router.get('/holidays', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.get('/holidays', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { year } = req.query;
     
@@ -91,7 +91,7 @@ router.get('/holidays', authenticateToken, requireAdmin, async (req: any, res: a
 });
 
 // Создать праздник
-router.post('/holidays', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.post('/holidays', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { date, name, description, is_national } = req.body;
     
@@ -119,12 +119,12 @@ router.post('/holidays', authenticateToken, requireAdmin, async (req: any, res: 
 });
 
 // Обновить праздник
-router.put('/holidays/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.put('/holidays/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { date, name, description, is_national } = req.body;
     
-    const updateData: any = {};
+    const updateData: Record<string, any> = {};
     if (date) updateData.date = date;
     if (name !== undefined) updateData.name = String(name).trim();
     if (description !== undefined) updateData.description = description;
@@ -145,7 +145,7 @@ router.put('/holidays/:id', authenticateToken, requireAdmin, async (req: any, re
 });
 
 // Удалить праздник
-router.delete('/holidays/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.delete('/holidays/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     await knex('holidays').where('id', id).del();

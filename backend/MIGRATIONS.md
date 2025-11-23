@@ -39,7 +39,16 @@ npm run seed
 
 ## Список миграций
 
-Всего миграций: **29**
+Всего миграций: **30**
+
+**Важно:** При выполнении миграций обязательно указывайте окружение:
+```bash
+# Для development
+NODE_ENV=development npm run migrate
+
+# Для production
+NODE_ENV=production npm run migrate
+```
 
 ### Базовые таблицы (2024-01-01)
 
@@ -155,6 +164,20 @@ npm run seed
 
 29. **20250926120000_add_competency_id_to_training_courses.js**
     - Добавление связи курсов с компетенциями
+
+### Оптимизация производительности (2025-01-31)
+
+30. **20250131000000_add_performance_indexes.js**
+    - Добавление индексов для оптимизации производительности запросов:
+      - `users`: `email`, `role_id`, `department_id`, `manager_id`, `is_active`
+      - `assessment_responses`: `respondent_id`, `question_id`, `respondent_id + question_id`
+      - `assessment_participants`: `cycle_id`, `user_id`, `status`, `cycle_id + user_id`
+      - `assessment_respondents`: `participant_id`, `respondent_user_id`, `status`, `participant_id + respondent_user_id`
+      - `role_permissions`: `role_id`, `role_id + permission`
+      - `departments`: `head_id`, `is_active`
+      - `questions`: `category_id`, `is_active`
+      - `certificates`: `user_id`, `competency_id`, `user_id + competency_id`
+    - **Важно**: Эта миграция значительно улучшает производительность запросов, особенно при работе с большими объемами данных
 
 ## Порядок выполнения
 

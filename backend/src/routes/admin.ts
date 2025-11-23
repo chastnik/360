@@ -2,14 +2,14 @@
 
 // Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import knex from '../database/connection';
-import { authenticateToken, requireAdmin, requirePermission } from '../middleware/auth';
+import { authenticateToken, requireAdmin, requirePermission, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // Недавняя активность для админ-панели
-router.get('/recent-activity', authenticateToken, requireAdmin, async (_req: any, res: any): Promise<void> => {
+router.get('/recent-activity', authenticateToken, requireAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const [usersRecent, cyclesCreated, cyclesStarted, assessmentsCompleted] = await Promise.all([
       knex('users')
@@ -105,7 +105,7 @@ router.get('/recent-activity', authenticateToken, requireAdmin, async (_req: any
 });
 
 // Получить логи системы
-router.get('/logs', authenticateToken, requirePermission('ui:view:admin.logs'), async (req: any, res: any): Promise<void> => {
+router.get('/logs', authenticateToken, requirePermission('ui:view:admin.logs'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { level, search, limit = 100 } = req.query;
     
@@ -167,7 +167,7 @@ export default router;
 
 
 // Компетенции (CRUD)
-router.get('/competencies', authenticateToken, requirePermission('ui:view:admin.competencies'), async (_req: any, res: any): Promise<void> => {
+router.get('/competencies', authenticateToken, requirePermission('ui:view:admin.competencies'), async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const rows = await knex('competencies').where('is_active', true).orderBy('name');
     res.json({ success: true, data: rows });
@@ -176,7 +176,7 @@ router.get('/competencies', authenticateToken, requirePermission('ui:view:admin.
   }
 });
 
-router.post('/competencies', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: any, res: any): Promise<void> => {
+router.post('/competencies', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, description } = req.body;
     if (!name || String(name).trim() === '') { res.status(400).json({ error: 'Название обязательно' }); return; }
@@ -187,7 +187,7 @@ router.post('/competencies', authenticateToken, requirePermission('ui:view:admin
   }
 });
 
-router.put('/competencies/:id', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: any, res: any): Promise<void> => {
+router.put('/competencies/:id', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { name, description, is_active } = req.body;
@@ -204,7 +204,7 @@ router.put('/competencies/:id', authenticateToken, requirePermission('ui:view:ad
   }
 });
 
-router.delete('/competencies/:id', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: any, res: any): Promise<void> => {
+router.delete('/competencies/:id', authenticateToken, requirePermission('ui:view:admin.competencies'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     await knex('competencies').where('id', id).update({ is_active: false, updated_at: knex.fn.now() });

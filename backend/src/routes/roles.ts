@@ -2,14 +2,14 @@
 
 // Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import db from '../database/connection';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // Список ролей
-router.get('/', authenticateToken, requireAdmin, async (_req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, requireAdmin, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const roles = await db('roles').select('id', 'key', 'name', 'description', 'is_system', 'created_at', 'updated_at').orderBy('name');
     res.json({ success: true, data: roles });
@@ -20,7 +20,7 @@ router.get('/', authenticateToken, requireAdmin, async (_req: any, res: any): Pr
 });
 
 // Создание роли
-router.post('/', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { key, name, description } = req.body;
     if (!key || !name) {
@@ -36,7 +36,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: any, res: any): Pr
 });
 
 // Обновление роли
-router.put('/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -58,7 +58,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: any, res: any): 
 });
 
 // Удаление роли (нельзя удалить системную)
-router.delete('/:id', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.delete('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const existing = await db('roles').where('id', id).first();
@@ -79,7 +79,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: any, res: any
 });
 
 // Права роли: получение
-router.get('/:id/permissions', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.get('/:id/permissions', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const permissions = await db('role_permissions').where('role_id', id).pluck('permission');
@@ -91,7 +91,7 @@ router.get('/:id/permissions', authenticateToken, requireAdmin, async (req: any,
 });
 
 // Права роли: замена списка
-router.put('/:id/permissions', authenticateToken, requireAdmin, async (req: any, res: any): Promise<void> => {
+router.put('/:id/permissions', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { permissions } = req.body as { permissions: string[] };

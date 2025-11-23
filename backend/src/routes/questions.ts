@@ -1,15 +1,61 @@
 // © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
-/* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
+import Joi from 'joi';
 import knex from '../database/connection';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest, requireAdmin } from '../middleware/auth';
+import { validate } from '../middleware/validation';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
+// Схемы валидации
+const createQuestionSchema = Joi.object({
+  text: Joi.string().required().min(1).max(1000).messages({
+    'string.empty': 'Текст вопроса обязателен',
+    'string.min': 'Текст вопроса должен содержать минимум 1 символ',
+    'string.max': 'Текст вопроса не должен превышать 1000 символов',
+    'any.required': 'Текст вопроса обязателен'
+  }),
+  description: Joi.string().allow('', null).max(2000).optional(),
+  category_id: Joi.string().uuid().required().messages({
+    'string.guid': 'Некорректный формат ID категории',
+    'any.required': 'ID категории обязателен'
+  }),
+  type: Joi.string().valid('rating', 'text', 'boolean').default('rating').optional(),
+  min_value: Joi.number().integer().min(0).max(10).default(1).optional(),
+  max_value: Joi.number().integer().min(1).max(10).default(5).optional(),
+  order_index: Joi.number().integer().min(0).default(0).optional(),
+  is_active: Joi.boolean().default(true).optional()
+});
+
+const updateQuestionSchema = Joi.object({
+  text: Joi.string().min(1).max(1000).optional(),
+  description: Joi.string().allow('', null).max(2000).optional(),
+  category_id: Joi.string().uuid().optional(),
+  type: Joi.string().valid('rating', 'text', 'boolean').optional(),
+  min_value: Joi.number().integer().min(0).max(10).optional(),
+  max_value: Joi.number().integer().min(1).max(10).optional(),
+  order_index: Joi.number().integer().min(0).optional(),
+  is_active: Joi.boolean().optional()
+});
+
+const questionIdSchema = Joi.object({
+  id: Joi.string().uuid().required()
+});
+
+const reorderQuestionsSchema = Joi.object({
+  questions: Joi.array().items(
+    Joi.object({
+      id: Joi.string().uuid().required(),
+      order_index: Joi.number().integer().min(0).required()
+    })
+  ).min(1).required()
+});
+
 // Получить все вопросы
-router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Для админов возвращаем все вопросы (включая неактивные)
     // Для обычных пользователей - только активные
@@ -47,32 +93,24 @@ router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => 
       data: questions
     });
   } catch (error) {
-    console.error('Ошибка получения вопросов:', error);
+    logger.error({ error }, 'Ошибка получения вопросов');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Создать новый вопрос (только админы)
-router.post('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.post('/', authenticateToken, requireAdmin, validate(createQuestionSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
     const {
       text,
       description,
       category_id,
-      type,
+      type = 'rating',
       min_value = 1,
       max_value = 5,
       order_index = 0,
       is_active = true
     } = req.body;
-
-    if (!text || !category_id) {
-      return res.status(400).json({ error: 'Обязательные поля: text, category_id' });
-    }
 
     // Проверяем, что категория существует
     const categoryExists = await knex('categories')
@@ -102,18 +140,14 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
       message: 'Вопрос успешно создан'
     });
   } catch (error) {
-    console.error('Ошибка создания вопроса:', error);
+    logger.error({ error }, 'Ошибка создания вопроса');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Обновить вопрос (только админы)
-router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.put('/:id', authenticateToken, requireAdmin, validate(questionIdSchema, 'params'), validate(updateQuestionSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
     const { id } = req.params;
     const {
       text,
@@ -146,7 +180,7 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
       }
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, any> = {};
     if (text !== undefined) updateData.question_text = text;
     if (description !== undefined) updateData.description = description;
     if (category_id !== undefined) updateData.category_id = category_id;
@@ -167,18 +201,14 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
       message: 'Вопрос успешно обновлен'
     });
   } catch (error) {
-    console.error('Ошибка обновления вопроса:', error);
+    logger.error({ error }, 'Ошибка обновления вопроса');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Переключить статус активности вопроса (только админы)
-router.patch('/:id/toggle-active', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/:id/toggle-active', authenticateToken, requireAdmin, validate(questionIdSchema, 'params'), validate(Joi.object({ is_active: Joi.boolean().required() })), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
     const { id } = req.params;
     const { is_active } = req.body;
 
@@ -203,23 +233,15 @@ router.patch('/:id/toggle-active', authenticateToken, async (req: any, res: any)
       message: `Вопрос успешно ${is_active ? 'активирован' : 'деактивирован'}`
     });
   } catch (error) {
-    console.error('Ошибка изменения статуса вопроса:', error);
+    logger.error({ error }, 'Ошибка изменения статуса вопроса');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Изменить порядок вопросов (только админы)
-router.patch('/reorder', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/reorder', authenticateToken, requireAdmin, validate(reorderQuestionsSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
     const { questions } = req.body;
-
-    if (!Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ error: 'Требуется массив вопросов' });
-    }
 
     // Обновляем порядок для каждого вопроса
     const transaction = await knex.transaction();
@@ -245,18 +267,14 @@ router.patch('/reorder', authenticateToken, async (req: any, res: any): Promise<
       throw error;
     }
   } catch (error) {
-    console.error('Ошибка изменения порядка вопросов:', error);
+    logger.error({ error }, 'Ошибка изменения порядка вопросов');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
 
 // Удалить вопрос (только админы)
-router.delete('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.delete('/:id', authenticateToken, requireAdmin, validate(questionIdSchema, 'params'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
-    }
-
     const { id } = req.params;
 
     // Проверяем, что вопрос существует
@@ -289,7 +307,7 @@ router.delete('/:id', authenticateToken, async (req: any, res: any): Promise<voi
       message: 'Вопрос успешно удален'
     });
   } catch (error) {
-    console.error('Ошибка удаления вопроса:', error);
+    logger.error({ error }, 'Ошибка удаления вопроса');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });

@@ -1,17 +1,21 @@
 // © 2025 Бит.Цифра - Стас Чашин
 
 // Автор: Стас Чашин @chastnik
-/* eslint-disable no-console */
+// ВАЖНО: Загружаем переменные окружения ПЕРВЫМ делом, до всех импортов
+import { config } from 'dotenv';
+import path from 'path';
+config({ path: path.resolve(__dirname, '../../.env') });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { config } from 'dotenv';
-import path from 'path';
 import rateLimit from 'express-rate-limit';
 import redisService from './services/redis';
 import databaseService from './services/database';
 import schedulerService from './services/scheduler';
+import { errorHandler } from './middleware/errorHandler';
+import { logger } from './utils/logger';
 
 // import authRoutes from './routes/auth'; // временно отключен
 import userRoutes from './routes/users';
@@ -29,9 +33,6 @@ import adminRoutes from './routes/admin';
 import learningRoutes from './routes/learning';
 import vacationRoutes from './routes/vacations';
 import calendarRoutes from './routes/calendar';
-
-// Загружаем переменные окружения из корневого .env файла
-config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,12 +61,30 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Test routes (временно заменяем основной auth)
-import testAuthRoutes from './routes/test-auth';
-app.use('/api/auth', testAuthRoutes);
+// Строгий rate limiting для критичных эндпоинтов аутентификации
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 5, // максимум 5 попыток
+  message: 'Слишком много попыток. Попробуйте позже.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 час
+  max: 3, // максимум 3 попытки в час
+  message: 'Слишком много запросов на сброс пароля. Попробуйте позже.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Routes
-// app.use('/api/auth', authRoutes); // временно отключен
+import authRoutes from './routes/auth';
+// Применяем строгий rate limiting к критичным эндпоинтам
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', passwordResetLimiter);
+app.use('/api/auth/reset-password', passwordResetLimiter);
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/questions', questionRoutes);
@@ -87,14 +106,8 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Error handling middleware
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false, 
-    error: process.env.NODE_ENV === 'production' ? 'Внутренняя ошибка сервера' : err.message 
-  });
-});
+// Error handling middleware (должен быть последним)
+app.use(errorHandler);
 
 // 404 handler
 app.use('*', (_req, res) => {
@@ -106,18 +119,18 @@ async function initializeServices() {
   try {
     // Initialize database first
     await databaseService.initialize();
-    console.log('✅ База данных инициализирована');
+    logger.info('База данных инициализирована');
     
     // Then initialize Redis
     await redisService.initialize();
-    console.log('✅ Redis инициализирован');
+    logger.info('Redis инициализирован');
     
     // Start scheduler
     schedulerService.start();
-    console.log('✅ Планировщик задач запущен');
+    logger.info('Планировщик задач запущен');
     
   } catch (error: any) {
-    console.error('❌ Ошибка инициализации сервисов:', error.message);
+    logger.error({ error }, 'Ошибка инициализации сервисов');
     process.exit(1);
   }
 }
@@ -125,23 +138,23 @@ async function initializeServices() {
 // Start server
 initializeServices().then(() => {
   app.listen(PORT, () => {
-    console.log(`🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📚 API доступен по адресу: http://localhost:${PORT}/api`);
+    logger.info({ port: PORT }, 'Сервер запущен');
+    logger.info({ url: `http://localhost:${PORT}/api` }, 'API доступен');
   });
 }).catch((error) => {
-  console.error('❌ Не удалось запустить сервер:', error);
+  logger.error({ error }, 'Не удалось запустить сервер');
   process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n🛑 Получен сигнал SIGINT, завершение работы...');
+  logger.info('Получен сигнал SIGINT, завершение работы...');
   schedulerService.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\n🛑 Получен сигнал SIGTERM, завершение работы...');
+  logger.info('Получен сигнал SIGTERM, завершение работы...');
   schedulerService.stop();
   process.exit(0);
 });

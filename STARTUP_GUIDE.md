@@ -25,6 +25,8 @@ cp env.example .env
 - `DB_PASSWORD` - пароль для базы данных
 - `JWT_SECRET` - секретный ключ для JWT (минимум 32 символа)
 - `REDIS_PASSWORD` - пароль для Redis
+- `ENCRYPTION_KEY` - ключ шифрования для Jira (128-bit, 32 hex символа)
+  - Генерация: `openssl rand -hex 16`
 
 #### Для установки без Docker
 
@@ -38,8 +40,15 @@ DB_NAME=assessment_db
 DB_USER=postgres
 DB_PASSWORD=your_password
 
-# JWT секрет (ОБЯЗАТЕЛЬНО)
+# JWT секрет (ОБЯЗАТЕЛЬНО - минимум 32 символа)
 JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
+
+# Encryption Key для Jira (ОБЯЗАТЕЛЬНО - 128-bit, 32 hex символа)
+# Генерация: openssl rand -hex 16
+ENCRYPTION_KEY=your-32-hex-character-encryption-key-here
+
+# Логирование (опционально)
+LOG_LEVEL=info
 
 # Redis (опционально - для первоначальных настроек в БД)
 REDIS_HOST=localhost

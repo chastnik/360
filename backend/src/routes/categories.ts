@@ -2,14 +2,14 @@
 
 // Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import knex from '../database/connection';
-import { authenticateToken, requirePermission } from '../middleware/auth';
+import { authenticateToken, requirePermission, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // Получить все категории
-router.get('/', authenticateToken, requirePermission('ui:view:admin.categories'), async (req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, requirePermission('ui:view:admin.categories'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Для админов возвращаем все категории (включая неактивные)
     // Для обычных пользователей - только активные
@@ -45,7 +45,7 @@ router.get('/', authenticateToken, requirePermission('ui:view:admin.categories')
 });
 
 // Создать новую категорию (только админы)
-router.post('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.post('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Доступ запрещен' });
@@ -96,7 +96,7 @@ router.post('/', authenticateToken, async (req: any, res: any): Promise<void> =>
 });
 
 // Обновить категорию (только админы)
-router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Доступ запрещен' });
@@ -158,7 +158,7 @@ router.put('/:id', authenticateToken, async (req: any, res: any): Promise<void> 
 });
 
 // Переключить статус активности категории (только админы)
-router.patch('/:id/toggle-active', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/:id/toggle-active', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Доступ запрещен' });
@@ -194,7 +194,7 @@ router.patch('/:id/toggle-active', authenticateToken, async (req: any, res: any)
 });
 
 // Изменить порядок категорий (только админы)
-router.patch('/reorder', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/reorder', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Доступ запрещен' });
@@ -236,7 +236,7 @@ router.patch('/reorder', authenticateToken, async (req: any, res: any): Promise<
 });
 
 // Удалить категорию (только админы)
-router.delete('/:id', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Доступ запрещен' });

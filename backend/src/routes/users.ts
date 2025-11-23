@@ -2,11 +2,12 @@
 
 // Автор: Стас Чашин @chastnik
 /* eslint-disable no-console */
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import db from '../database/connection';
-import { authenticateToken, requirePermission } from '../middleware/auth';
+import { authenticateToken, requirePermission, AuthRequest } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
+import { validatePasswordStrength } from '../utils/passwordValidation';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
@@ -32,7 +33,7 @@ initializeRoleConstraint();
 
 const router = Router();
 
-router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем права доступа для определения, какие данные показывать
     const roleId = req.user?.roleId;
@@ -80,7 +81,7 @@ router.get('/', authenticateToken, async (req: any, res: any): Promise<void> => 
 });
 
 // Получить пользователя по ID
-router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
+router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     
@@ -110,7 +111,7 @@ router.get('/:id', authenticateToken, async (req: any, res): Promise<void> => {
 });
 
 // Обновление профиля пользователя
-router.put('/profile', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { first_name, last_name, email, position, department, department_id, avatar_url, resume } = req.body;
     const userId = req.user.userId;
@@ -174,7 +175,7 @@ router.put('/profile', authenticateToken, async (req: any, res: any): Promise<vo
 });
 
 // Смена пароля
-router.put('/password', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.put('/password', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { current_password, new_password } = req.body;
     const userId = req.user.userId;
@@ -184,8 +185,10 @@ router.put('/password', authenticateToken, async (req: any, res: any): Promise<v
       return;
     }
 
-    if (new_password.length < 6) {
-      res.status(400).json({ error: 'Новый пароль должен содержать не менее 6 символов' });
+    // Проверка сложности пароля
+    const passwordValidation = validatePasswordStrength(new_password);
+    if (!passwordValidation.valid) {
+      res.status(400).json({ error: passwordValidation.error });
       return;
     }
 
@@ -229,7 +232,7 @@ router.put('/password', authenticateToken, async (req: any, res: any): Promise<v
 });
 
 // Создание нового пользователя (только для админов)
-router.post('/', authenticateToken, requirePermission('action:users:create'), async (req: any, res: any): Promise<void> => {
+router.post('/', authenticateToken, requirePermission('action:users:create'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
     if (req.user.role !== 'admin') {
@@ -331,7 +334,7 @@ router.post('/', authenticateToken, requirePermission('action:users:create'), as
 });
 
 // Обновление пользователя (только для админов)
-router.put('/:id', authenticateToken, requirePermission('action:users:update'), async (req: any, res: any): Promise<void> => {
+router.put('/:id', authenticateToken, requirePermission('action:users:update'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
     if (req.user.role !== 'admin') {
@@ -462,7 +465,7 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
 });
 
 // Активация пользователя
-router.patch('/:id/activate', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/:id/activate', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
     if (req.user.role !== 'admin') {
@@ -498,7 +501,7 @@ router.patch('/:id/activate', authenticateToken, async (req: any, res: any): Pro
 });
 
 // Деактивация пользователя
-router.patch('/:id/deactivate', authenticateToken, async (req: any, res: any): Promise<void> => {
+router.patch('/:id/deactivate', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
     if (req.user.role !== 'admin') {
@@ -542,7 +545,7 @@ router.patch('/:id/deactivate', authenticateToken, async (req: any, res: any): P
 export default router; 
 
 // Загрузка аватара текущего пользователя
-router.post('/profile/avatar', authenticateToken, upload.single('avatar'), async (req: any, res: any): Promise<void> => {
+router.post('/profile/avatar', authenticateToken, upload.single('avatar'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user.userId;
     if (!req.file) {

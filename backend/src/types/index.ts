@@ -10,10 +10,12 @@ export interface User {
   middle_name?: string;
   position?: string;
   department?: string;
+  department_id?: string;
   manager_id?: string;
   mattermost_username?: string;
   mattermost_user_id?: string;
   role: 'admin' | 'hr' | 'manager' | 'user';
+  role_id?: string | null;
   is_manager: boolean;
   is_active: boolean;
   last_login?: Date;

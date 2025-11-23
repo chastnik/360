@@ -44,53 +44,74 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
         .orderBy('created_at', 'desc');
     }
 
-    // Получить количество участников и средний балл для каждого цикла
-    const cyclesWithParticipantsCount = await Promise.all(
-      cycles.map(async (cycle) => {
-        const participantsCount = await db('assessment_participants')
-          .where('cycle_id', cycle.id)
+    // Оптимизация: получаем количество участников одним запросом для всех циклов
+    const cycleIds = cycles.map(c => c.id);
+    const participantsCounts = cycleIds.length > 0
+      ? await db('assessment_participants')
+          .select('cycle_id')
           .count('id as count')
-          .first();
+          .whereIn('cycle_id', cycleIds)
+          .groupBy('cycle_id')
+      : [];
 
-        let overall_average = null;
-        
-        // Если запрашиваются циклы пользователя (?my=true), рассчитываем средний балл
-        if (myOnly && userIdStr) {
-          // Находим participant_id для этого пользователя в этом цикле
-          const participant = await db('assessment_participants')
-            .where('cycle_id', cycle.id)
-            .where('user_id', userIdStr)
-            .select('id')
-            .first();
-
-          if (participant) {
-            // Рассчитываем средний балл по всем ответам для этого участника
-            const avgResult = await db('assessment_responses')
-              .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
-              .where('assessment_respondents.participant_id', participant.id)
-              .avg('assessment_responses.rating_value as avg_score')
-              .first();
-
-            if (avgResult && avgResult.avg_score !== null) {
-              overall_average = Math.round(Number(avgResult.avg_score || 0) * 100) / 100;
-            }
-          }
-        }
-
-        return {
-          ...cycle,
-          participants_count: Number(participantsCount?.count || 0),
-          ...(overall_average !== null && { overall_average })
-        };
-      })
+    // Создаем мапу для быстрого доступа к количеству участников
+    const participantsCountMap = new Map(
+      participantsCounts.map((item: { cycle_id: string; count: string | number }) => [
+        item.cycle_id,
+        parseInt(String(item.count || '0'))
+      ])
     );
+
+    // Если запрашиваются циклы пользователя, получаем средние баллы одним запросом
+    let averagesMap = new Map<string, number>();
+    if (myOnly && userIdStr && cycleIds.length > 0) {
+      // Получаем все participant_id для этого пользователя в запрошенных циклах
+      const participants = await db('assessment_participants')
+        .select('id', 'cycle_id')
+        .whereIn('cycle_id', cycleIds)
+        .where('user_id', userIdStr);
+
+      if (participants.length > 0) {
+        const participantIds = participants.map(p => p.id);
+        
+        // Получаем средние баллы для всех участников одним запросом
+        const avgResults = await db('assessment_responses')
+          .join('assessment_respondents', 'assessment_responses.respondent_id', 'assessment_respondents.id')
+          .select('assessment_respondents.participant_id')
+          .avg('assessment_responses.rating_value as avg_score')
+          .whereIn('assessment_respondents.participant_id', participantIds)
+          .groupBy('assessment_respondents.participant_id');
+
+        // Создаем мапу participant_id -> cycle_id
+        const participantToCycleMap = new Map(
+          participants.map((p: { id: string; cycle_id: string }) => [p.id, p.cycle_id])
+        );
+
+        // Создаем мапу cycle_id -> average
+        avgResults.forEach((result: { participant_id: string; avg_score: string | number | null }) => {
+          const cycleId = participantToCycleMap.get(result.participant_id);
+          if (cycleId && result.avg_score !== null) {
+            const avg = Math.round(Number(result.avg_score || 0) * 100) / 100;
+            averagesMap.set(cycleId, avg);
+          }
+        });
+      }
+    }
+
+    // Объединяем данные
+    const cyclesWithParticipantsCount = cycles.map((cycle) => ({
+      ...cycle,
+      participants_count: participantsCountMap.get(cycle.id) || 0,
+      ...(averagesMap.has(cycle.id) && { overall_average: averagesMap.get(cycle.id) })
+    }));
 
     res.json({
       success: true,
       data: cyclesWithParticipantsCount
     });
   } catch (error) {
-    console.error('Ошибка получения циклов оценки:', error);
+    const logger = (await import('../utils/logger')).logger;
+    logger.error({ error }, 'Ошибка получения циклов оценки');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });

@@ -9,7 +9,6 @@ import db from '../database/connection';
 
 export interface AuthRequest extends Request {
   user?: AuthTokenPayload;
-  headers: any;
 }
 
 export const authenticateToken = async (
@@ -42,8 +41,9 @@ export const authenticateToken = async (
     
     // Проверяем, что пользователь существует и активен
     const user = await db('users')
+      .select('id', 'email', 'role', 'role_id', 'is_active')
       .where({ id: decoded.userId, is_active: true })
-      .first();
+      .first<{ id: string; email: string; role: string; role_id: string | null; is_active: boolean }>();
 
     if (!user) {
       res.status(401).json({ 
@@ -62,12 +62,13 @@ export const authenticateToken = async (
       userId: decoded.userId,
       email: decoded.email,
       role: user.role,
-      roleId: (user as any).role_id || null,
+      roleId: user.role_id || null,
       permissions: userPermissions
     };
     next();
   } catch (error) {
-    console.error('JWT verification error:', error);
+    const logger = (await import('../utils/logger')).logger;
+    logger.error({ error }, 'JWT verification error');
     res.status(403).json({ 
       success: false, 
       error: 'Недействительный токен' 
@@ -108,7 +109,7 @@ export const requirePermission = (permission: string) => {
         res.status(401).json({ success: false, error: 'Пользователь не авторизован' });
         return;
       }
-      const roleId = (req.user as any).roleId;
+      const roleId = req.user?.roleId;
       if (!roleId) {
         res.status(403).json({ success: false, error: 'У пользователя не назначена роль' });
         return;
@@ -120,7 +121,8 @@ export const requirePermission = (permission: string) => {
       }
       next();
     } catch (error) {
-      console.error('Permission check error:', error);
+      const logger = (await import('../utils/logger')).logger;
+      logger.error({ error }, 'Permission check error');
       res.status(500).json({ success: false, error: 'Ошибка проверки прав' });
     }
   };

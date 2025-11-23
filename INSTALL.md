@@ -40,6 +40,8 @@ nano .env  # или используйте любой редактор
 - `DB_PASSWORD` - пароль для базы данных
 - `JWT_SECRET` - секретный ключ для JWT (минимум 32 символа)
 - `REDIS_PASSWORD` - пароль для Redis
+- `ENCRYPTION_KEY` - ключ шифрования для Jira (128-bit, 32 hex символа)
+  - Генерация: `openssl rand -hex 16`
 - `MATTERMOST_TOKEN` - токен бота Mattermost (если используется)
 
 #### 3. Автоматическая установка
@@ -185,8 +187,14 @@ cd backend && ./scripts/deploy-migrations.sh --with-seeds
 
 # Или вручную
 cd backend
-npm run migrate   # Применить миграции
+# Для development окружения
+NODE_ENV=development npm run migrate   # Применить миграции
+# Для production окружения
+NODE_ENV=production npm run migrate
 npm run seed      # Заполнить базу тестовыми данными
+
+# Важно: Миграция 20250131000000_add_performance_indexes.js добавляет
+# индексы для оптимизации производительности запросов
 ```
 
 #### 7. Запуск приложения

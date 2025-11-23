@@ -12,6 +12,7 @@ import { LoginRequest, RegisterRequest } from '../types';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import emailService from '../services/email';
 import mattermostService from '../services/mattermost';
+import { validatePasswordStrength } from '../utils/passwordValidation';
 
 const router = Router();
 
@@ -68,14 +69,13 @@ router.post('/login', async (req, res): Promise<void> => {
 
     const { email, password }: LoginRequest = req.body;
 
-    // Найти пользователя (используем прямой SQL для избежания проблем с .first())
-    const result = await db.raw(`
-      SELECT * FROM users 
-      WHERE email = ? AND is_active = true
-      LIMIT 1
-    `, [email.toLowerCase()]);
-    
-    const user = result.rows[0];
+    // Найти пользователя
+    const user = await db('users')
+      .where({ 
+        email: email.toLowerCase(), 
+        is_active: true 
+      })
+      .first();
 
     if (!user) {
       res.status(401).json({
@@ -95,6 +95,11 @@ router.post('/login', async (req, res): Promise<void> => {
       return;
     }
 
+    // Проверяем наличие JWT_SECRET
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET не установлен в переменных окружения');
+    }
+
     // Создать JWT токен
     const token = jwt.sign(
       { 
@@ -103,21 +108,14 @@ router.post('/login', async (req, res): Promise<void> => {
         role: user.role,
         roleId: user.role_id || null
       },
-      process.env.JWT_SECRET!,
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    // Отдаём ещё permissions для фронта
-    const permissions = await db('role_permissions').where('role_id', user.role_id).pluck('permission');
-    
-    // Debug log
-    console.log('LOGIN DEBUG - user object:', {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      role_id: user.role_id,
-      permissions_count: permissions.length
-    });
+    // Отдаём ещё permissions для фронта (если role_id установлен)
+    const permissions = user.role_id 
+      ? await db('role_permissions').where('role_id', user.role_id).pluck('permission')
+      : [];
     
     res.json({
       success: true,
@@ -133,11 +131,22 @@ router.post('/login', async (req, res): Promise<void> => {
       }
     });
 
-  } catch (error) {
-    console.error('Ошибка при входе:', error);
+  } catch (error: any) {
+    const logger = (await import('../utils/logger')).logger;
+    logger.error({ 
+      error: {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      }
+    }, 'Ошибка при входе');
+    // В development режиме показываем детали ошибки для отладки
+    const errorMessage = process.env.NODE_ENV === 'production' 
+      ? 'Внутренняя ошибка сервера' 
+      : (error?.message || 'Внутренняя ошибка сервера');
     res.status(500).json({
       success: false,
-      error: 'Внутренняя ошибка сервера'
+      error: errorMessage
     });
   }
 });
@@ -202,7 +211,7 @@ router.post('/register', async (req, res): Promise<void> => {
     });
 
   } catch (error) {
-    console.error('Ошибка при регистрации:', error);
+    logger.error({ error }, 'Ошибка при регистрации');
     res.status(500).json({
       success: false,
       error: 'Внутренняя ошибка сервера'
@@ -240,7 +249,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res): Promise<void
     });
 
   } catch (error) {
-    console.error('Ошибка получения пользователя:', error);
+    logger.error({ error }, 'Ошибка получения пользователя');
     res.status(500).json({
       success: false,
       error: 'Внутренняя ошибка сервера'
@@ -261,10 +270,12 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
       return;
     }
 
-    if (new_password.length < 6) {
+    // Проверка сложности пароля
+    const passwordValidation = validatePasswordStrength(new_password);
+    if (!passwordValidation.valid) {
       res.status(400).json({
         success: false,
-        error: 'Новый пароль должен содержать минимум 6 символов'
+        error: passwordValidation.error
       });
       return;
     }
@@ -306,7 +317,7 @@ router.post('/change-password', authenticateToken, async (req: AuthRequest, res)
     });
 
   } catch (error) {
-    console.error('Ошибка смены пароля:', error);
+    logger.error({ error }, 'Ошибка смены пароля');
     res.status(500).json({
       success: false,
       error: 'Внутренняя ошибка сервера'
@@ -327,8 +338,8 @@ const resetPasswordSchema = Joi.object({
   token: Joi.string().required().messages({
     'any.required': 'Токен сброса обязателен'
   }),
-  password: Joi.string().min(6).required().messages({
-    'string.min': 'Пароль должен содержать минимум 6 символов',
+  password: Joi.string().min(8).required().messages({
+    'string.min': 'Пароль должен содержать минимум 8 символов',
     'any.required': 'Новый пароль обязателен'
   })
 });
@@ -381,14 +392,18 @@ router.post('/forgot-password', async (req, res): Promise<void> => {
 
     // Проверяем результаты отправки email
     if (emailSent.status === 'rejected' || (emailSent.status === 'fulfilled' && !emailSent.value)) {
-      // Если email не настроен, выводим токен в консоль для разработки
-      console.log(`⚠️  Email сервис не настроен. Токен сброса пароля для ${email}: ${resetToken}`);
-      console.log(`Ссылка для сброса: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`);
+      // Если email не настроен, выводим токен в консоль только в development режиме
+      if (process.env.NODE_ENV !== 'production') {
+        logger.warn({ email, resetToken }, 'Email сервис не настроен. Токен сброса пароля');
+        logger.debug({ 
+          resetUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}` 
+        }, 'Ссылка для сброса пароля');
+      }
     }
 
     // Проверяем результаты отправки Mattermost
     if (mattermostSent.status === 'rejected') {
-      console.error('Ошибка отправки уведомления в Mattermost:', mattermostSent.reason);
+      logger.error({ reason: mattermostSent.reason }, 'Ошибка отправки уведомления в Mattermost');
     }
 
     res.json({
@@ -397,7 +412,7 @@ router.post('/forgot-password', async (req, res): Promise<void> => {
     });
 
   } catch (error) {
-    console.error('Ошибка запроса сброса пароля:', error);
+    logger.error({ error }, 'Ошибка запроса сброса пароля');
     res.status(500).json({
       success: false,
       error: 'Внутренняя ошибка сервера'
@@ -418,6 +433,16 @@ router.post('/reset-password', async (req, res): Promise<void> => {
     }
 
     const { token, password } = req.body;
+
+    // Проверка сложности пароля
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: passwordValidation.error
+      });
+      return;
+    }
 
     // Найти пользователя по токену
     const user = await db('users')
@@ -455,7 +480,7 @@ router.post('/reset-password', async (req, res): Promise<void> => {
     });
 
   } catch (error) {
-    console.error('Ошибка сброса пароля:', error);
+    logger.error({ error }, 'Ошибка сброса пароля');
     res.status(500).json({
       success: false,
       error: 'Внутренняя ошибка сервера'
@@ -555,7 +580,7 @@ router.get('/test-sql', async (_req, res) => {
     const result = await db.raw(`
       SELECT id, email, role, role_id, first_name, last_name, is_active
       FROM users 
-      WHERE email = ? AND is_active = true
+      WHERE email = $1 AND is_active = true
     `, ['admin@company.com']);
     
     const user = result.rows[0];
