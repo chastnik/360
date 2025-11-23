@@ -30,8 +30,14 @@ cp env.example .env
 
 #### Для установки без Docker
 
-Создайте файл `backend/.env` на основе `backend/env.example`:
+Создайте файл `.env` в корне проекта на основе `env.example`:
 
+```bash
+cp env.example .env
+# Отредактируйте .env файл
+```
+
+**Обязательные настройки в корневом `.env`:**
 ```bash
 # База данных (ОБЯЗАТЕЛЬНО для первого запуска)
 DB_HOST=localhost

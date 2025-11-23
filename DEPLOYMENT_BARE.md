@@ -45,35 +45,7 @@ REDIS_PORT=6379
 REACT_APP_API_URL=http://localhost:5000/api
 ```
 
-#### Backend `.env` файл
-Создайте `backend/.env` на основе `backend/env.example`:
-```bash
-cp backend/env.example backend/.env
-```
-
-Отредактируйте `backend/.env`:
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=assessment360
-DB_USER=assessment_user
-DB_PASSWORD=change_me_secure_password
-
-JWT_SECRET=change_me_long_secret_minimum_32_characters
-PORT=5000
-NODE_ENV=development
-
-FRONTEND_URL=http://localhost:3000
-
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=change_me_redis
-
-MATTERMOST_URL=https://your-mattermost-server.com
-MATTERMOST_TOKEN=your-mattermost-token
-```
-
-**Примечание:** Backend использует `backend/.env`, фронтенд использует `REACT_APP_API_URL` из корневого `.env` при сборке.
+**Важно:** Система использует только один `.env` файл в корне проекта. Backend автоматически загружает переменные окружения из корневого `.env` файла. Все настройки (база данных, JWT, Redis, Mattermost и т.д.) должны быть указаны в корневом `.env` файле.
 
 ### 3) Установка зависимостей
 ```bash
@@ -187,7 +159,7 @@ psql -h localhost -U "$DB_USER" "$DB_NAME" < backup.sql
 
 #### Проблема: Backend не может подключиться к базе данных
 - Проверьте, что PostgreSQL запущен: `sudo systemctl status postgresql`
-- Убедитесь, что в `backend/.env` правильно указаны `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- Убедитесь, что в корневом `.env` файле правильно указаны `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
 - Проверьте права пользователя базы данных
 
 #### Проблема: Frontend не может подключиться к API
@@ -196,7 +168,7 @@ psql -h localhost -U "$DB_USER" "$DB_NAME" < backup.sql
 - Проверьте CORS настройки в backend
 
 #### Проблема: CORS ошибки
-- Убедитесь, что в `backend/.env` правильно указан `FRONTEND_URL`
+- Убедитесь, что в корневом `.env` файле правильно указан `FRONTEND_URL`
 - Проверьте, что `FRONTEND_URL` соответствует URL, с которого открывается frontend
 
 #### Проблема: Порт уже используется
@@ -211,7 +183,7 @@ kill -9 <PID>
 
 #### Другие замечания
 - Эндпоинт здоровья бэкенда: `/health` (не `/api/health`)
-- Для продакшн режима используйте `NODE_ENV=production` в `backend/.env`
+- Для продакшн режима используйте `NODE_ENV=production` в корневом `.env` файле
 - Рекомендуется использовать PM2 для управления процессами Node.js
 
 ## Дополнительные ресурсы

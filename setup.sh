@@ -28,9 +28,9 @@ echo ""
 echo "📋 Настройка переменных окружения"
 echo "==================================="
 
-# Создание .env файла для backend
-if [ ! -f "backend/.env" ]; then
-    echo "Создаем backend/.env файл..."
+# Создание .env файла в корне проекта
+if [ ! -f ".env" ]; then
+    echo "Создаем .env файл в корне проекта..."
     
     read -p "Хост PostgreSQL [localhost]: " DB_HOST
     DB_HOST=${DB_HOST:-localhost}
@@ -38,11 +38,11 @@ if [ ! -f "backend/.env" ]; then
     read -p "Порт PostgreSQL [5432]: " DB_PORT
     DB_PORT=${DB_PORT:-5432}
     
-    read -p "Имя базы данных [assessment_db]: " DB_NAME
-    DB_NAME=${DB_NAME:-assessment_db}
+    read -p "Имя базы данных [assessment360]: " DB_NAME
+    DB_NAME=${DB_NAME:-assessment360}
     
-    read -p "Пользователь PostgreSQL [postgres]: " DB_USER
-    DB_USER=${DB_USER:-postgres}
+    read -p "Пользователь PostgreSQL [assessment_user]: " DB_USER
+    DB_USER=${DB_USER:-assessment_user}
     
     read -s -p "Пароль PostgreSQL: " DB_PASSWORD
     echo ""
@@ -59,7 +59,10 @@ if [ ! -f "backend/.env" ]; then
     # Генерация JWT секрета
     JWT_SECRET=$(openssl rand -base64 32)
     
-    cat > backend/.env << EOF
+    # Генерация ENCRYPTION_KEY для Jira (128-bit, 32 hex символа)
+    ENCRYPTION_KEY=$(openssl rand -hex 16)
+    
+    cat > .env << EOF
 # База данных
 DB_HOST=$DB_HOST
 DB_PORT=$DB_PORT
@@ -70,12 +73,16 @@ DB_PASSWORD=$DB_PASSWORD
 # JWT
 JWT_SECRET=$JWT_SECRET
 
+# Encryption Key для Jira (128-bit, 32 hex символа)
+ENCRYPTION_KEY=$ENCRYPTION_KEY
+
 # Сервер
 PORT=5000
 NODE_ENV=development
 
 # Frontend URL
 FRONTEND_URL=http://localhost:3000
+REACT_APP_API_URL=http://localhost:5000/api
 
 # Redis
 REDIS_HOST=$REDIS_HOST
@@ -85,11 +92,18 @@ REDIS_PASSWORD=$REDIS_PASSWORD
 # Mattermost (можно настроить позже)
 MATTERMOST_URL=https://your-mattermost-instance.com
 MATTERMOST_TOKEN=your-bot-token-here
+MATTERMOST_TEAM_ID=
+MATTERMOST_BOT_USERNAME=360-assessment-bot
+
+# Логирование
+LOG_LEVEL=info
 EOF
     
-    echo "✅ Файл backend/.env создан"
+    echo "✅ Файл .env создан в корне проекта"
 else
-    echo "✅ Файл backend/.env уже существует"
+    echo "✅ Файл .env уже существует"
+    # Загружаем переменные из существующего .env
+    source .env 2>/dev/null || true
 fi
 
 echo ""
