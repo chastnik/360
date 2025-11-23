@@ -9,6 +9,8 @@ import { Link } from 'react-router-dom';
 import VacationModal from '../components/VacationModal';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { authAPI } from '../services/api';
+import { validatePassword } from '../utils/passwordValidation';
 
 export const ProfilePage: React.FC = () => {
   const { userId: urlUserId } = useParams<{ userId?: string }>();
@@ -47,6 +49,18 @@ export const ProfilePage: React.FC = () => {
   const [showVacationModal, setShowVacationModal] = useState(false);
   const [editingVacation, setEditingVacation] = useState<any | null>(null);
   const [vacationLoading, setVacationLoading] = useState(false);
+
+  // Управление сменой пароля
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   // Флаг для предотвращения множественных одновременных загрузок
   const isLoadingDataRef = useRef(false);
@@ -700,6 +714,232 @@ export const ProfilePage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Карточка смены пароля (только для собственного профиля) */}
+      {!isViewingOtherProfile && (
+        <div className="card p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Безопасность</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Измените пароль для защиты вашего аккаунта</p>
+            </div>
+            {!showPasswordChange && (
+              <button
+                onClick={() => {
+                  setShowPasswordChange(true);
+                  setPasswordError(null);
+                  setPasswordSuccess(null);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+                className="btn btn-outline btn-sm"
+              >
+                Изменить пароль
+              </button>
+            )}
+          </div>
+
+          {showPasswordChange && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setPasswordError(null);
+                setPasswordSuccess(null);
+
+                // Проверка совпадения паролей
+                if (newPassword !== confirmPassword) {
+                  setPasswordError('Новые пароли не совпадают');
+                  return;
+                }
+
+                // Валидация нового пароля
+                const validation = validatePassword(newPassword);
+                if (!validation.valid) {
+                  setPasswordError(validation.error || 'Пароль не соответствует требованиям');
+                  return;
+                }
+
+                setPasswordChangeLoading(true);
+
+                try {
+                  const response = await authAPI.changePassword(currentPassword, newPassword);
+                  
+                  if (response.success) {
+                    setPasswordSuccess('Пароль успешно изменен');
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setTimeout(() => {
+                      setShowPasswordChange(false);
+                      setPasswordSuccess(null);
+                    }, 2000);
+                  } else {
+                    setPasswordError(response.error || 'Не удалось изменить пароль');
+                  }
+                } catch (err: any) {
+                  console.error('Ошибка смены пароля:', err);
+                  setPasswordError(err.response?.data?.error || 'Произошла ошибка при смене пароля');
+                } finally {
+                  setPasswordChangeLoading(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              {passwordError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+                  {passwordError}
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
+                  {passwordSuccess}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="currentPassword" className="label text-gray-900 dark:text-white">
+                  Текущий пароль
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-400">🔒</span>
+                  </div>
+                  <input
+                    id="currentPassword"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="input pl-10 pr-10"
+                    placeholder="Введите текущий пароль"
+                    required
+                    disabled={passwordChangeLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={passwordChangeLoading}
+                  >
+                    {showCurrentPassword ? (
+                      <span className="text-gray-400 hover:text-gray-600">🙈</span>
+                    ) : (
+                      <span className="text-gray-400 hover:text-gray-600">👁️</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="newPassword" className="label text-gray-900 dark:text-white">
+                  Новый пароль
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-400">🔒</span>
+                  </div>
+                  <input
+                    id="newPassword"
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input pl-10 pr-10"
+                    placeholder="Введите новый пароль"
+                    required
+                    disabled={passwordChangeLoading}
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={passwordChangeLoading}
+                  >
+                    {showNewPassword ? (
+                      <span className="text-gray-400 hover:text-gray-600">🙈</span>
+                    ) : (
+                      <span className="text-gray-400 hover:text-gray-600">👁️</span>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Пароль должен содержать минимум 8 символов, заглавные и строчные буквы, цифры и специальные символы
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="confirmPassword" className="label text-gray-900 dark:text-white">
+                  Подтвердите новый пароль
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-400">🔒</span>
+                  </div>
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input pl-10 pr-10"
+                    placeholder="Повторите новый пароль"
+                    required
+                    disabled={passwordChangeLoading}
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={passwordChangeLoading}
+                  >
+                    {showConfirmPassword ? (
+                      <span className="text-gray-400 hover:text-gray-600">🙈</span>
+                    ) : (
+                      <span className="text-gray-400 hover:text-gray-600">👁️</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordChange(false);
+                    setPasswordError(null);
+                    setPasswordSuccess(null);
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  }}
+                  disabled={passwordChangeLoading}
+                  className="btn btn-outline"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordChangeLoading}
+                  className="btn btn-primary"
+                >
+                  {passwordChangeLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Сохранение...
+                    </>
+                  ) : (
+                    'Изменить пароль'
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Карточка отпусков */}
       {(!isViewingOtherProfile || permissions?.includes('action:vacations:view')) && (

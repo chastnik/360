@@ -103,7 +103,14 @@ class EmailService {
    * Отправка письма для сброса пароля
    */
   async sendPasswordResetEmail(email: string, resetToken: string): Promise<boolean> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    // Определяем правильный URL в зависимости от окружения
+    let frontendUrl = process.env.FRONTEND_URL;
+    if (!frontendUrl) {
+      // В development используем порт 3000, в production - без порта (nginx на 80)
+      frontendUrl = process.env.NODE_ENV === 'production' 
+        ? 'http://localhost' 
+        : 'http://localhost:3000';
+    }
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
     const subject = 'Сброс пароля - 360 Assessment';

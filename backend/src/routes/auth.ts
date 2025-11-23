@@ -394,9 +394,10 @@ router.post('/forgot-password', async (req, res): Promise<void> => {
     if (emailSent.status === 'rejected' || (emailSent.status === 'fulfilled' && !emailSent.value)) {
       // Если email не настроен, выводим токен в консоль только в development режиме
       if (process.env.NODE_ENV !== 'production') {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         logger.warn({ email, resetToken }, 'Email сервис не настроен. Токен сброса пароля');
         logger.debug({ 
-          resetUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}` 
+          resetUrl: `${frontendUrl}/reset-password?token=${resetToken}` 
         }, 'Ссылка для сброса пароля');
       }
     }

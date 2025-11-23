@@ -127,7 +127,7 @@
   }
   
   .btn-outline {
-    @apply border border-gray-300 bg-white hover:bg-gray-50 hover:text-gray-900 h-10 px-4 py-2;
+    @apply border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 hover:text-gray-900 h-10 px-4 py-2;
   }
   
   .btn-ghost {
@@ -164,7 +164,7 @@
   }
   
   .dark .btn-outline {
-    @apply border-gray-600 bg-gray-800 hover:bg-gray-700 hover:text-white;
+    @apply border-gray-600 bg-gray-800 text-white hover:bg-gray-700 hover:text-white;
   }
   
   .dark .btn-ghost {
