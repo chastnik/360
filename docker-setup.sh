@@ -66,15 +66,33 @@ load_env_file() {
     
     # Безопасная загрузка переменных окружения
     # Игнорируем комментарии и пустые строки, загружаем только KEY=VALUE
+    # Поддерживает значения с пробелами, кавычками и специальными символами
     set -a
     while IFS= read -r line || [ -n "$line" ]; do
         # Пропускаем комментарии и пустые строки
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${line// }" ]] && continue
         
+        # Убираем ведущие и завершающие пробелы
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        
         # Проверяем формат KEY=VALUE
-        if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
-            export "$line"
+        if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            local key="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+            
+            # Убираем кавычки если значение обернуто в них (только если кавычки на начале и конце)
+            # Обрабатываем двойные кавычки
+            if [[ "$value" =~ ^\"(.*)\"$ ]]; then
+                value="${BASH_REMATCH[1]}"
+            # Обрабатываем одинарные кавычки
+            elif [[ "$value" =~ ^\'(.*)\'$ ]]; then
+                value="${BASH_REMATCH[1]}"
+            fi
+            
+            # Экспортируем переменную с правильным экранированием
+            export "$key=$value"
         fi
     done < "$env_file"
     set +a
@@ -96,7 +114,8 @@ detect_docker_compose_cmd() {
 # Проверка версии Docker
 check_docker_version() {
     local docker_version
-    docker_version=$(docker --version 2>/dev/null | grep -oP '\d+\.\d+' | head -1)
+    # Используем grep -oE вместо -oP для совместимости с macOS (BSD grep)
+    docker_version=$(docker --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
     
     if [ -z "$docker_version" ]; then
         error "Не удалось определить версию Docker"
@@ -104,6 +123,7 @@ check_docker_version() {
     fi
     
     # Сравнение версий (простое сравнение строк для формата X.Y)
+    # Используем grep -oE вместо -oP для совместимости с macOS
     local min_version_parts=(${MIN_DOCKER_VERSION//./ })
     local current_version_parts=(${docker_version//./ })
     
@@ -150,6 +170,12 @@ check_dependencies() {
     
     if ! detect_docker_compose_cmd; then
         error "Docker Compose не установлен. Установите Docker Compose v2"
+        exit 1
+    fi
+    
+    # Проверка наличия docker-compose.yml
+    if [ ! -f docker-compose.yml ]; then
+        error "Файл docker-compose.yml не найден. Убедитесь, что вы находитесь в корне проекта"
         exit 1
     fi
     
