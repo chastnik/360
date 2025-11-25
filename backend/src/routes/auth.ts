@@ -13,6 +13,7 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 import emailService from '../services/email';
 import mattermostService from '../services/mattermost';
 import { validatePasswordStrength } from '../utils/passwordValidation';
+import { logger } from '../utils/logger';
 
 const router = Router();
 

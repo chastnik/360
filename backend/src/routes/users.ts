@@ -114,7 +114,12 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
 router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { first_name, last_name, email, position, department, department_id, avatar_url, resume } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
 
     // Проверяем, не занят ли email другим пользователем
     if (email) {
@@ -178,7 +183,12 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res: Response
 router.put('/password', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { current_password, new_password } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
 
     if (!current_password || !new_password) {
       res.status(400).json({ error: 'Необходимо указать текущий и новый пароль' });
@@ -235,7 +245,7 @@ router.put('/password', authenticateToken, async (req: AuthRequest, res: Respons
 router.post('/', authenticateToken, requirePermission('action:users:create'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
-    if (req.user.role !== 'admin') {
+    if (req.user?.role !== 'admin') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -337,7 +347,7 @@ router.post('/', authenticateToken, requirePermission('action:users:create'), as
 router.put('/:id', authenticateToken, requirePermission('action:users:update'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
-    if (req.user.role !== 'admin') {
+    if (req.user?.role !== 'admin') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -370,7 +380,7 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
     if (email && email !== existingUser.email) {
       const duplicateUser = await db('users')
         .where('email', email)
-        .where('id', '!=', userId)
+        .whereNot('id', userId)
         .first();
       
       if (duplicateUser) {
@@ -468,7 +478,7 @@ router.put('/:id', authenticateToken, requirePermission('action:users:update'), 
 router.patch('/:id/activate', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
-    if (req.user.role !== 'admin') {
+    if (req.user?.role !== 'admin') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -504,7 +514,7 @@ router.patch('/:id/activate', authenticateToken, async (req: AuthRequest, res: R
 router.patch('/:id/deactivate', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Проверяем, что пользователь админ
-    if (req.user.role !== 'admin') {
+    if (req.user?.role !== 'admin') {
       res.status(403).json({ error: 'Недостаточно прав доступа' });
       return;
     }
@@ -519,7 +529,7 @@ router.patch('/:id/deactivate', authenticateToken, async (req: AuthRequest, res:
     }
 
     // Нельзя деактивировать самого себя
-    if (userId === req.user.userId) {
+    if (userId === req.user?.userId) {
       res.status(400).json({ error: 'Нельзя деактивировать самого себя' });
       return;
     }
@@ -547,7 +557,12 @@ export default router;
 // Загрузка аватара текущего пользователя
 router.post('/profile/avatar', authenticateToken, upload.single('avatar'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Пользователь не авторизован' });
+      return;
+    }
     if (!req.file) {
       res.status(400).json({ error: 'Файл не загружен' });
       return;

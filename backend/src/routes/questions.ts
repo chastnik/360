@@ -59,7 +59,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
   try {
     // Для админов возвращаем все вопросы (включая неактивные)
     // Для обычных пользователей - только активные
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = req.user?.role === 'admin';
     const { category_id } = req.query;
     
     let query = knex('questions')
@@ -118,7 +118,8 @@ router.post('/', authenticateToken, requireAdmin, validate(createQuestionSchema)
       .first();
 
     if (!categoryExists) {
-      return res.status(400).json({ error: 'Категория не найдена' });
+      res.status(400).json({ error: 'Категория не найдена' });
+      return;
     }
 
     const [questionId] = await knex('questions')
@@ -166,7 +167,8 @@ router.put('/:id', authenticateToken, requireAdmin, validate(questionIdSchema, '
       .first();
 
     if (!questionExists) {
-      return res.status(404).json({ error: 'Вопрос не найден' });
+      res.status(404).json({ error: 'Вопрос не найден' });
+      return;
     }
 
     // Если указана категория, проверяем её существование
@@ -176,7 +178,8 @@ router.put('/:id', authenticateToken, requireAdmin, validate(questionIdSchema, '
         .first();
 
       if (!categoryExists) {
-        return res.status(400).json({ error: 'Категория не найдена' });
+        res.status(400).json({ error: 'Категория не найдена' });
+        return;
       }
     }
 
@@ -218,7 +221,8 @@ router.patch('/:id/toggle-active', authenticateToken, requireAdmin, validate(que
       .first();
 
     if (!questionExists) {
-      return res.status(404).json({ error: 'Вопрос не найден' });
+      res.status(404).json({ error: 'Вопрос не найден' });
+      return;
     }
 
     await knex('questions')
@@ -283,7 +287,8 @@ router.delete('/:id', authenticateToken, requireAdmin, validate(questionIdSchema
       .first();
 
     if (!questionExists) {
-      return res.status(404).json({ error: 'Вопрос не найден' });
+      res.status(404).json({ error: 'Вопрос не найден' });
+      return;
     }
 
     // Проверяем, не используется ли вопрос в ответах
@@ -292,10 +297,11 @@ router.delete('/:id', authenticateToken, requireAdmin, validate(questionIdSchema
       .count('id as count')
       .first();
 
-    if (responsesCount && parseInt(responsesCount.count as string) > 0) {
-      return res.status(400).json({ 
+    if (responsesCount && parseInt(String(responsesCount.count || '0')) > 0) {
+      res.status(400).json({ 
         error: 'Нельзя удалить вопрос, который используется в оценках' 
       });
+      return;
     }
 
     await knex('questions')

@@ -13,7 +13,7 @@ router.get('/', authenticateToken, requirePermission('ui:view:admin.categories')
   try {
     // Для админов возвращаем все категории (включая неактивные)
     // Для обычных пользователей - только активные
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = req.user?.role === 'admin';
     
     let query = knex('categories')
       .select(
@@ -47,8 +47,9 @@ router.get('/', authenticateToken, requirePermission('ui:view:admin.categories')
 // Создать новую категорию (только админы)
 router.post('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ error: 'Доступ запрещен' });
+      return;
     }
 
     const {
@@ -61,7 +62,8 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response): Pro
     } = req.body;
 
     if (!name) {
-      return res.status(400).json({ error: 'Обязательное поле: name' });
+      res.status(400).json({ error: 'Обязательное поле: name' });
+      return;
     }
 
     // Проверяем уникальность названия
@@ -70,7 +72,8 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response): Pro
       .first();
 
     if (existingCategory) {
-      return res.status(400).json({ error: 'Категория с таким названием уже существует' });
+      res.status(400).json({ error: 'Категория с таким названием уже существует' });
+      return;
     }
 
     const [categoryId] = await knex('categories')
@@ -98,8 +101,9 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response): Pro
 // Обновить категорию (только админы)
 router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ error: 'Доступ запрещен' });
+      return;
     }
 
     const { id } = req.params;
@@ -118,18 +122,20 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
       .first();
 
     if (!categoryExists) {
-      return res.status(404).json({ error: 'Категория не найдена' });
+      res.status(404).json({ error: 'Категория не найдена' });
+      return;
     }
 
     // Если изменяется название, проверяем уникальность
     if (name && name !== categoryExists.name) {
       const nameExists = await knex('categories')
         .where('name', name)
-        .where('id', '!=', id)
+        .whereNot('id', id)
         .first();
 
       if (nameExists) {
-        return res.status(400).json({ error: 'Категория с таким названием уже существует' });
+        res.status(400).json({ error: 'Категория с таким названием уже существует' });
+        return;
       }
     }
 
@@ -160,8 +166,9 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res: Response): P
 // Переключить статус активности категории (только админы)
 router.patch('/:id/toggle-active', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ error: 'Доступ запрещен' });
+      return;
     }
 
     const { id } = req.params;
@@ -173,7 +180,8 @@ router.patch('/:id/toggle-active', authenticateToken, async (req: AuthRequest, r
       .first();
 
     if (!categoryExists) {
-      return res.status(404).json({ error: 'Категория не найдена' });
+      res.status(404).json({ error: 'Категория не найдена' });
+      return;
     }
 
     await knex('categories')
@@ -196,14 +204,16 @@ router.patch('/:id/toggle-active', authenticateToken, async (req: AuthRequest, r
 // Изменить порядок категорий (только админы)
 router.patch('/reorder', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ error: 'Доступ запрещен' });
+      return;
     }
 
     const { categories } = req.body;
 
     if (!Array.isArray(categories) || categories.length === 0) {
-      return res.status(400).json({ error: 'Требуется массив категорий' });
+      res.status(400).json({ error: 'Требуется массив категорий' });
+      return;
     }
 
     // Обновляем порядок для каждой категории
@@ -238,8 +248,9 @@ router.patch('/reorder', authenticateToken, async (req: AuthRequest, res: Respon
 // Удалить категорию (только админы)
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Доступ запрещен' });
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ error: 'Доступ запрещен' });
+      return;
     }
 
     const { id } = req.params;
@@ -250,7 +261,8 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response)
       .first();
 
     if (!categoryExists) {
-      return res.status(404).json({ error: 'Категория не найдена' });
+      res.status(404).json({ error: 'Категория не найдена' });
+      return;
     }
 
     // Проверяем, не используется ли категория в вопросах
@@ -259,10 +271,11 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response)
       .count('id as count')
       .first();
 
-    if (questionsCount && parseInt(questionsCount.count as string) > 0) {
-      return res.status(400).json({ 
+    if (questionsCount && parseInt(String(questionsCount.count || '0')) > 0) {
+      res.status(400).json({ 
         error: 'Нельзя удалить категорию, в которой есть вопросы' 
       });
+      return;
     }
 
     await knex('categories')

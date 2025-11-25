@@ -1014,7 +1014,7 @@ router.get('/ml-analysis', authenticateToken, async (_req: any, res: any): Promi
 
       // Создаем мапу для быстрого доступа
       const avgScoresMap = new Map(
-        avgResults.map((result: { participant_id: string; avg_score: string | number | null }) => [
+        avgResults.map((result: any) => [
           result.participant_id,
           result.avg_score !== null ? Number(result.avg_score) : null
         ])

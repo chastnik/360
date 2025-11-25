@@ -56,7 +56,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
 
     // Создаем мапу для быстрого доступа к количеству участников
     const participantsCountMap = new Map(
-      participantsCounts.map((item: { cycle_id: string; count: string | number }) => [
+      participantsCounts.map((item: any) => [
         item.cycle_id,
         parseInt(String(item.count || '0'))
       ])
@@ -88,7 +88,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
         );
 
         // Создаем мапу cycle_id -> average
-        avgResults.forEach((result: { participant_id: string; avg_score: string | number | null }) => {
+        avgResults.forEach((result: any) => {
           const cycleId = participantToCycleMap.get(result.participant_id);
           if (cycleId && result.avg_score !== null) {
             const avg = Math.round(Number(result.avg_score || 0) * 100) / 100;

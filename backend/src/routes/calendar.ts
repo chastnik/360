@@ -28,7 +28,8 @@ router.get('/work-schedule', authenticateToken, requireAdmin, async (_req: AuthR
       ];
       await knex('work_schedule').insert(defaultSchedule);
       const newSchedule = await knex('work_schedule').select('*').orderBy('day_of_week');
-      return res.json({ success: true, data: newSchedule });
+      res.json({ success: true, data: newSchedule });
+      return;
     }
     
     res.json({ success: true, data: schedule });
@@ -44,7 +45,8 @@ router.put('/work-schedule', authenticateToken, requireAdmin, async (req: AuthRe
     const { schedule } = req.body;
     
     if (!Array.isArray(schedule)) {
-      return res.status(400).json({ error: 'Неверный формат данных' });
+      res.status(400).json({ error: 'Неверный формат данных' });
+      return;
     }
     
     // Удаляем старое расписание
@@ -96,7 +98,8 @@ router.post('/holidays', authenticateToken, requireAdmin, async (req: AuthReques
     const { date, name, description, is_national } = req.body;
     
     if (!date || !name) {
-      return res.status(400).json({ error: 'Дата и название обязательны' });
+      res.status(400).json({ error: 'Дата и название обязательны' });
+      return;
     }
     
     const [holiday] = await knex('holidays')
@@ -111,7 +114,8 @@ router.post('/holidays', authenticateToken, requireAdmin, async (req: AuthReques
     res.status(201).json({ success: true, data: holiday });
   } catch (error: any) {
     if (error.code === '23505') { // unique violation
-      return res.status(400).json({ error: 'Праздник с такой датой уже существует' });
+      res.status(400).json({ error: 'Праздник с такой датой уже существует' });
+      return;
     }
     console.error('Ошибка создания праздника:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
@@ -137,7 +141,8 @@ router.put('/holidays/:id', authenticateToken, requireAdmin, async (req: AuthReq
     res.json({ success: true, data: holiday });
   } catch (error: any) {
     if (error.code === '23505') {
-      return res.status(400).json({ error: 'Праздник с такой датой уже существует' });
+      res.status(400).json({ error: 'Праздник с такой датой уже существует' });
+      return;
     }
     console.error('Ошибка обновления праздника:', error);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });

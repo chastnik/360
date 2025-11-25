@@ -91,7 +91,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
 
     // Создаем мапу для быстрого доступа к количеству сотрудников
     const countMap = new Map(
-      employeeCounts.map((item: { department_id: string; count: string | number }) => [
+      employeeCounts.map((item: any) => [
         item.department_id,
         parseInt(String(item.count || '0'))
       ])
@@ -244,7 +244,7 @@ router.put('/:id', authenticateToken, requireAdmin, validate(departmentIdSchema,
     if (name.trim() !== existingDepartment.name) {
       const duplicateName = await db('departments')
         .where('name', name.trim())
-        .where('id', '!=', departmentId)
+        .whereNot('id', departmentId)
         .first();
       
       if (duplicateName) {
@@ -257,7 +257,7 @@ router.put('/:id', authenticateToken, requireAdmin, validate(departmentIdSchema,
     if (code && code.trim() && code.trim() !== existingDepartment.code) {
       const duplicateCode = await db('departments')
         .where('code', code.trim())
-        .where('id', '!=', departmentId)
+        .whereNot('id', departmentId)
         .first();
       
       if (duplicateCode) {

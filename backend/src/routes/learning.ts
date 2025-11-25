@@ -1450,9 +1450,11 @@ router.get('/certificates/:id/file', authenticateToken, async (req: AuthRequest,
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(certificate.file_name)}"`);
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.send(certificate.file_data);
+    return;
   } catch (error) {
     console.error('Error fetching certificate file:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
+    return;
   }
 });
 

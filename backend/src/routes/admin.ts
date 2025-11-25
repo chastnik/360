@@ -144,7 +144,8 @@ router.get('/logs', authenticateToken, requirePermission('ui:view:admin.logs'), 
     
     // Поиск
     if (search) {
-      const searchLower = search.toLowerCase();
+      const searchStr = Array.isArray(search) ? search[0] : search;
+      const searchLower = String(searchStr).toLowerCase();
       filteredLogs = filteredLogs.filter(log => {
         const contextMatch = log.context ? log.context.toLowerCase().includes(searchLower) : false;
         const userEmailStr = log.userEmail as string | null;
