@@ -136,14 +136,18 @@ async function initializeServices() {
 }
 
 // Start server
-initializeServices().then(() => {
-  app.listen(PORT, () => {
-    logger.info({ port: PORT }, 'Сервер запущен');
-    logger.info({ url: `http://localhost:${PORT}/api` }, 'API доступен');
+// Запускаем сервер сразу, чтобы health check работал
+// Инициализация сервисов происходит асинхронно
+app.listen(PORT, () => {
+  logger.info({ port: PORT }, 'Сервер запущен');
+  logger.info({ url: `http://localhost:${PORT}/api` }, 'API доступен');
+  
+  // Инициализируем сервисы после запуска сервера
+  initializeServices().catch((error) => {
+    logger.error({ error }, 'Ошибка инициализации сервисов');
+    // Не завершаем процесс, чтобы сервер продолжал работать
+    // Health check может показать, что сервисы не инициализированы
   });
-}).catch((error) => {
-  logger.error({ error }, 'Не удалось запустить сервер');
-  process.exit(1);
 });
 
 // Graceful shutdown
