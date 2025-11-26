@@ -1,6 +1,9 @@
 // © 2025 Бит.Цифра - Стас Чашин
 
-import pino from 'pino';
+import type { LoggerOptions } from 'pino';
+// Используем require для обхода проблемы с разрешением модуля в TypeScript
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pino = require('pino');
 
 /**
  * Настройка структурированного логирования с использованием pino
@@ -14,7 +17,7 @@ import pino from 'pino';
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
 
-const loggerConfig: pino.LoggerOptions = {
+const loggerConfig: LoggerOptions = {
   level: logLevel,
   formatters: {
     level: (label: string) => {
