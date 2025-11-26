@@ -311,7 +311,12 @@ run_migrations() {
     
     # Выполняем миграции с явным указанием окружения
     # Переменные окружения уже переданы через docker-compose.yml, но NODE_ENV нужно установить явно
-    if $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && NODE_ENV=production npm run migrate"; then
+    # Knex ищет knexfile.js в текущей директории, поэтому просто переходим в /app
+    # Выводим диагностическую информацию для отладки
+    log "Проверка наличия knexfile.js в контейнере..."
+    $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && pwd && ls -la knexfile.js 2>&1 || echo 'Файл knexfile.js не найден!'" || true
+    
+    if $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && NODE_ENV=production npx knex migrate:latest"; then
         success "Миграции выполнены успешно"
         return 0
     else
@@ -332,7 +337,8 @@ run_seeds() {
     
     # Выполняем сиды с явным указанием окружения
     # Переменные окружения уже переданы через docker-compose.yml, но NODE_ENV нужно установить явно
-    if $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && NODE_ENV=production npm run seed"; then
+    # Knex ищет knexfile.js в текущей директории, поэтому просто переходим в /app
+    if $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && NODE_ENV=production npx knex seed:run"; then
         success "Начальные данные загружены"
         return 0
     else

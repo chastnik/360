@@ -21,39 +21,118 @@ class RedisService {
         return;
       }
       
-      const redisSettings = await connection('system_settings')
-        .whereIn('setting_key', [
-          'redis_enabled', 'redis_host', 'redis_port', 
-          'redis_password', 'redis_db'
-        ])
-        .where('category', 'cache');
-
-      // Преобразовать в удобный объект
-      this.settings = redisSettings.reduce((acc: any, setting: any) => {
-        acc[setting.setting_key] = this.convertValue(setting.setting_value, setting.setting_type);
-        return acc;
-      }, {});
-
-      // Проверить, включен ли Redis
-      if (!this.settings.redis_enabled) {
-        console.log('Redis отключен в настройках');
+      // Проверяем существование таблицы перед запросом
+      const hasTable = await connection.schema.hasTable('system_settings');
+      if (!hasTable) {
+        // Таблица не существует - используем настройки из .env
+        console.log('Таблица system_settings не найдена, используем настройки Redis из .env');
+        await this.initializeFromEnv();
         return;
       }
+      
+      try {
+        const redisSettings = await connection('system_settings')
+          .whereIn('setting_key', [
+            'redis_enabled', 'redis_host', 'redis_port', 
+            'redis_password', 'redis_db'
+          ])
+          .where('category', 'cache');
 
-      // Настройки подключения
-      const options: any = {
-        socket: {
-          host: this.settings.redis_host || 'localhost',
-          port: this.settings.redis_port || 6379
-        },
-        database: this.settings.redis_db || 0
-      };
+        // Преобразовать в удобный объект
+        this.settings = redisSettings.reduce((acc: any, setting: any) => {
+          acc[setting.setting_key] = this.convertValue(setting.setting_value, setting.setting_type);
+          return acc;
+        }, {});
 
-      // Добавить пароль если указан
-      if (this.settings.redis_password) {
-        options.password = this.settings.redis_password;
+        // Проверить, включен ли Redis
+        if (!this.settings.redis_enabled) {
+          console.log('Redis отключен в настройках');
+          return;
+        }
+
+        // Настройки подключения
+        const options: any = {
+          socket: {
+            host: this.settings.redis_host || 'localhost',
+            port: this.settings.redis_port || 6379
+          },
+          database: this.settings.redis_db || 0
+        };
+
+        // Добавить пароль если указан
+        if (this.settings.redis_password) {
+          options.password = this.settings.redis_password;
+        }
+
+        // Создать клиент
+        const { createClient } = require('redis');
+        this.client = createClient(options);
+
+        // Обработчики событий
+        this.client.on('error', (err: Error) => {
+          console.error('Ошибка Redis:', err);
+        });
+
+        this.client.on('connect', () => {
+          console.log('📦 Подключение к Redis установлено');
+        });
+
+        this.client.on('ready', () => {
+          console.log('✅ Redis готов к работе');
+        });
+
+        this.client.on('end', () => {
+          console.log('🔌 Соединение с Redis закрыто');
+        });
+
+        // Подключиться
+        await this.client.connect();
+      } catch (error: any) {
+        // Если ошибка при чтении настроек из БД, используем .env
+        if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+          console.log('Ошибка чтения настроек Redis из БД, используем настройки из .env');
+          await this.initializeFromEnv();
+          return;
+        }
+        throw error;
       }
 
+    } catch (error) {
+      console.error('Ошибка инициализации Redis:', error);
+      // Пытаемся инициализировать из .env как fallback
+      try {
+        await this.initializeFromEnv();
+      } catch (envError) {
+        console.error('Не удалось инициализировать Redis из .env:', envError);
+        this.client = null;
+      }
+    }
+  }
+
+  /**
+   * Инициализация Redis из переменных окружения
+   */
+  private async initializeFromEnv(): Promise<void> {
+    const redisHost = process.env.REDIS_HOST || 'localhost';
+    const redisPort = parseInt(process.env.REDIS_PORT || '6379');
+    const redisPassword = process.env.REDIS_PASSWORD || undefined;
+    const redisDb = parseInt(process.env.REDIS_DB || '0');
+
+    // Настройки подключения
+    const options: any = {
+      socket: {
+        host: redisHost,
+        port: redisPort
+      },
+      database: redisDb
+    };
+
+    // Добавить пароль если указан
+    if (redisPassword) {
+      options.password = redisPassword;
+    }
+
+    try {
       // Создать клиент
       const { createClient } = require('redis');
       this.client = createClient(options);
@@ -64,7 +143,7 @@ class RedisService {
       });
 
       this.client.on('connect', () => {
-        console.log('📦 Подключение к Redis установлено');
+        console.log('📦 Подключение к Redis установлено (из .env)');
       });
 
       this.client.on('ready', () => {
@@ -77,9 +156,8 @@ class RedisService {
 
       // Подключиться
       await this.client.connect();
-
     } catch (error) {
-      console.error('Ошибка инициализации Redis:', error);
+      console.error('Ошибка подключения к Redis из .env:', error);
       this.client = null;
     }
   }

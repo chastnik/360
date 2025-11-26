@@ -85,6 +85,13 @@ class DatabaseService {
    */
   private async getSettingsFromDatabase(connection: Knex): Promise<DatabaseSettings | null> {
     try {
+      // Проверяем существование таблицы перед запросом
+      const hasTable = await connection.schema.hasTable('system_settings');
+      if (!hasTable) {
+        // Таблица не существует - это нормально при первом запуске до выполнения миграций
+        return null;
+      }
+
       const settings = await connection('system_settings')
         .whereIn('setting_key', ['db_host', 'db_port', 'db_name', 'db_user', 'db_password'])
         .where('category', 'database');
@@ -112,8 +119,13 @@ class DatabaseService {
         user: settingsMap.db_user,
         password: settingsMap.db_password || ''
       };
-    } catch (error) {
-      console.warn('Не удалось получить настройки БД из system_settings:', error);
+    } catch (error: any) {
+      // Проверяем, является ли ошибка отсутствием таблицы (это нормально при первом запуске)
+      if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+        // Таблица не существует - это нормально до выполнения миграций
+        return null;
+      }
+      console.warn('Не удалось получить настройки БД из system_settings:', error?.message || error);
       return null;
     }
   }

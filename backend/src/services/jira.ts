@@ -61,6 +61,13 @@ class JiraService {
    */
   private async getSettings(): Promise<JiraSettings | null> {
     try {
+      // Проверяем существование таблицы перед запросом
+      const hasTable = await knex.schema.hasTable('system_settings');
+      if (!hasTable) {
+        // Таблица не существует - это нормально при первом запуске до выполнения миграций
+        return null;
+      }
+
       const settings = await knex('system_settings')
         .whereIn('setting_key', ['jira_url', 'jira_username', 'jira_password', 'jira_enabled', 'jira_project_key', 'jira_epic_key'])
         .where('category', 'integrations');
@@ -97,8 +104,13 @@ class JiraService {
         projectKey: settingsMap.projectKey || '',
         epicKey: settingsMap.epicKey || ''
       };
-    } catch (error) {
-      console.error('Ошибка получения настроек Jira:', error);
+    } catch (error: any) {
+      // Проверяем, является ли ошибка отсутствием таблицы (это нормально при первом запуске)
+      if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+        // Таблица не существует - это нормально до выполнения миграций
+        return null;
+      }
+      console.error('Ошибка получения настроек Jira:', error?.message || error);
       return null;
     }
   }
