@@ -6,7 +6,14 @@
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.up = function(knex) {
+exports.up = async function(knex) {
+  // Проверяем существование таблицы перед выполнением операции
+  const hasTable = await knex.schema.hasTable('test_results');
+  if (!hasTable) {
+    console.log('Таблица test_results не существует, пропускаем миграцию');
+    return;
+  }
+  
   return knex.raw(`
     ALTER TABLE test_results 
     DROP CONSTRAINT IF EXISTS test_results_growth_plan_id_course_id_unique;
@@ -17,7 +24,14 @@ exports.up = function(knex) {
  * @param { import("knex").Knex } knex
  * @returns { Promise<void> }
  */
-exports.down = function(knex) {
+exports.down = async function(knex) {
+  // Проверяем существование таблицы перед выполнением операции
+  const hasTable = await knex.schema.hasTable('test_results');
+  if (!hasTable) {
+    console.log('Таблица test_results не существует, пропускаем откат миграции');
+    return;
+  }
+  
   return knex.raw(`
     ALTER TABLE test_results 
     ADD CONSTRAINT test_results_growth_plan_id_course_id_unique 

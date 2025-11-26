@@ -8,6 +8,13 @@
  * @returns { Promise<void> }
  */
 exports.up = async function(knex) {
+  // Проверяем существование таблицы перед выполнением операций
+  const hasTable = await knex.schema.hasTable('competence_matrix');
+  if (!hasTable) {
+    console.log('Таблица competence_matrix не существует, пропускаем миграцию');
+    return;
+  }
+  
   // Сначала обновляем существующие данные
   await knex.raw(`
     UPDATE competence_matrix 
@@ -22,7 +29,7 @@ exports.up = async function(knex) {
   // Изменяем enum тип
   await knex.raw(`
     ALTER TABLE competence_matrix 
-    DROP CONSTRAINT competence_matrix_level_check
+    DROP CONSTRAINT IF EXISTS competence_matrix_level_check
   `);
   
   await knex.raw(`
@@ -37,6 +44,13 @@ exports.up = async function(knex) {
  * @returns { Promise<void> }
  */
 exports.down = async function(knex) {
+  // Проверяем существование таблицы перед выполнением операций
+  const hasTable = await knex.schema.hasTable('competence_matrix');
+  if (!hasTable) {
+    console.log('Таблица competence_matrix не существует, пропускаем откат миграции');
+    return;
+  }
+  
   // Возвращаем обратно старые уровни
   await knex.raw(`
     UPDATE competence_matrix 
@@ -50,7 +64,7 @@ exports.down = async function(knex) {
   
   await knex.raw(`
     ALTER TABLE competence_matrix 
-    DROP CONSTRAINT competence_matrix_level_check
+    DROP CONSTRAINT IF EXISTS competence_matrix_level_check
   `);
   
   await knex.raw(`

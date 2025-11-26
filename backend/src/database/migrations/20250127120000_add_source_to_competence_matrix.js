@@ -8,6 +8,13 @@
  * @returns { Promise<void> }
  */
 exports.up = async function(knex) {
+  // Проверяем существование таблицы перед выполнением операций
+  const hasTable = await knex.schema.hasTable('competence_matrix');
+  if (!hasTable) {
+    console.log('Таблица competence_matrix не существует, пропускаем миграцию');
+    return;
+  }
+  
   // Проверяем, существует ли колонка source
   const hasSourceColumn = await knex.schema.hasColumn('competence_matrix', 'source');
   
@@ -30,6 +37,13 @@ exports.up = async function(knex) {
  * @returns { Promise<void> }
  */
 exports.down = async function(knex) {
+  // Проверяем существование таблицы перед выполнением операций
+  const hasTable = await knex.schema.hasTable('competence_matrix');
+  if (!hasTable) {
+    console.log('Таблица competence_matrix не существует, пропускаем откат миграции');
+    return;
+  }
+  
   // Удаляем колонку source
   const hasSourceColumn = await knex.schema.hasColumn('competence_matrix', 'source');
   
