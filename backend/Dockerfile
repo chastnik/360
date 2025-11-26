@@ -18,6 +18,10 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/dist ./dist
 COPY backend/package*.json ./
+COPY backend/knexfile.js ./
+# Копируем миграции и seeds для выполнения через knex CLI
+COPY --from=builder /app/src/database/migrations ./src/database/migrations
+COPY --from=builder /app/src/database/seeds ./src/database/seeds
 RUN npm ci --omit=dev
 
 # Копируем корневой .env на время сборки не требуется; в рантайме переменные передаются окружением

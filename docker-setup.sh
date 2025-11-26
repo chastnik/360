@@ -304,7 +304,14 @@ wait_for_backend() {
 run_migrations() {
     log "Выполнение миграций базы данных..."
     
-    if $DOCKER_COMPOSE_CMD exec -T backend npm run migrate; then
+    # Загружаем переменные окружения если они не загружены
+    if [ -f .env ]; then
+        load_env_file .env || true
+    fi
+    
+    # Выполняем миграции с явным указанием окружения
+    # Переменные окружения уже переданы через docker-compose.yml, но NODE_ENV нужно установить явно
+    if $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && NODE_ENV=production npm run migrate"; then
         success "Миграции выполнены успешно"
         return 0
     else
@@ -318,7 +325,14 @@ run_migrations() {
 run_seeds() {
     log "Заполнение базы данных начальными данными..."
     
-    if $DOCKER_COMPOSE_CMD exec -T backend npm run seed; then
+    # Загружаем переменные окружения если они не загружены
+    if [ -f .env ]; then
+        load_env_file .env || true
+    fi
+    
+    # Выполняем сиды с явным указанием окружения
+    # Переменные окружения уже переданы через docker-compose.yml, но NODE_ENV нужно установить явно
+    if $DOCKER_COMPOSE_CMD exec -T backend sh -c "cd /app && NODE_ENV=production npm run seed"; then
         success "Начальные данные загружены"
         return 0
     else
