@@ -283,6 +283,12 @@ run_migrations() {
     # Загружаем переменные окружения
     source .env
     
+    # Исправляем имя переименованной миграции, если необходимо
+    if [ -f "backend/scripts/fix-migration-name.js" ]; then
+        print_info "Проверка и исправление имени миграции..."
+        cd backend && node scripts/fix-migration-name.js > /dev/null 2>&1 && cd ..
+    fi
+    
     if cd backend && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run migrate; then
         print_success "Миграции выполнены успешно"
     else
