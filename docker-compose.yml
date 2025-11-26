@@ -1,6 +1,6 @@
 # © 2025 Бит.Цифра - Стас Чашин
 # Автор: Стас Чашин @chastnik
-version: "3.9"
+# Примечание: атрибут version устарел в Docker Compose v2, удален для совместимости
 
 services:
   database:

@@ -456,10 +456,21 @@ check_status() {
     echo "Frontend: ${frontend_url}"
     echo "Backend API: ${backend_url}/api"
     echo ""
-    echo "=== Учетные данные по умолчанию (после seed) ==="
-    echo "Email: admin@company.com / Пароль: admin123"
-    echo "Email: manager@company.com / Пароль: manager123"
-    echo "Email: user@company.com / Пароль: user123"
+    
+    # Проверка выполнения миграций
+    local db_user="${DB_USER:-assessment_user}"
+    if $DOCKER_COMPOSE_CMD exec -T database psql -U "$db_user" -d "${DB_NAME:-assessment360}" -c "SELECT 1 FROM system_settings LIMIT 1;" &> /dev/null 2>&1; then
+        echo "=== Учетные данные по умолчанию (после seed) ==="
+        echo "Email: admin@company.com / Пароль: admin123"
+        echo "Email: manager@company.com / Пароль: manager123"
+        echo "Email: user@company.com / Пароль: user123"
+    else
+        warning ""
+        warning "⚠️  ВНИМАНИЕ: Миграции базы данных не выполнены!"
+        warning "Выполните миграции командой: $0 migrate"
+        warning "После миграций выполните seed: $0 seed"
+        warning ""
+    fi
 }
 
 # ============================================================================
