@@ -37,6 +37,12 @@ import calendarRoutes from './routes/calendar';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Health check должен быть ПЕРВЫМ, до всех middleware
+// Это критично для Docker health check
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Trust proxy - устанавливаем в 1 для доверия только первому прокси (более безопасно)
 // Это нужно для корректной работы за прокси/балансировщиком, но не позволяет обойти rate limiting
 app.set('trust proxy', 1);
@@ -101,11 +107,6 @@ app.use('/api/learning', learningRoutes);
 app.use('/api/vacations', vacationRoutes);
 app.use('/api/calendar', calendarRoutes);
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
 // Error handling middleware (должен быть последним)
 app.use(errorHandler);
 
@@ -138,18 +139,29 @@ async function initializeServices() {
 // Start server
 // Запускаем сервер сразу, чтобы health check работал
 // Инициализация сервисов происходит асинхронно
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, 'Сервер запущен');
-  logger.info({ url: `http://localhost:${PORT}/api` }, 'API доступен');
-  
-  // Инициализируем сервисы после запуска сервера
-  initializeServices().catch((error) => {
-    logger.error({ error }, 'Ошибка инициализации сервисов');
-    logger.warn('Приложение продолжит работу, но некоторые функции могут быть недоступны');
-    // Не завершаем процесс, чтобы сервер продолжал работать
-    // Health check может показать, что сервисы не инициализированы
+try {
+  app.listen(PORT, '0.0.0.0', () => {
+    logger.info({ port: PORT }, 'Сервер запущен');
+    logger.info({ url: `http://localhost:${PORT}/api` }, 'API доступен');
+    
+    // Инициализируем сервисы после запуска сервера
+    initializeServices().catch((error) => {
+      logger.error({ error }, 'Ошибка инициализации сервисов');
+      logger.warn('Приложение продолжит работу, но некоторые функции могут быть недоступны');
+      // Не завершаем процесс, чтобы сервер продолжал работать
+      // Health check может показать, что сервисы не инициализированы
+    });
+  }).on('error', (error: any) => {
+    logger.error({ error }, 'Ошибка запуска сервера');
+    // Не завершаем процесс сразу, даем время для диагностики
+    setTimeout(() => {
+      process.exit(1);
+    }, 5000);
   });
-});
+} catch (error) {
+  logger.error({ error }, 'Критическая ошибка при запуске сервера');
+  process.exit(1);
+}
 
 // Graceful shutdown
 process.on('SIGINT', () => {
