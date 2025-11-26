@@ -4,6 +4,13 @@
  * @returns { Promise<void> }
  */
 exports.up = async function(knex) {
+  // Проверяем существование таблицы vacations
+  const hasTable = await knex.schema.hasTable('vacations');
+  if (!hasTable) {
+    console.log('Таблица vacations не существует, пропускаем миграцию');
+    return;
+  }
+  
   // Получаем все отпуска
   const vacations = await knex('vacations').select('id', 'start_date', 'end_date');
   
@@ -39,6 +46,13 @@ exports.up = async function(knex) {
  * @returns { Promise<void> }
  */
 exports.down = async function(knex) {
+  // Проверяем существование таблицы vacations
+  const hasTable = await knex.schema.hasTable('vacations');
+  if (!hasTable) {
+    console.log('Таблица vacations не существует, пропускаем откат миграции');
+    return;
+  }
+  
   // Откат миграции: пересчитываем обратно на рабочие дни
   const vacations = await knex('vacations').select('id', 'start_date', 'end_date');
   
