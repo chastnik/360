@@ -345,16 +345,115 @@ start_dev() {
     npm run dev
 }
 
+# Создание nginx конфигурации для production
+create_nginx_config() {
+    print_info "Создание конфигурации nginx для production..."
+    
+    # Загружаем переменные окружения
+    source .env
+    
+    local backend_port="${PORT:-5000}"
+    local frontend_build_dir="$(pwd)/frontend/build"
+    
+    # Создаем временную конфигурацию nginx для bare-metal
+    local nginx_config="/tmp/nginx-360-production.conf"
+    
+    cat > "$nginx_config" <<EOF
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+    
+    # Gzip сжатие
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    
+    server {
+        listen 80;
+        server_name localhost;
+        root ${frontend_build_dir};
+        index index.html;
+        
+        # Основное приложение
+        location / {
+            try_files \$uri \$uri/ /index.html;
+        }
+        
+        # API прокси на backend
+        location /api/ {
+            proxy_pass http://127.0.0.1:${backend_port};
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_cache_bypass \$http_upgrade;
+        }
+        
+        # Health check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Кэширование статических файлов
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        error_page 404 /index.html;
+    }
+}
+EOF
+    
+    echo "$nginx_config"
+}
+
 # Запуск в продакшн режиме
 start_production() {
     print_info "Запуск в продакшн режиме..."
+    
+    # Загружаем переменные окружения
+    source .env
+    
+    local backend_port="${PORT:-5000}"
+    
+    # Проверка наличия nginx
+    if ! command -v nginx &> /dev/null; then
+        print_error "nginx не установлен. Установите nginx для production режима:"
+        print_info "  sudo apt-get install nginx  # Ubuntu/Debian"
+        print_info "  sudo yum install nginx      # CentOS/RHEL"
+        exit 1
+    fi
     
     # Сборка проектов
     build_backend
     build_frontend
     
+    # Проверка что frontend собран
+    if [ ! -d "frontend/build" ]; then
+        print_error "Frontend не собран. Директория frontend/build не найдена"
+        exit 1
+    fi
+    
+    # Создание конфигурации nginx
+    local nginx_config=$(create_nginx_config)
+    
     # Запуск backend
-    print_info "Запуск backend..."
+    print_info "Запуск backend на порту ${backend_port}..."
     cd backend && npm start &
     BACKEND_PID=$!
     cd ..
@@ -363,21 +462,42 @@ start_production() {
     sleep 3
     
     # Проверка что backend запустился
-    if curl -s http://localhost:3001/api/health &> /dev/null; then
-        print_success "Backend запущен успешно"
+    if curl -s "http://localhost:${backend_port}/health" &> /dev/null; then
+        print_success "Backend запущен успешно на порту ${backend_port}"
     else
-        print_error "Backend не запустился"
+        print_error "Backend не запустился на порту ${backend_port}"
+        kill $BACKEND_PID 2>/dev/null
+        exit 1
+    fi
+    
+    # Запуск nginx
+    print_info "Запуск nginx..."
+    if sudo nginx -t -c "$nginx_config" &> /dev/null; then
+        # Останавливаем существующий nginx если запущен
+        sudo nginx -s quit 2>/dev/null || true
+        sleep 1
+        
+        # Запускаем nginx с нашей конфигурацией
+        if sudo nginx -c "$nginx_config"; then
+            print_success "Nginx запущен успешно"
+        else
+            print_error "Не удалось запустить nginx"
+            kill $BACKEND_PID 2>/dev/null
+            exit 1
+        fi
+    else
+        print_error "Ошибка в конфигурации nginx"
         kill $BACKEND_PID 2>/dev/null
         exit 1
     fi
     
     print_info "Система запущена!"
-    print_info "Backend: http://localhost:3001"
-    print_info "Frontend: http://localhost:80 (через nginx)"
+    print_info "Backend: http://localhost:${backend_port}/api"
+    print_info "Frontend: http://localhost (через nginx)"
     print_info "Для остановки нажмите Ctrl+C"
     
     # Ожидание сигнала завершения
-    trap "echo; print_info 'Остановка системы...'; kill $BACKEND_PID 2>/dev/null; exit 0" INT TERM
+    trap "echo; print_info 'Остановка системы...'; kill $BACKEND_PID 2>/dev/null; sudo nginx -s quit 2>/dev/null; rm -f $nginx_config; exit 0" INT TERM
     wait
 }
 
