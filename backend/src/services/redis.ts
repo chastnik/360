@@ -50,18 +50,25 @@ class RedisService {
           return;
         }
 
+        // В Docker окружении приоритет у переменных окружения
+        // Используем настройки из БД только если переменные окружения не заданы
+        const redisHost = process.env.REDIS_HOST || this.settings.redis_host || 'localhost';
+        const redisPort = parseInt(process.env.REDIS_PORT || String(this.settings.redis_port || 6379));
+        const redisPassword = process.env.REDIS_PASSWORD || this.settings.redis_password;
+        const redisDb = this.settings.redis_db || 0;
+
         // Настройки подключения
         const options: any = {
           socket: {
-            host: this.settings.redis_host || 'localhost',
-            port: this.settings.redis_port || 6379
+            host: redisHost,
+            port: redisPort
           },
-          database: this.settings.redis_db || 0
+          database: redisDb
         };
 
         // Добавить пароль если указан
-        if (this.settings.redis_password) {
-          options.password = this.settings.redis_password;
+        if (redisPassword) {
+          options.password = redisPassword;
         }
 
         // Создать клиент
