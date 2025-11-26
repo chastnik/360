@@ -17,7 +17,7 @@ const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
 const loggerConfig: pino.LoggerOptions = {
   level: logLevel,
   formatters: {
-    level: (label) => {
+    level: (label: string) => {
       return { level: label };
     },
   },
