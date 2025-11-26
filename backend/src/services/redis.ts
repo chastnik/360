@@ -101,7 +101,10 @@ class RedisService {
           await this.initializeFromEnv();
           return;
         }
-        throw error;
+        // Если ошибка подключения к Redis, пробуем через .env
+        console.warn('Ошибка подключения к Redis с настройками из БД, пробуем через .env:', error?.message || error);
+        await this.initializeFromEnv();
+        return;
       }
 
     } catch (error) {
