@@ -35,7 +35,7 @@ import vacationRoutes from './routes/vacations';
 import calendarRoutes from './routes/calendar';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Health check должен быть ПЕРВЫМ, до всех middleware
 // Это критично для Docker health check
