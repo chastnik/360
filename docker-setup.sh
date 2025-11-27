@@ -439,6 +439,9 @@ start_system() {
         return 1
     fi
     
+    # Исправление предупреждений PostgreSQL о collation перед запуском backend
+    fix_postgres_collation
+    
     # Запуск backend
     log "Запуск backend..."
     if ! $DOCKER_COMPOSE_CMD up -d backend; then
