@@ -103,7 +103,7 @@ install_dependencies() {
     fi
     
     # Проверка зависимостей frontend
-    if [ ! -d "frontend/node_modules" ]; then
+    if [ ! -d "frontend/node_modules" ] || [ ! -f "frontend/node_modules/.bin/react-scripts" ]; then
         print_info "Установка зависимостей frontend..."
         cd frontend && npm install && cd ..
     fi
@@ -317,6 +317,12 @@ run_seeds() {
 # Сборка frontend
 build_frontend() {
     print_info "Сборка frontend..."
+    
+    # Проверка наличия react-scripts
+    if [ ! -f "frontend/node_modules/.bin/react-scripts" ]; then
+        print_info "react-scripts не найден, устанавливаю зависимости frontend..."
+        cd frontend && npm install && cd ..
+    fi
     
     if cd frontend && npm run build; then
         print_success "Frontend собран успешно"
