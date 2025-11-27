@@ -472,13 +472,12 @@ start_production() {
     
     # Проверка и установка зависимостей backend перед запуском
     # Используем npm list для надежной проверки установки node-cron
-    if ! cd backend && npm list node-cron &> /dev/null; then
+    cd backend
+    if ! npm list node-cron &> /dev/null; then
         print_info "node-cron не установлен, устанавливаю зависимости backend..."
         npm install
-        cd ..
-    else
-        cd ..
     fi
+    cd ..
     
     # Запуск backend
     print_info "Запуск backend на порту ${backend_port}..."
