@@ -24,7 +24,9 @@ COPY backend/knexfile.js ./
 # Копируем миграции и seeds для выполнения через knex CLI
 COPY --from=builder /app/src/database/migrations ./src/database/migrations
 COPY --from=builder /app/src/database/seeds ./src/database/seeds
-RUN npm ci --omit=dev
+# Пытаемся использовать npm ci для быстрой установки
+# Если package-lock.json не синхронизирован, обновляем его и используем npm install
+RUN npm ci --omit=dev || (echo "package-lock.json не синхронизирован, обновляю..." && npm install --omit=dev)
 
 # Копируем корневой .env на время сборки не требуется; в рантайме переменные передаются окружением
 
