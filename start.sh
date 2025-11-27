@@ -578,9 +578,26 @@ start_production() {
         cd ..
     fi
     
+    # Проверка занятости порта перед запуском backend
+    if command -v lsof &> /dev/null; then
+        if lsof -Pi :${backend_port} -sTCP:LISTEN -t >/dev/null 2>&1; then
+            print_warning "Порт ${backend_port} уже занят"
+            print_info "Попытка остановить процесс на порту ${backend_port}..."
+            lsof -ti :${backend_port} | xargs kill -9 2>/dev/null || true
+            sleep 2
+        fi
+    elif command -v netstat &> /dev/null; then
+        if netstat -tuln | grep -q ":${backend_port} "; then
+            print_warning "Порт ${backend_port} уже занят"
+            print_info "Найдите и остановите процесс вручную:"
+            print_info "  lsof -i :${backend_port}  # или netstat -tulpn | grep :${backend_port}"
+            exit 1
+        fi
+    fi
+    
     # Запуск backend
     print_info "Запуск backend на порту ${backend_port}..."
-    cd backend && npm start &
+    cd backend && npm start > /tmp/backend.log 2>&1 &
     BACKEND_PID=$!
     cd ..
     
@@ -592,6 +609,11 @@ start_production() {
         print_success "Backend запущен успешно на порту ${backend_port}"
     else
         print_error "Backend не запустился на порту ${backend_port}"
+        print_info "Проверьте логи: tail -f /tmp/backend.log"
+        if [ -f /tmp/backend.log ]; then
+            print_info "Последние строки лога:"
+            tail -20 /tmp/backend.log
+        fi
         kill $BACKEND_PID 2>/dev/null
         exit 1
     fi
@@ -599,16 +621,28 @@ start_production() {
     # Запуск nginx
     print_info "Запуск nginx..."
     nginx_test_output=$(sudo nginx -t -c "$nginx_config" 2>&1)
-    if [ $? -eq 0 ]; then
+    nginx_test_status=$?
+    
+    if [ $nginx_test_status -eq 0 ]; then
         # Останавливаем существующий nginx если запущен
         sudo nginx -s quit 2>/dev/null || true
         sleep 1
         
-        # Запускаем nginx с нашей конфигурацией
-        if sudo nginx -c "$nginx_config"; then
-            print_success "Nginx запущен успешно"
+        # Запускаем nginx с нашей конфигурацией в фоне
+        if sudo nginx -c "$nginx_config" 2>&1; then
+            sleep 1
+            # Проверяем, что nginx запустился
+            if pgrep -x nginx > /dev/null; then
+                print_success "Nginx запущен успешно"
+            else
+                print_error "Nginx не запустился (процесс не найден)"
+                print_info "Проверьте логи nginx: sudo tail -f /var/log/nginx/error.log"
+                kill $BACKEND_PID 2>/dev/null
+                exit 1
+            fi
         else
             print_error "Не удалось запустить nginx"
+            print_info "Проверьте логи nginx: sudo tail -f /var/log/nginx/error.log"
             kill $BACKEND_PID 2>/dev/null
             exit 1
         fi
