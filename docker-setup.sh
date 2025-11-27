@@ -301,6 +301,28 @@ wait_for_backend() {
 # ============================================================================
 
 # Выполнение миграций
+# Исправление предупреждений PostgreSQL о collation версии
+fix_postgres_collation() {
+    log "Исправление предупреждений PostgreSQL о collation версии..."
+    
+    # Загружаем переменные окружения если они не загружены
+    if [ -f .env ]; then
+        load_env_file .env || true
+    fi
+    
+    local db_name="${DB_NAME:-assessment360}"
+    local db_user="${DB_USER:-assessment_user}"
+    local db_password="${DB_PASSWORD:-}"
+    
+    # Выполняем ALTER DATABASE ... REFRESH COLLATION VERSION для всех баз данных
+    if [ -n "$db_password" ]; then
+        $DOCKER_COMPOSE_CMD exec -T database psql -U "$db_user" -d postgres -c "ALTER DATABASE $db_name REFRESH COLLATION VERSION;" 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD exec -T database psql -U "$db_user" -d postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;" 2>/dev/null || true
+    fi
+    
+    log "Попытка исправления collation завершена (предупреждения могут остаться, это не критично)"
+}
+
 run_migrations() {
     log "Выполнение миграций базы данных..."
     
@@ -308,6 +330,9 @@ run_migrations() {
     if [ -f .env ]; then
         load_env_file .env || true
     fi
+    
+    # Исправляем предупреждения о collation перед миграциями
+    fix_postgres_collation
     
     # Выполняем миграции с явным указанием окружения
     # Переменные окружения уже переданы через docker-compose.yml, но NODE_ENV нужно установить явно
