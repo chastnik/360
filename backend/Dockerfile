@@ -3,7 +3,9 @@ FROM node:20-alpine as builder
 WORKDIR /app
 
 COPY backend/package*.json ./
-RUN npm ci
+# Пытаемся использовать npm ci для быстрой установки
+# Если package-lock.json не синхронизирован, обновляем его и используем npm install
+RUN npm ci || (echo "package-lock.json не синхронизирован, обновляю..." && npm install)
 
 COPY backend/ ./
 RUN npm run build

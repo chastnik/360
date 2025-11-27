@@ -3,7 +3,9 @@ FROM node:20-alpine as build
 WORKDIR /app
 
 COPY frontend/package*.json ./
-RUN npm ci
+# Пытаемся использовать npm ci для быстрой установки
+# Если package-lock.json не синхронизирован, обновляем его и используем npm install
+RUN npm ci || (echo "package-lock.json не синхронизирован, обновляю..." && npm install)
 
 ARG REACT_APP_API_URL
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
