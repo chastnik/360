@@ -470,6 +470,12 @@ start_production() {
     # Создание конфигурации nginx
     local nginx_config=$(create_nginx_config)
     
+    # Проверка и установка зависимостей backend перед запуском
+    if [ ! -d "backend/node_modules/node-cron" ]; then
+        print_info "node-cron не найден, устанавливаю зависимости backend..."
+        cd backend && npm install && cd ..
+    fi
+    
     # Запуск backend
     print_info "Запуск backend на порту ${backend_port}..."
     cd backend && npm start &
