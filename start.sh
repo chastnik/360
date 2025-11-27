@@ -97,7 +97,7 @@ install_dependencies() {
     fi
     
     # Проверка зависимостей backend
-    if [ ! -d "backend/node_modules" ]; then
+    if [ ! -d "backend/node_modules" ] || [ ! -d "backend/node_modules/node-cron" ]; then
         print_info "Установка зависимостей backend..."
         cd backend && npm install && cd ..
     fi
@@ -336,6 +336,12 @@ build_frontend() {
 # Сборка backend
 build_backend() {
     print_info "Сборка backend..."
+    
+    # Проверка наличия node-cron
+    if [ ! -d "backend/node_modules/node-cron" ]; then
+        print_info "node-cron не найден, устанавливаю зависимости backend..."
+        cd backend && npm install && cd ..
+    fi
     
     if cd backend && npm run build; then
         print_success "Backend собран успешно"
