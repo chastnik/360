@@ -10,14 +10,57 @@ set -e  # Остановиться при любой ошибке
 echo "🚀 Настройка системы 360° оценки"
 echo "=================================="
 
-# Проверка Node.js
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js не найден. Установите Node.js 16+ перед продолжением."
-    exit 1
-fi
+# Функция установки/обновления Node.js через NVM
+install_or_update_nodejs() {
+    local required_version="20"
+    local current_version=""
+    
+    if command -v node &> /dev/null; then
+        current_version=$(node -v | cut -d 'v' -f 2 | cut -d '.' -f 1)
+        echo "📦 Текущая версия Node.js: $(node -v)"
+        
+        if [ "$current_version" -ge "$required_version" ]; then
+            echo "✅ Node.js версии $current_version соответствует требованиям (>= $required_version)"
+            return 0
+        fi
+    fi
+    
+    echo "🔄 Установка/обновление Node.js до версии $required_version+ через NVM..."
+    
+    # Проверка наличия NVM
+    if [ ! -s "$HOME/.nvm/nvm.sh" ]; then
+        echo "📥 Установка NVM..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+        
+        # Загрузка NVM
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    else
+        # Загрузка NVM если уже установлен
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    fi
+    
+    # Установка последней LTS версии Node.js
+    echo "📦 Установка последней LTS версии Node.js..."
+    nvm install --lts
+    nvm use --lts
+    nvm alias default lts/*
+    
+    # Проверка установки
+    if command -v node &> /dev/null; then
+        echo "✅ Node.js установлен: $(node -v)"
+        echo "✅ npm установлен: $(npm -v)"
+    else
+        echo "❌ Не удалось установить Node.js"
+        exit 1
+    fi
+}
 
-NODE_VERSION=$(node -v | cut -d 'v' -f 2)
-echo "✅ Node.js версия: $NODE_VERSION"
+# Проверка и обновление Node.js
+install_or_update_nodejs
 
 # Проверка PostgreSQL
 if ! command -v psql &> /dev/null; then
@@ -116,11 +159,24 @@ cd backend
 npm install
 echo "✅ Зависимости backend установлены"
 
+# Обновление устаревших пакетов backend
+echo "🔄 Проверка обновлений пакетов backend..."
+npm outdated || true
+echo "📦 Обновление пакетов backend до последних версий..."
+npm update
+cd ..
+
 # Установка зависимостей frontend
 echo "Установка зависимостей frontend..."
-cd ../frontend
+cd frontend
 npm install
 echo "✅ Зависимости frontend установлены"
+
+# Обновление устаревших пакетов frontend
+echo "🔄 Проверка обновлений пакетов frontend..."
+npm outdated || true
+echo "📦 Обновление пакетов frontend до последних версий..."
+npm update
 cd ..
 
 echo ""

@@ -41,17 +41,74 @@ print_header() {
     echo
 }
 
-# Проверка наличия Node.js
-check_node() {
-    if ! command -v node &> /dev/null; then
-        print_error "Node.js не установлен. Установите Node.js версии 16 или выше."
+# Функция установки/обновления Node.js через NVM
+install_or_update_nodejs() {
+    local required_version="20"
+    local current_version=""
+    
+    if command -v node &> /dev/null; then
+        current_version=$(node -v | cut -d 'v' -f 2 | cut -d '.' -f 1)
+        
+        if [ "$current_version" -ge "$required_version" ]; then
+            return 0
+        fi
+    fi
+    
+    print_warning "Требуется Node.js версии $required_version или выше"
+    print_info "Текущая версия: $(node -v 2>/dev/null || echo 'не установлена')"
+    
+    read -p "Хотите установить/обновить Node.js через NVM? (y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_error "Обновление Node.js отменено. Установите Node.js $required_version+ вручную."
         exit 1
     fi
     
-    NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VERSION" -lt 16 ]; then
-        print_error "Требуется Node.js версии 16 или выше. Текущая версия: $(node --version)"
+    # Проверка наличия NVM
+    if [ ! -s "$HOME/.nvm/nvm.sh" ]; then
+        print_info "Установка NVM..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+        
+        # Загрузка NVM
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    else
+        # Загрузка NVM если уже установлен
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    fi
+    
+    # Установка последней LTS версии Node.js
+    print_info "Установка последней LTS версии Node.js..."
+    nvm install --lts
+    nvm use --lts
+    nvm alias default lts/*
+    
+    # Проверка установки
+    if command -v node &> /dev/null; then
+        print_success "Node.js установлен: $(node -v)"
+        print_success "npm установлен: $(npm -v)"
+    else
+        print_error "Не удалось установить Node.js"
         exit 1
+    fi
+}
+
+# Проверка наличия Node.js
+check_node() {
+    if ! command -v node &> /dev/null; then
+        print_error "Node.js не установлен."
+        install_or_update_nodejs
+        return
+    fi
+    
+    NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NODE_VERSION" -lt 20 ]; then
+        print_warning "Рекомендуется Node.js версии 20 или выше. Текущая версия: $(node --version)"
+        install_or_update_nodejs
+        return
     fi
     
     print_success "Node.js версии $(node --version) найден"
@@ -102,10 +159,34 @@ install_dependencies() {
         cd backend && npm install && cd ..
     fi
     
+    # Обновление устаревших пакетов backend (опционально, только если есть обновления)
+    if [ -d "backend/node_modules" ]; then
+        print_info "Проверка обновлений пакетов backend..."
+        cd backend
+        outdated_count=$(npm outdated 2>/dev/null | wc -l)
+        if [ "$outdated_count" -gt 1 ]; then
+            print_info "Найдены устаревшие пакеты. Обновление..."
+            npm update
+        fi
+        cd ..
+    fi
+    
     # Проверка зависимостей frontend
     if [ ! -d "frontend/node_modules" ] || [ ! -f "frontend/node_modules/.bin/react-scripts" ]; then
         print_info "Установка зависимостей frontend..."
         cd frontend && npm install && cd ..
+    fi
+    
+    # Обновление устаревших пакетов frontend (опционально, только если есть обновления)
+    if [ -d "frontend/node_modules" ]; then
+        print_info "Проверка обновлений пакетов frontend..."
+        cd frontend
+        outdated_count=$(npm outdated 2>/dev/null | wc -l)
+        if [ "$outdated_count" -gt 1 ]; then
+            print_info "Найдены устаревшие пакеты. Обновление..."
+            npm update
+        fi
+        cd ..
     fi
     
     print_success "Все зависимости установлены"
