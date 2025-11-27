@@ -490,7 +490,8 @@ start_production() {
     
     # Запуск nginx
     print_info "Запуск nginx..."
-    if sudo nginx -t -c "$nginx_config" &> /dev/null; then
+    nginx_test_output=$(sudo nginx -t -c "$nginx_config" 2>&1)
+    if [ $? -eq 0 ]; then
         # Останавливаем существующий nginx если запущен
         sudo nginx -s quit 2>/dev/null || true
         sleep 1
@@ -504,7 +505,8 @@ start_production() {
             exit 1
         fi
     else
-        print_error "Ошибка в конфигурации nginx"
+        print_error "Ошибка в конфигурации nginx:"
+        echo "$nginx_test_output"
         kill $BACKEND_PID 2>/dev/null
         exit 1
     fi
