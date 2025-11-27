@@ -474,7 +474,16 @@ start_production() {
     # Проверяем наличие файла, который требуется для работы
     if [ ! -f "backend/node_modules/node-cron/dist/cjs/node-cron.js" ]; then
         print_info "node-cron не установлен полностью, переустанавливаю зависимости backend..."
-        cd backend && npm install && cd ..
+        cd backend
+        # Удаляем node-cron и переустанавливаем
+        rm -rf node_modules/node-cron
+        npm install node-cron@^4.2.1
+        # Проверяем еще раз после установки
+        if [ ! -f "node_modules/node-cron/dist/cjs/node-cron.js" ]; then
+            print_error "Не удалось установить node-cron. Попробуйте выполнить: cd backend && npm install"
+            exit 1
+        fi
+        cd ..
     fi
     
     # Запуск backend
