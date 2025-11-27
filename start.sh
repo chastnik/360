@@ -97,7 +97,7 @@ install_dependencies() {
     fi
     
     # Проверка зависимостей backend
-    if [ ! -d "backend/node_modules" ] || [ ! -d "backend/node_modules/node-cron" ]; then
+    if [ ! -d "backend/node_modules" ] || [ ! -d "backend/node_modules/node-cron" ] || [ ! -f "backend/node_modules/node-cron/package.json" ]; then
         print_info "Установка зависимостей backend..."
         cd backend && npm install && cd ..
     fi
@@ -338,7 +338,7 @@ build_backend() {
     print_info "Сборка backend..."
     
     # Проверка наличия node-cron
-    if [ ! -d "backend/node_modules/node-cron" ]; then
+    if [ ! -d "backend/node_modules/node-cron" ] || [ ! -f "backend/node_modules/node-cron/package.json" ]; then
         print_info "node-cron не найден, устанавливаю зависимости backend..."
         cd backend && npm install && cd ..
     fi
@@ -471,7 +471,7 @@ start_production() {
     local nginx_config=$(create_nginx_config)
     
     # Проверка и установка зависимостей backend перед запуском
-    if [ ! -d "backend/node_modules/node-cron" ]; then
+    if [ ! -d "backend/node_modules/node-cron" ] || [ ! -f "backend/node_modules/node-cron/package.json" ]; then
         print_info "node-cron не найден, устанавливаю зависимости backend..."
         cd backend && npm install && cd ..
     fi
