@@ -471,9 +471,13 @@ start_production() {
     local nginx_config=$(create_nginx_config)
     
     # Проверка и установка зависимостей backend перед запуском
-    if [ ! -d "backend/node_modules/node-cron" ] || [ ! -f "backend/node_modules/node-cron/package.json" ]; then
-        print_info "node-cron не найден, устанавливаю зависимости backend..."
-        cd backend && npm install && cd ..
+    # Используем npm list для надежной проверки установки node-cron
+    if ! cd backend && npm list node-cron &> /dev/null; then
+        print_info "node-cron не установлен, устанавливаю зависимости backend..."
+        npm install
+        cd ..
+    else
+        cd ..
     fi
     
     # Запуск backend
