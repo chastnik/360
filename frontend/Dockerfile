@@ -14,6 +14,8 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM nginx:1.25-alpine
+# Устанавливаем wget для health check
+RUN apk add --no-cache wget
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/build /usr/share/nginx/html
 EXPOSE 80
