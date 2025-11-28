@@ -323,6 +323,7 @@ fix_postgres_collation() {
     # Выполняем ALTER DATABASE ... REFRESH COLLATION VERSION для всех баз данных
     # В docker-compose.yml используется POSTGRES_USER из .env или значение по умолчанию
     # Используем POSTGRES_USER из docker-compose (это DB_USER из .env)
+    # В Docker контейнере PostgreSQL роль создается из POSTGRES_USER, а не "postgres"
     local postgres_user="${DB_USER:-assessment_user}"
     
     # Проверяем, что имя базы данных не пустое и не равно имени пользователя
@@ -332,24 +333,36 @@ fix_postgres_collation() {
     fi
     
     # Исправляем collation для основной базы данных
-    # Используем PGPASSWORD для аутентификации через переменную окружения docker-compose
+    # Используем PGPASSWORD для аутентификации
+    # Подключаемся к базе данных "postgres" (системная база) с ролью DB_USER
+    # В Docker контейнере PostgreSQL роль DB_USER имеет права суперпользователя
+    if [ -n "$db_password" ]; then
+        export PGPASSWORD="$db_password"
+    fi
+    
+    # Исправляем collation для основной базы данных
     if $DOCKER_COMPOSE_CMD exec -T -e PGPASSWORD="$db_password" database psql -U "$postgres_user" -d postgres -c "ALTER DATABASE $db_name REFRESH COLLATION VERSION;" 2>/dev/null; then
         log "Collation для базы данных $db_name обновлен"
     else
-        # Пробуем с postgres пользователем (суперпользователь)
-        if $DOCKER_COMPOSE_CMD exec -T database psql -U postgres -d postgres -c "ALTER DATABASE $db_name REFRESH COLLATION VERSION;" 2>/dev/null; then
-            log "Collation для базы данных $db_name обновлен (через postgres)"
-        else
-            warning "Не удалось обновить collation для $db_name (база может не существовать или нет прав, не критично)"
-        fi
+        warning "Не удалось обновить collation для $db_name (не критично, предупреждения могут остаться)"
     fi
     
-    # Исправляем collation для template1 (только через postgres пользователя)
-    if $DOCKER_COMPOSE_CMD exec -T database psql -U postgres -d postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;" 2>/dev/null; then
+    # Исправляем collation для template1
+    # Используем ту же роль DB_USER (в Docker она имеет права суперпользователя)
+    if $DOCKER_COMPOSE_CMD exec -T -e PGPASSWORD="$db_password" database psql -U "$postgres_user" -d postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;" 2>/dev/null; then
         log "Collation для template1 обновлен"
     else
-        warning "Не удалось обновить collation для template1 (не критично)"
+        warning "Не удалось обновить collation для template1 (не критично, предупреждения могут остаться)"
     fi
+    
+    # Исправляем collation для системной базы данных postgres
+    if $DOCKER_COMPOSE_CMD exec -T -e PGPASSWORD="$db_password" database psql -U "$postgres_user" -d postgres -c "ALTER DATABASE postgres REFRESH COLLATION VERSION;" 2>/dev/null; then
+        log "Collation для базы данных postgres обновлен"
+    else
+        warning "Не удалось обновить collation для postgres (не критично, предупреждения могут остаться)"
+    fi
+    
+    unset PGPASSWORD
     
     log "Исправление collation завершено"
 }
