@@ -653,14 +653,28 @@ start_production() {
         exit 1
     fi
     
-    print_info "Система запущена!"
-    print_info "Backend: http://localhost:${backend_port}/api"
-    print_info "Frontend: http://localhost (через nginx)"
-    print_info "Для остановки нажмите Ctrl+C"
+    echo ""
+    print_success "=========================================="
+    print_success "Система запущена и работает!"
+    print_success "=========================================="
+    echo ""
+    print_info "Backend API: http://localhost:${backend_port}/api"
+    print_info "Frontend: http://localhost (через nginx на порту 80)"
+    print_info "Health check: http://localhost:${backend_port}/health"
+    echo ""
+    print_info "Для остановки системы нажмите Ctrl+C"
+    print_info "Скрипт будет работать до получения сигнала завершения..."
+    echo ""
     
     # Ожидание сигнала завершения
-    trap "echo; print_info 'Остановка системы...'; kill $BACKEND_PID 2>/dev/null; sudo nginx -s quit 2>/dev/null; rm -f $nginx_config; exit 0" INT TERM
-    wait
+    trap "echo; print_info 'Получен сигнал завершения. Остановка системы...'; kill $BACKEND_PID 2>/dev/null; sudo nginx -s quit 2>/dev/null; rm -f $nginx_config; print_success 'Система остановлена'; exit 0" INT TERM
+    
+    # Ждем завершения backend процесса (или сигнала)
+    wait $BACKEND_PID 2>/dev/null || true
+    
+    # Если wait завершился без сигнала, останавливаем nginx
+    sudo nginx -s quit 2>/dev/null || true
+    rm -f $nginx_config
 }
 
 # Показать справку
