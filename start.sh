@@ -690,9 +690,8 @@ start_production() {
     # Создание конфигурации nginx
     local nginx_config=$(create_nginx_config)
     
-    # Определяем корневую директорию проекта
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root=$(get_project_root "$script_dir")
+    # Используем тот же project_root, который был определен выше и передан в build_backend/build_frontend
+    # Не определяем заново, чтобы избежать проблем с неправильным определением корня
     local backend_dir="$project_root/backend"
     
     # Проверка и установка зависимостей backend перед запуском
