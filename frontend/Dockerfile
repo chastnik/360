@@ -16,7 +16,9 @@ RUN npm run build
 FROM nginx:1.25-alpine
 # Устанавливаем wget для health check
 RUN apk add --no-cache wget
-COPY nginx.conf /etc/nginx/nginx.conf
+# Копируем nginx.conf как шаблон для envsubst
+# nginx:alpine автоматически обрабатывает шаблоны из /etc/nginx/templates/
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/build /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
