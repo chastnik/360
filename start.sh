@@ -508,8 +508,13 @@ create_nginx_config() {
     # Загружаем переменные окружения
     source .env
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local frontend_dir="$project_root/frontend"
+    
     local backend_port="${PORT:-5000}"
-    local frontend_build_dir="$(pwd)/frontend/build"
+    local frontend_build_dir="$frontend_dir/build"
     
     # Создаем временную конфигурацию nginx для bare-metal
     local nginx_config="/tmp/nginx-360-production.conf"
