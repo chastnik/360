@@ -467,23 +467,24 @@ run_seeds() {
 
 # Сборка frontend
 build_frontend() {
+    local project_root="${1:-}"
+    
     print_info "Сборка frontend..."
     
-    # Определяем корневую директорию проекта (используем тот же метод, что и для backend)
-    # Сначала пробуем текущую рабочую директорию (pwd), так как скрипт должен запускаться из корня проекта
-    local project_root=""
-    
-    # Проверяем текущую рабочую директорию
-    if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
-        project_root="$(pwd)"
-    else
-        # Если не нашли в текущей директории, используем get_project_root
-        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        project_root=$(get_project_root "$script_dir")
-        
-        # Если и это не помогло, пробуем get_project_root с текущей директорией
-        if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
-            project_root=$(get_project_root "$(pwd)")
+    # Если project_root не передан, определяем его
+    if [ -z "$project_root" ]; then
+        # Сначала пробуем текущую рабочую директорию (pwd), так как скрипт должен запускаться из корня проекта
+        if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
+            project_root="$(pwd)"
+        else
+            # Если не нашли в текущей директории, используем get_project_root
+            local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            project_root=$(get_project_root "$script_dir")
+            
+            # Если и это не помогло, пробуем get_project_root с текущей директорией
+            if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
+                project_root=$(get_project_root "$(pwd)")
+            fi
         fi
     fi
     
@@ -519,11 +520,23 @@ build_frontend() {
 
 # Сборка backend
 build_backend() {
+    local project_root="${1:-}"
+    
     print_info "Сборка backend..."
     
-    # Определяем корневую директорию проекта
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root=$(get_project_root "$script_dir")
+    # Если project_root не передан, определяем его
+    if [ -z "$project_root" ]; then
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        project_root=$(get_project_root "$script_dir")
+        
+        # Если не нашли через get_project_root, пробуем текущую директорию
+        if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
+            if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
+                project_root="$(pwd)"
+            fi
+        fi
+    fi
+    
     local backend_dir="$project_root/backend"
     
     # Проверка наличия node-cron
@@ -654,11 +667,19 @@ start_production() {
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local project_root=$(get_project_root "$script_dir")
+    
+    # Если не нашли через get_project_root, пробуем текущую директорию
+    if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
+        if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
+            project_root="$(pwd)"
+        fi
+    fi
+    
     local frontend_dir="$project_root/frontend"
     
-    # Сборка проектов
-    build_backend
-    build_frontend
+    # Сборка проектов (передаем project_root как параметр)
+    build_backend "$project_root"
+    build_frontend "$project_root"
     
     # Проверка что frontend собран
     if [ ! -d "$frontend_dir/build" ]; then
@@ -943,8 +964,19 @@ main() {
     
     # Сборка проектов
     if [ "$BUILD_ONLY" = true ]; then
-        build_backend
-        build_frontend
+        # Определяем корневую директорию проекта
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        local project_root=$(get_project_root "$script_dir")
+        
+        # Если не нашли через get_project_root, пробуем текущую директорию
+        if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
+            if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
+                project_root="$(pwd)"
+            fi
+        fi
+        
+        build_backend "$project_root"
+        build_frontend "$project_root"
         print_success "Сборка завершена"
         exit 0
     fi
