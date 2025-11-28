@@ -167,13 +167,11 @@ install_dependencies() {
     # Обновление устаревших пакетов backend (опционально, только если есть обновления)
     if [ -d "$backend_dir/node_modules" ]; then
         print_info "Проверка обновлений пакетов backend..."
-        (cd "$backend_dir"
-        outdated_count=$(npm outdated 2>/dev/null | wc -l)
+        outdated_count=$(cd "$backend_dir" && npm outdated 2>/dev/null | wc -l)
         if [ "$outdated_count" -gt 1 ]; then
             print_info "Найдены устаревшие пакеты. Обновление..."
-            npm update
+            (cd "$backend_dir" && npm update)
         fi
-        cd ..
     fi
     
     # Проверка зависимостей frontend
