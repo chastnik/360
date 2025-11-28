@@ -470,27 +470,31 @@ build_frontend() {
     print_info "Сборка frontend..."
     
     # Определяем корневую директорию проекта (используем тот же метод, что и для backend)
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root=$(get_project_root "$script_dir")
+    # Сначала пробуем текущую рабочую директорию (pwd), так как скрипт должен запускаться из корня проекта
+    local project_root=""
     
-    # Если не нашли через get_project_root, пробуем использовать текущую директорию
-    if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
-        if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
-            project_root="$(pwd)"
+    # Проверяем текущую рабочую директорию
+    if [ -d "$(pwd)/backend" ] && [ -d "$(pwd)/frontend" ]; then
+        project_root="$(pwd)"
+    else
+        # Если не нашли в текущей директории, используем get_project_root
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        project_root=$(get_project_root "$script_dir")
+        
+        # Если и это не помогло, пробуем get_project_root с текущей директорией
+        if [ ! -d "$project_root/backend" ] || [ ! -d "$project_root/frontend" ]; then
+            project_root=$(get_project_root "$(pwd)")
         fi
     fi
     
     local frontend_dir="$project_root/frontend"
     
-    # Отладочная информация
-    print_info "Директория скрипта: $script_dir"
-    print_info "Корень проекта: $project_root"
-    print_info "Директория frontend: $frontend_dir"
-    
     # Проверяем наличие директории frontend
     if [ ! -d "$frontend_dir" ]; then
         print_error "Директория frontend не найдена: $frontend_dir"
         print_info "Убедитесь, что скрипт запускается из корня проекта"
+        print_info "Текущая рабочая директория: $(pwd)"
+        print_info "Корень проекта: $project_root"
         print_info "Ожидаемая структура: $project_root/frontend/"
         print_info "Проверка директорий:"
         print_info "  backend существует: $([ -d "$project_root/backend" ] && echo "да" || echo "нет")"
