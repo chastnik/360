@@ -7,10 +7,12 @@ services:
     image: postgres:15
     container_name: assessment360_database
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DB_NAME:-assessment360}
       POSTGRES_USER: ${DB_USER:-assessment_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -26,6 +28,8 @@ services:
     image: redis:7-alpine
     container_name: assessment360_redis
     restart: unless-stopped
+    env_file:
+      - .env
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-}"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -49,6 +53,8 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: ${PORT:-5000}
