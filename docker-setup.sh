@@ -425,6 +425,25 @@ run_seeds() {
 build_images() {
     log "Сборка Docker образов..."
     
+    # Проверяем наличие .env файла перед сборкой
+    if [ ! -f .env ]; then
+        error ".env файл не найден. Создайте его из env.example или используйте docker-setup.sh install"
+        return 1
+    fi
+    
+    # Загружаем переменные окружения для проверки
+    if [ -f .env ]; then
+        load_env_file .env || true
+    fi
+    
+    # Проверяем, что основные переменные установлены
+    if [ -z "${DB_NAME:-}" ]; then
+        warning "DB_NAME не установлен в .env, будет использовано значение по умолчанию: assessment360"
+    fi
+    if [ -z "${DB_USER:-}" ]; then
+        warning "DB_USER не установлен в .env, будет использовано значение по умолчанию: assessment_user"
+    fi
+    
     if $DOCKER_COMPOSE_CMD build; then
         success "Образы собраны успешно"
         return 0
@@ -438,6 +457,25 @@ build_images() {
 # Запуск системы
 start_system() {
     log "Запуск системы..."
+    
+    # Проверяем наличие .env файла перед запуском
+    if [ ! -f .env ]; then
+        error ".env файл не найден. Создайте его из env.example или используйте docker-setup.sh install"
+        return 1
+    fi
+    
+    # Загружаем переменные окружения для проверки
+    if [ -f .env ]; then
+        load_env_file .env || true
+    fi
+    
+    # Проверяем, что основные переменные установлены
+    if [ -z "${DB_NAME:-}" ]; then
+        warning "DB_NAME не установлен в .env, будет использовано значение по умолчанию: assessment360"
+    fi
+    if [ -z "${DB_USER:-}" ]; then
+        warning "DB_USER не установлен в .env, будет использовано значение по умолчанию: assessment_user"
+    fi
     
     # Запуск базы данных и Redis
     log "Запуск базы данных и Redis..."

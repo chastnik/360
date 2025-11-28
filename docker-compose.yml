@@ -10,6 +10,7 @@ services:
     env_file:
       - .env
     environment:
+      # Используем значения по умолчанию, если переменные не установлены
       POSTGRES_DB: ${DB_NAME:-assessment360}
       POSTGRES_USER: ${DB_USER:-assessment_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-}
