@@ -5,7 +5,8 @@
 
 server {
     listen 80;
-    server_name localhost;
+    # Принимаем запросы с любого IP/домена
+    server_name _;
     root /usr/share/nginx/html;
     index index.html;
 
