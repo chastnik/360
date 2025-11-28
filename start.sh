@@ -34,6 +34,30 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Определение корневой директории проекта
+# Ищет директорию, содержащую backend/, frontend/ и .env
+get_project_root() {
+    local current_dir="$1"
+    local max_depth=5
+    local depth=0
+    
+    # Начинаем с директории скрипта или текущей директории
+    while [ "$depth" -lt "$max_depth" ] && [ "$current_dir" != "/" ]; do
+        # Проверяем наличие характерных файлов/директорий проекта
+        if [ -d "$current_dir/backend" ] && [ -d "$current_dir/frontend" ] && [ -f "$current_dir/.env" ]; then
+            echo "$current_dir"
+            return 0
+        fi
+        # Переходим на уровень выше
+        current_dir="$(dirname "$current_dir")"
+        depth=$((depth + 1))
+    done
+    
+    # Если не нашли, возвращаем директорию скрипта
+    echo "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    return 1
+}
+
 print_header() {
     echo -e "${PURPLE}================================${NC}"
     echo -e "${PURPLE}  Система 360-градусной оценки${NC}"
@@ -441,13 +465,14 @@ build_frontend() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local frontend_dir="$project_root/frontend"
     
     # Проверяем наличие директории frontend
     if [ ! -d "$frontend_dir" ]; then
         print_error "Директория frontend не найдена: $frontend_dir"
         print_info "Убедитесь, что скрипт запускается из корня проекта"
+        print_info "Ожидаемая структура: $project_root/frontend/"
         exit 1
     fi
     
