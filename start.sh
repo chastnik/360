@@ -179,7 +179,7 @@ install_dependencies() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local backend_dir="$project_root/backend"
     
     # Проверка зависимостей backend
@@ -200,7 +200,7 @@ install_dependencies() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local frontend_dir="$project_root/frontend"
     
     # Проверка зависимостей frontend
@@ -393,7 +393,7 @@ run_migrations() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local backend_dir="$project_root/backend"
     
     # Проверяем наличие директории backend
@@ -432,7 +432,7 @@ run_seeds() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local backend_dir="$project_root/backend"
     
     # Проверяем наличие директории backend
@@ -497,7 +497,7 @@ build_backend() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local backend_dir="$project_root/backend"
     
     # Проверка наличия node-cron
@@ -535,7 +535,7 @@ create_nginx_config() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local frontend_dir="$project_root/frontend"
     
     local backend_port="${PORT:-5000}"
@@ -627,7 +627,7 @@ start_production() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local frontend_dir="$project_root/frontend"
     
     # Сборка проектов
@@ -645,7 +645,7 @@ start_production() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local backend_dir="$project_root/backend"
     
     # Проверка и установка зависимостей backend перед запуском
@@ -691,7 +691,7 @@ start_production() {
     
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$script_dir"
+    local project_root=$(get_project_root "$script_dir")
     local backend_dir="$project_root/backend"
     
     # Запуск backend
