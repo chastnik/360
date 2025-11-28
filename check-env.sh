@@ -94,6 +94,14 @@ fi
 
 success "DB_NAME и DB_USER различаются"
 
+# Проверка PORT (опционально, но рекомендуется)
+if [ -z "${PORT:-}" ]; then
+    warning "PORT не установлен в .env файле, будет использовано значение по умолчанию: 5000"
+    echo "  Рекомендуется добавить в .env: PORT=5000"
+else
+    success "PORT=$PORT"
+fi
+
 echo ""
 log "Проверка переменных для Docker Compose:"
 echo ""
