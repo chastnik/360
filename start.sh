@@ -174,22 +174,25 @@ install_dependencies() {
         fi
     fi
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local frontend_dir="$project_root/frontend"
+    
     # Проверка зависимостей frontend
-    if [ ! -d "frontend/node_modules" ] || [ ! -f "frontend/node_modules/.bin/react-scripts" ]; then
+    if [ ! -d "$frontend_dir/node_modules" ] || [ ! -f "$frontend_dir/node_modules/.bin/react-scripts" ]; then
         print_info "Установка зависимостей frontend..."
-        cd frontend && npm install && cd ..
+        (cd "$frontend_dir" && npm install)
     fi
     
     # Обновление устаревших пакетов frontend (опционально, только если есть обновления)
-    if [ -d "frontend/node_modules" ]; then
+    if [ -d "$frontend_dir/node_modules" ]; then
         print_info "Проверка обновлений пакетов frontend..."
-        cd frontend
-        outdated_count=$(npm outdated 2>/dev/null | wc -l)
+        outdated_count=$(cd "$frontend_dir" && npm outdated 2>/dev/null | wc -l)
         if [ "$outdated_count" -gt 1 ]; then
             print_info "Найдены устаревшие пакеты. Обновление..."
-            npm update
+            (cd "$frontend_dir" && npm update)
         fi
-        cd ..
     fi
     
     print_success "Все зависимости установлены"
@@ -436,19 +439,31 @@ run_seeds() {
 build_frontend() {
     print_info "Сборка frontend..."
     
-    # Проверка наличия react-scripts
-    if [ ! -f "frontend/node_modules/.bin/react-scripts" ]; then
-        print_info "react-scripts не найден, устанавливаю зависимости frontend..."
-        cd frontend && npm install && cd ..
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local frontend_dir="$project_root/frontend"
+    
+    # Проверяем наличие директории frontend
+    if [ ! -d "$frontend_dir" ]; then
+        print_error "Директория frontend не найдена: $frontend_dir"
+        print_info "Убедитесь, что скрипт запускается из корня проекта"
+        exit 1
     fi
     
-    if cd frontend && npm run build; then
+    # Проверка наличия react-scripts
+    if [ ! -f "$frontend_dir/node_modules/.bin/react-scripts" ]; then
+        print_info "react-scripts не найден, устанавливаю зависимости frontend..."
+        (cd "$frontend_dir" && npm install)
+    fi
+    
+    # Выполняем сборку
+    if (cd "$frontend_dir" && npm run build); then
         print_success "Frontend собран успешно"
     else
         print_error "Ошибка при сборке frontend"
         exit 1
     fi
-    cd ..
 }
 
 # Сборка backend
