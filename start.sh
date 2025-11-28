@@ -600,13 +600,18 @@ start_production() {
         exit 1
     fi
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local frontend_dir="$project_root/frontend"
+    
     # Сборка проектов
     build_backend
     build_frontend
     
     # Проверка что frontend собран
-    if [ ! -d "frontend/build" ]; then
-        print_error "Frontend не собран. Директория frontend/build не найдена"
+    if [ ! -d "$frontend_dir/build" ]; then
+        print_error "Frontend не собран. Директория $frontend_dir/build не найдена"
         exit 1
     fi
     
