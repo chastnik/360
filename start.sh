@@ -153,16 +153,21 @@ install_dependencies() {
         npm install
     fi
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local backend_dir="$project_root/backend"
+    
     # Проверка зависимостей backend
-    if [ ! -d "backend/node_modules" ] || [ ! -d "backend/node_modules/node-cron" ] || [ ! -f "backend/node_modules/node-cron/package.json" ]; then
+    if [ ! -d "$backend_dir/node_modules" ] || [ ! -d "$backend_dir/node_modules/node-cron" ] || [ ! -f "$backend_dir/node_modules/node-cron/package.json" ]; then
         print_info "Установка зависимостей backend..."
-        cd backend && npm install && cd ..
+        (cd "$backend_dir" && npm install)
     fi
     
     # Обновление устаревших пакетов backend (опционально, только если есть обновления)
-    if [ -d "backend/node_modules" ]; then
+    if [ -d "$backend_dir/node_modules" ]; then
         print_info "Проверка обновлений пакетов backend..."
-        cd backend
+        (cd "$backend_dir"
         outdated_count=$(npm outdated 2>/dev/null | wc -l)
         if [ "$outdated_count" -gt 1 ]; then
             print_info "Найдены устаревшие пакеты. Обновление..."
@@ -361,38 +366,72 @@ check_database() {
 run_migrations() {
     print_info "Запуск миграций базы данных..."
     
-    # Загружаем переменные окружения
-    source .env
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local backend_dir="$project_root/backend"
     
-    # Исправляем имя переименованной миграции, если необходимо
-    if [ -f "backend/scripts/fix-migration-name.js" ]; then
-        print_info "Проверка и исправление имени миграции..."
-        cd backend && node scripts/fix-migration-name.js > /dev/null 2>&1 && cd ..
+    # Проверяем наличие директории backend
+    if [ ! -d "$backend_dir" ]; then
+        print_error "Директория backend не найдена: $backend_dir"
+        print_info "Убедитесь, что скрипт запускается из корня проекта"
+        exit 1
     fi
     
-    if cd backend && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run migrate; then
+    # Загружаем переменные окружения
+    if [ -f "$project_root/.env" ]; then
+        source "$project_root/.env"
+    else
+        print_error "Файл .env не найден в $project_root"
+        exit 1
+    fi
+    
+    # Исправляем имя переименованной миграции, если необходимо
+    if [ -f "$backend_dir/scripts/fix-migration-name.js" ]; then
+        print_info "Проверка и исправление имени миграции..."
+        (cd "$backend_dir" && node scripts/fix-migration-name.js > /dev/null 2>&1) || true
+    fi
+    
+    # Выполняем миграции
+    if (cd "$backend_dir" && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run migrate); then
         print_success "Миграции выполнены успешно"
     else
         print_error "Ошибка при выполнении миграций"
         exit 1
     fi
-    cd ..
 }
 
 # Запуск сидов
 run_seeds() {
     print_info "Запуск сидов базы данных..."
     
-    # Загружаем переменные окружения
-    source .env
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local backend_dir="$project_root/backend"
     
-    if cd backend && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run seed; then
+    # Проверяем наличие директории backend
+    if [ ! -d "$backend_dir" ]; then
+        print_error "Директория backend не найдена: $backend_dir"
+        print_info "Убедитесь, что скрипт запускается из корня проекта"
+        exit 1
+    fi
+    
+    # Загружаем переменные окружения
+    if [ -f "$project_root/.env" ]; then
+        source "$project_root/.env"
+    else
+        print_error "Файл .env не найден в $project_root"
+        exit 1
+    fi
+    
+    # Выполняем сиды
+    if (cd "$backend_dir" && DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" DB_PORT="$DB_PORT" npm run seed); then
         print_success "Сиды выполнены успешно"
     else
         print_error "Ошибка при выполнении сидов"
         exit 1
     fi
-    cd ..
 }
 
 # Сборка frontend
@@ -418,13 +457,18 @@ build_frontend() {
 build_backend() {
     print_info "Сборка backend..."
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local backend_dir="$project_root/backend"
+    
     # Проверка наличия node-cron
-    if [ ! -d "backend/node_modules/node-cron" ] || [ ! -f "backend/node_modules/node-cron/package.json" ]; then
+    if [ ! -d "$backend_dir/node_modules/node-cron" ] || [ ! -f "$backend_dir/node_modules/node-cron/package.json" ]; then
         print_info "node-cron не найден, устанавливаю зависимости backend..."
-        cd backend && npm install && cd ..
+        (cd "$backend_dir" && npm install)
     fi
     
-    if cd backend && npm run build; then
+    if (cd "$backend_dir" && npm run build); then
         print_success "Backend собран успешно"
     else
         print_error "Ошибка при сборке backend"
@@ -551,11 +595,16 @@ start_production() {
     # Создание конфигурации nginx
     local nginx_config=$(create_nginx_config)
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local backend_dir="$project_root/backend"
+    
     # Проверка и установка зависимостей backend перед запуском
     # Проверяем наличие файла, который требуется для работы
-    if [ ! -f "backend/node_modules/node-cron/dist/cjs/node-cron.js" ]; then
+    if [ ! -f "$backend_dir/node_modules/node-cron/dist/cjs/node-cron.js" ]; then
         print_info "node-cron не установлен полностью, переустанавливаю зависимости backend..."
-        cd backend
+        (cd "$backend_dir"
         # Проверяем, установлен ли пакет вообще
         if [ ! -d "node_modules/node-cron" ]; then
             print_info "Пакет node-cron отсутствует, устанавливаю..."
@@ -595,11 +644,15 @@ start_production() {
         fi
     fi
     
+    # Определяем корневую директорию проекта
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$script_dir"
+    local backend_dir="$project_root/backend"
+    
     # Запуск backend
     print_info "Запуск backend на порту ${backend_port}..."
-    cd backend && npm start > /tmp/backend.log 2>&1 &
+    (cd "$backend_dir" && npm start > /tmp/backend.log 2>&1) &
     BACKEND_PID=$!
-    cd ..
     
     # Ожидание запуска backend
     sleep 3
