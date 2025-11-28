@@ -735,9 +735,8 @@ start_production() {
         fi
     fi
     
-    # Определяем корневую директорию проекта
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root=$(get_project_root "$script_dir")
+    # Используем тот же project_root, который был определен выше
+    # Не определяем заново, чтобы избежать проблем с неправильным определением корня
     local backend_dir="$project_root/backend"
     
     # Запуск backend
