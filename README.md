@@ -87,7 +87,7 @@
 ```mermaid
 graph TD
   subgraph "Клиентская часть"
-    A[Web Browser] --> B[React Frontend<br/>:3000 (dev) / :443 (HTTPS)]
+    A[Web Browser] --> B[React Frontend<br/>:3000 dev / :443 HTTPS]
     B1[Admin Panel] --> B
     B2[User Dashboard] --> B
     B3[Assessment Form] --> B
