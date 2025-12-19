@@ -87,7 +87,7 @@
 ```mermaid
 graph TD
   subgraph "Клиентская часть"
-    A[Web Browser] --> B[React Frontend<br/>:3000 / :80]
+    A[Web Browser] --> B[React Frontend<br/>:3000 (dev) / :443 (HTTPS)]
     B1[Admin Panel] --> B
     B2[User Dashboard] --> B
     B3[Assessment Form] --> B
@@ -863,7 +863,8 @@ sequenceDiagram
 
 #### Для Docker установки (рекомендуется)
 - Docker 20.10+ и Docker Compose v2
-- Порты: 80 (frontend), 5000 (backend), 5432 (PostgreSQL), 6379 (Redis)
+- Порты: 443 (frontend HTTPS), 5000 (backend), 5432 (PostgreSQL), 6379 (Redis)
+- SSL сертификаты для HTTPS (самоподписанные для разработки, Let's Encrypt для production)
 
 #### Для установки без Docker
 - Node.js >= 16.0.0
@@ -906,8 +907,10 @@ docker compose exec backend npm run seed
 ```
 
 Система будет доступна по адресам:
-- **Frontend**: http://localhost
+- **Frontend**: https://localhost:443 (HTTPS)
 - **Backend API**: http://localhost:5000/api
+
+**Важно:** Фронтенд работает только на порту 443 (HTTPS) для безопасности. SSL сертификаты обязательны.
 
 **Учетные данные по умолчанию** (после выполнения seed):
 - Email: `admin@company.com` / Пароль: `admin123`
@@ -956,8 +959,10 @@ cd frontend && npm start
 ```
 
 Система будет доступна по адресам:
-- **Frontend**: http://localhost:3000 (dev) или http://localhost:80 (production)
+- **Frontend**: http://localhost:3000 (dev) или https://localhost:443 (production HTTPS)
 - **Backend API**: http://localhost:5000/api
+
+**Важно:** В production режиме фронтенд работает только на порту 443 (HTTPS) для безопасности. SSL сертификаты обязательны.
 
 ### Альтернативные способы запуска
 
@@ -997,15 +1002,22 @@ DB_PORT=5432
 
 # Порты
 PORT=5000
-FRONTEND_PORT=80
+FRONTEND_PORT=443
 BACKEND_PORT=5000
+
+# SSL сертификаты (ОБЯЗАТЕЛЬНО для production)
+# Для тестирования: используются самоподписанные сертификаты из директории ssl/
+# Для production: замените на реальные сертификаты от Let's Encrypt или другого CA
+SSL_CERT_PATH=./ssl/ssl.crt
+SSL_KEY_PATH=./ssl/ssl.key
 
 # JWT
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-minimum-32-characters
 
 # Frontend
 REACT_APP_API_URL=http://localhost:5000/api
-FRONTEND_URL=http://localhost
+FRONTEND_URL=https://localhost
+# ВАЖНО: В production используйте HTTPS URL (https://your-domain.com)
 
 # Redis
 REDIS_PASSWORD=your_redis_password_here
@@ -1111,6 +1123,7 @@ npm run seed
 ├── docker-compose.yml # Docker конфигурация
 ├── nginx.conf        # Nginx конфигурация
 ├── env.example       # Пример конфигурации
+├── ssl/              # SSL сертификаты (ssl.crt, ssl.key, README.md)
 ├── CODE_REVIEW.md    # Отчет о code review и исправлениях
 ├── DEPLOYMENT.md     # Общая документация по развертыванию
 ├── DEPLOYMENT_DOCKER.md # Развертывание с Docker
@@ -1349,6 +1362,8 @@ POST /api/learning/growth-plans
 - **Middleware** для проверки прав доступа
 
 ### Защита данных
+- **HTTPS только** - фронтенд работает исключительно на порту 443 (HTTPS) для безопасности
+- **SSL/TLS шифрование** - обязательное использование SSL сертификатов для всех соединений
 - **Helmet** для установки защитных HTTP заголовков
 - **CORS** с настройкой разрешенных источников
 - **Rate Limiting** (1000 запросов в минуту с одного IP, строгие лимиты для auth endpoints)
@@ -1363,6 +1378,13 @@ POST /api/learning/growth-plans
 - JWT секрет хранится отдельно от кода
 - **ENCRYPTION_KEY** для Jira интеграции (128-bit, обязателен)
 - Шифрование чувствительных данных (пароли Jira) с использованием AES-128-CBC
+- **SSL сертификаты** - приватные ключи защищены через `.gitignore`, не попадают в репозиторий
+
+### SSL/HTTPS конфигурация
+- **Обязательный HTTPS** - фронтенд работает только на порту 443
+- **Самоподписанные сертификаты** для разработки (в директории `ssl/`)
+- **Let's Encrypt** или коммерческие CA для production
+- Подробная инструкция по SSL: см. [ssl/README.md](ssl/README.md)
 
 ### Логирование и мониторинг
 - **Pino** для структурированного логирования
