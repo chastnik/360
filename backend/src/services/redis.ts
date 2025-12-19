@@ -31,24 +31,24 @@ class RedisService {
       }
       
       try {
-        const redisSettings = await connection('system_settings')
-          .whereIn('setting_key', [
-            'redis_enabled', 'redis_host', 'redis_port', 
-            'redis_password', 'redis_db'
-          ])
-          .where('category', 'cache');
+      const redisSettings = await connection('system_settings')
+        .whereIn('setting_key', [
+          'redis_enabled', 'redis_host', 'redis_port', 
+          'redis_password', 'redis_db'
+        ])
+        .where('category', 'cache');
 
-        // Преобразовать в удобный объект
-        this.settings = redisSettings.reduce((acc: any, setting: any) => {
-          acc[setting.setting_key] = this.convertValue(setting.setting_value, setting.setting_type);
-          return acc;
-        }, {});
+      // Преобразовать в удобный объект
+      this.settings = redisSettings.reduce((acc: any, setting: any) => {
+        acc[setting.setting_key] = this.convertValue(setting.setting_value, setting.setting_type);
+        return acc;
+      }, {});
 
-        // Проверить, включен ли Redis
-        if (!this.settings.redis_enabled) {
-          console.log('Redis отключен в настройках');
-          return;
-        }
+      // Проверить, включен ли Redis
+      if (!this.settings.redis_enabled) {
+        console.log('Redis отключен в настройках');
+        return;
+      }
 
         // В Docker окружении приоритет у переменных окружения
         // Используем настройки из БД только если переменные окружения не заданы
@@ -57,43 +57,43 @@ class RedisService {
         const redisPassword = process.env.REDIS_PASSWORD || this.settings.redis_password;
         const redisDb = this.settings.redis_db || 0;
 
-        // Настройки подключения
-        const options: any = {
-          socket: {
+      // Настройки подключения
+      const options: any = {
+        socket: {
             host: redisHost,
             port: redisPort
-          },
+        },
           database: redisDb
-        };
+      };
 
-        // Добавить пароль если указан
+      // Добавить пароль если указан
         if (redisPassword) {
           options.password = redisPassword;
-        }
+      }
 
-        // Создать клиент
-        const { createClient } = require('redis');
-        this.client = createClient(options);
+      // Создать клиент
+      const { createClient } = require('redis');
+      this.client = createClient(options);
 
-        // Обработчики событий
-        this.client.on('error', (err: Error) => {
-          console.error('Ошибка Redis:', err);
-        });
+      // Обработчики событий
+      this.client.on('error', (err: Error) => {
+        console.error('Ошибка Redis:', err);
+      });
 
-        this.client.on('connect', () => {
-          console.log('📦 Подключение к Redis установлено');
-        });
+      this.client.on('connect', () => {
+        console.log('📦 Подключение к Redis установлено');
+      });
 
-        this.client.on('ready', () => {
-          console.log('✅ Redis готов к работе');
-        });
+      this.client.on('ready', () => {
+        console.log('✅ Redis готов к работе');
+      });
 
-        this.client.on('end', () => {
-          console.log('🔌 Соединение с Redis закрыто');
-        });
+      this.client.on('end', () => {
+        console.log('🔌 Соединение с Redis закрыто');
+      });
 
-        // Подключиться
-        await this.client.connect();
+      // Подключиться
+      await this.client.connect();
       } catch (error: any) {
         // Если ошибка при чтении настроек из БД, используем .env
         if (error?.code === '42P01' || error?.message?.includes('does not exist')) {

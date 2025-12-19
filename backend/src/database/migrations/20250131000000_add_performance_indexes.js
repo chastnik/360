@@ -28,24 +28,24 @@ exports.up = async function(knex) {
       const hasIsActive = await hasColumn(knex, 'users', 'is_active');
       
       if (hasRoleId || hasDepartmentId || hasIsActive) {
-        await knex.schema.alterTable('users', function(table) {
+    await knex.schema.alterTable('users', function(table) {
           // Индекс для role_id (часто используется в JOIN и WHERE) - только если колонка существует
           if (hasRoleId) {
-            table.index('role_id', 'idx_users_role_id');
+      table.index('role_id', 'idx_users_role_id');
           }
           // Индекс для department_id (часто используется в JOIN и WHERE) - только если колонка существует
           if (hasDepartmentId) {
-            table.index('department_id', 'idx_users_department_id');
+      table.index('department_id', 'idx_users_department_id');
           }
-          // Индекс для is_active (часто используется в WHERE)
+      // Индекс для is_active (часто используется в WHERE)
           if (hasIsActive) {
-            table.index('is_active', 'idx_users_is_active');
+      table.index('is_active', 'idx_users_is_active');
           }
           // Составной индекс для частых запросов - только если обе колонки существуют
           if (hasIsActive && hasRoleId) {
-            table.index(['is_active', 'role_id'], 'idx_users_active_role');
+      table.index(['is_active', 'role_id'], 'idx_users_active_role');
           }
-        });
+    });
       }
     }
   } catch (error) {
@@ -60,20 +60,20 @@ exports.up = async function(knex) {
       const hasQuestionId = await hasColumn(knex, 'assessment_responses', 'question_id');
       
       if (hasRespondentId || hasQuestionId) {
-        await knex.schema.alterTable('assessment_responses', function(table) {
-          // Индекс для respondent_id (часто используется в JOIN)
+    await knex.schema.alterTable('assessment_responses', function(table) {
+      // Индекс для respondent_id (часто используется в JOIN)
           if (hasRespondentId) {
-            table.index('respondent_id', 'idx_responses_respondent_id');
+      table.index('respondent_id', 'idx_responses_respondent_id');
           }
-          // Индекс для question_id (часто используется в JOIN)
+      // Индекс для question_id (часто используется в JOIN)
           if (hasQuestionId) {
-            table.index('question_id', 'idx_responses_question_id');
+      table.index('question_id', 'idx_responses_question_id');
           }
-          // Составной индекс для частых запросов
+      // Составной индекс для частых запросов
           if (hasRespondentId && hasQuestionId) {
-            table.index(['respondent_id', 'question_id'], 'idx_responses_respondent_question');
+      table.index(['respondent_id', 'question_id'], 'idx_responses_respondent_question');
           }
-        });
+    });
       }
     }
   } catch (error) {
@@ -88,20 +88,20 @@ exports.up = async function(knex) {
       const hasUserId = await hasColumn(knex, 'assessment_participants', 'user_id');
       
       if (hasCycleId || hasUserId) {
-        await knex.schema.alterTable('assessment_participants', function(table) {
-          // Индекс для cycle_id (часто используется в WHERE и GROUP BY)
+    await knex.schema.alterTable('assessment_participants', function(table) {
+      // Индекс для cycle_id (часто используется в WHERE и GROUP BY)
           if (hasCycleId) {
-            table.index('cycle_id', 'idx_participants_cycle_id');
+      table.index('cycle_id', 'idx_participants_cycle_id');
           }
-          // Индекс для user_id (часто используется в WHERE)
+      // Индекс для user_id (часто используется в WHERE)
           if (hasUserId) {
-            table.index('user_id', 'idx_participants_user_id');
+      table.index('user_id', 'idx_participants_user_id');
           }
-          // Составной индекс для частых запросов
+      // Составной индекс для частых запросов
           if (hasCycleId && hasUserId) {
-            table.index(['cycle_id', 'user_id'], 'idx_participants_cycle_user');
+      table.index(['cycle_id', 'user_id'], 'idx_participants_cycle_user');
           }
-        });
+    });
       }
     }
   } catch (error) {
@@ -116,16 +116,16 @@ exports.up = async function(knex) {
       const hasRespondentUserId = await hasColumn(knex, 'assessment_respondents', 'respondent_user_id');
       
       if (hasParticipantId || hasRespondentUserId) {
-        await knex.schema.alterTable('assessment_respondents', function(table) {
-          // Индекс для participant_id (часто используется в JOIN)
+    await knex.schema.alterTable('assessment_respondents', function(table) {
+      // Индекс для participant_id (часто используется в JOIN)
           if (hasParticipantId) {
-            table.index('participant_id', 'idx_respondents_participant_id');
+      table.index('participant_id', 'idx_respondents_participant_id');
           }
-          // Индекс для respondent_user_id (часто используется в JOIN)
+      // Индекс для respondent_user_id (часто используется в JOIN)
           if (hasRespondentUserId) {
-            table.index('respondent_user_id', 'idx_respondents_user_id');
+      table.index('respondent_user_id', 'idx_respondents_user_id');
           }
-        });
+    });
       }
     }
   } catch (error) {
@@ -138,10 +138,10 @@ exports.up = async function(knex) {
     if (hasTable) {
       const hasRoleId = await hasColumn(knex, 'role_permissions', 'role_id');
       if (hasRoleId) {
-        await knex.schema.alterTable('role_permissions', function(table) {
-          // Индекс для role_id (часто используется в WHERE)
-          table.index('role_id', 'idx_role_permissions_role_id');
-        });
+    await knex.schema.alterTable('role_permissions', function(table) {
+      // Индекс для role_id (часто используется в WHERE)
+      table.index('role_id', 'idx_role_permissions_role_id');
+    });
       }
     }
   } catch (error) {
@@ -156,16 +156,16 @@ exports.up = async function(knex) {
       const hasHeadId = await hasColumn(knex, 'departments', 'head_id');
       
       if (hasIsActive || hasHeadId) {
-        await knex.schema.alterTable('departments', function(table) {
-          // Индекс для is_active (часто используется в WHERE)
+    await knex.schema.alterTable('departments', function(table) {
+      // Индекс для is_active (часто используется в WHERE)
           if (hasIsActive) {
-            table.index('is_active', 'idx_departments_is_active');
+      table.index('is_active', 'idx_departments_is_active');
           }
-          // Индекс для head_id (часто используется в JOIN)
+      // Индекс для head_id (часто используется в JOIN)
           if (hasHeadId) {
-            table.index('head_id', 'idx_departments_head_id');
+      table.index('head_id', 'idx_departments_head_id');
           }
-        });
+    });
       }
     }
   } catch (error) {
@@ -180,16 +180,16 @@ exports.up = async function(knex) {
       const hasIsActive = await hasColumn(knex, 'questions', 'is_active');
       
       if (hasCategoryId || hasIsActive) {
-        await knex.schema.alterTable('questions', function(table) {
-          // Индекс для category_id (часто используется в WHERE и JOIN)
+    await knex.schema.alterTable('questions', function(table) {
+      // Индекс для category_id (часто используется в WHERE и JOIN)
           if (hasCategoryId) {
-            table.index('category_id', 'idx_questions_category_id');
+      table.index('category_id', 'idx_questions_category_id');
           }
-          // Индекс для is_active (часто используется в WHERE)
+      // Индекс для is_active (часто используется в WHERE)
           if (hasIsActive) {
-            table.index('is_active', 'idx_questions_is_active');
+      table.index('is_active', 'idx_questions_is_active');
           }
-        });
+    });
       }
     }
   } catch (error) {

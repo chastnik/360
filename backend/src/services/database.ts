@@ -154,37 +154,37 @@ class DatabaseService {
       
       if (!isDocker) {
         // Только вне Docker пытаемся использовать настройки из БД
-        try {
-          const dbSettings = await this.getSettingsFromDatabase(this.envConnection);
-          
-          if (dbSettings) {
-            // 4. Проверяем, отличаются ли настройки от .env
-            const envSettings: DatabaseSettings = {
-              host: process.env.DB_HOST || 'localhost',
-              port: parseInt(process.env.DB_PORT || '5432'),
-              database: process.env.DB_NAME || 'assessment_db', 
-              user: process.env.DB_USER || 'postgres',
-              password: process.env.DB_PASSWORD || ''
-            };
+      try {
+        const dbSettings = await this.getSettingsFromDatabase(this.envConnection);
+        
+        if (dbSettings) {
+          // 4. Проверяем, отличаются ли настройки от .env
+          const envSettings: DatabaseSettings = {
+            host: process.env.DB_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT || '5432'),
+            database: process.env.DB_NAME || 'assessment_db', 
+            user: process.env.DB_USER || 'postgres',
+            password: process.env.DB_PASSWORD || ''
+          };
 
-            const isDifferent = this.compareSettings(envSettings, dbSettings);
+          const isDifferent = this.compareSettings(envSettings, dbSettings);
+          
+          if (isDifferent) {
+            console.log('🔄 Найдены отличающиеся настройки БД в system_settings');
             
-            if (isDifferent) {
-              console.log('🔄 Найдены отличающиеся настройки БД в system_settings');
-              
-              // 5. Создаем новое подключение с настройками из БД
-              const testConnection = this.createConnectionFromSettings(dbSettings);
-              await testConnection.raw('SELECT 1');
-              
-              this.runtimeConnection = testConnection;
-              console.log('✅ Переключение на настройки БД из system_settings');
-              
-              this.isInitialized = true;
-              return this.runtimeConnection;
-            }
+            // 5. Создаем новое подключение с настройками из БД
+            const testConnection = this.createConnectionFromSettings(dbSettings);
+            await testConnection.raw('SELECT 1');
+            
+            this.runtimeConnection = testConnection;
+            console.log('✅ Переключение на настройки БД из system_settings');
+            
+            this.isInitialized = true;
+            return this.runtimeConnection;
           }
-        } catch (error) {
-          console.warn('Не удалось использовать настройки из БД, используем .env:', error);
+        }
+      } catch (error) {
+        console.warn('Не удалось использовать настройки из БД, используем .env:', error);
         }
       } else {
         console.log('🐳 Docker окружение обнаружено, используем только переменные окружения');
