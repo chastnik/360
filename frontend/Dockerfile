@@ -20,7 +20,7 @@ RUN apk add --no-cache wget
 # nginx:alpine автоматически обрабатывает шаблоны из /etc/nginx/templates/ с envsubst
 COPY frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/build /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 443
 CMD ["nginx", "-g", "daemon off;"]
 
 

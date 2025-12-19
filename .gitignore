@@ -180,6 +180,9 @@ docker-compose.override.yml
 *.key
 *.crt
 *.csr
+ssl/
+# Исключаем только приватные ключи, сертификаты можно коммитить для разработки
+# !ssl/ssl.crt
 
 # Monitoring и метрики
 .pm2/

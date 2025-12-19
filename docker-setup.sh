@@ -528,14 +528,14 @@ check_status() {
     
     # Получаем порты из переменных окружения с значениями по умолчанию
     local backend_port="${BACKEND_PORT:-5000}"
-    local frontend_port="${FRONTEND_PORT:-80}"
+    local frontend_port="${FRONTEND_PORT:-443}"
     
-    # Формируем URL для frontend (порт 80 не указываем в URL)
+    # Формируем URL для frontend (порт 443 использует HTTPS)
     local frontend_url
-    if [ "$frontend_port" = "80" ]; then
-        frontend_url="http://localhost"
+    if [ "$frontend_port" = "443" ]; then
+        frontend_url="https://localhost"
     else
-        frontend_url="http://localhost:${frontend_port}"
+        frontend_url="https://localhost:${frontend_port}"
     fi
     
     # Формируем URL для backend

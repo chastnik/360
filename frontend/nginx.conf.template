@@ -4,11 +4,20 @@
 # Содержит только блок server, так как включается в основную конфигурацию nginx
 
 server {
-    listen 80;
+    listen 443 ssl http2;
     # Принимаем запросы с любого IP/домена
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
+
+    # SSL конфигурация
+    ssl_certificate /etc/nginx/ssl/ssl.crt;
+    ssl_certificate_key /etc/nginx/ssl/ssl.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
 
     # Настройки безопасности
     add_header X-Frame-Options DENY;

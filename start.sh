@@ -575,6 +575,41 @@ create_nginx_config() {
     # Определяем корневую директорию проекта
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local project_root=$(get_project_root "$script_dir")
+    
+    # Проверка наличия SSL сертификатов
+    # Используем пути из .env или значения по умолчанию относительно корня проекта
+    local ssl_cert_path="${SSL_CERT_PATH:-$project_root/ssl/ssl.crt}"
+    local ssl_key_path="${SSL_KEY_PATH:-$project_root/ssl/ssl.key}"
+    
+    # Преобразуем относительные пути в абсолютные
+    if [[ "$ssl_cert_path" != /* ]]; then
+        ssl_cert_path="$project_root/$ssl_cert_path"
+    fi
+    if [[ "$ssl_key_path" != /* ]]; then
+        ssl_key_path="$project_root/$ssl_key_path"
+    fi
+    
+    if [ ! -f "$ssl_cert_path" ] || [ ! -f "$ssl_key_path" ]; then
+        print_error "SSL сертификаты не найдены!"
+        print_info "Ожидаемые пути:"
+        print_info "  Сертификат: $ssl_cert_path"
+        print_info "  Ключ: $ssl_key_path"
+        print_info ""
+        print_info "Сертификаты должны быть созданы в директории ssl/ проекта."
+        print_info "Для создания самоподписанного сертификата:"
+        print_info "  mkdir -p $project_root/ssl"
+        print_info "  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\"
+        print_info "    -keyout $project_root/ssl/ssl.key \\"
+        print_info "    -out $project_root/ssl/ssl.crt \\"
+        print_info "    -subj \"/C=RU/ST=Moscow/L=Moscow/O=Bit.Cifra/OU=IT/CN=localhost\""
+        exit 1
+    fi
+    
+    # Определяем корневую директорию проекта (если еще не определена)
+    if [ -z "$project_root" ]; then
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        project_root=$(get_project_root "$script_dir")
+    fi
     local frontend_dir="$project_root/frontend"
     
     local backend_port="${PORT:-5000}"
@@ -603,10 +638,25 @@ http {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
     
     server {
-        listen 80;
+        listen 443 ssl http2;
         server_name localhost;
         root ${frontend_build_dir};
         index index.html;
+        
+        # SSL конфигурация
+        ssl_certificate ${ssl_cert_path};
+        ssl_certificate_key ${ssl_key_path};
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+        
+        # Настройки безопасности
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
         
         # Основное приложение
         location / {
@@ -802,7 +852,7 @@ start_production() {
     print_success "=========================================="
     echo ""
     print_info "Backend API: http://localhost:${backend_port}/api"
-    print_info "Frontend: http://localhost (через nginx на порту 80)"
+    print_info "Frontend: https://localhost:443 (через nginx на порту 443 с SSL)"
     print_info "Health check: http://localhost:${backend_port}/health"
     echo ""
     print_info "Для остановки системы нажмите Ctrl+C"
