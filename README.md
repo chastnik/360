@@ -988,6 +988,24 @@ docker compose down
 - **Без Docker**: см. [DEPLOYMENT_BARE.md](DEPLOYMENT_BARE.md)
 - **Общая информация**: см. [DEPLOYMENT.md](DEPLOYMENT.md)
 
+#### Автоматическое обновление в production
+```bash
+# Полное автоматическое обновление (рекомендуется)
+./update-production.sh
+
+# С опциями
+./update-production.sh --non-interactive --branch main
+```
+
+Скрипт `update-production.sh` автоматически выполняет все шаги обновления:
+- Создание резервной копии БД
+- Остановку системы
+- Обновление кода (git pull)
+- Пересборку образов
+- Запуск системы
+- Выполнение миграций
+- Проверку статуса
+
 ## ⚙️ Конфигурация
 
 Основные настройки в `.env` файле:
